@@ -1,0 +1,235 @@
+# Alogrithm Cloud 微服务应用部署配置
+# 包含：Gateway、User、Post、File、Mail、Notification、Search、Log、AI 服务
+# 使用方式：docker-compose up -d
+
+version: '3.8'
+
+services:
+  # API 网关
+  alogrithm-gateway:
+    build:
+      context: .
+      dockerfile: alogrithm-gateway/Dockerfile
+    image: alogrithm-gateway:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: alogrithm-gateway
+    restart: always
+    ports:
+      - "${GATEWAY_PORT_EXTERNAL}:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_USERNAME=${NACOS_USERNAME}
+      - SPRING_CLOUD_NACOS_PASSWORD=${NACOS_PASSWORD}
+      - SPRING_MAIN_LAZY_INITIALIZATION=true
+      - JAVA_TOOL_OPTIONS=-Xss256k -XX:MaxMetaspaceSize=128m -XX:MaxRAMPercentage=60.0 -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Dnacos.logging.default.config.enabled=false
+    deploy:
+      resources:
+        limits:
+          memory: 448M
+    networks:
+      - alogrithm-network
+
+  # 用户服务
+  alogrithm-user-service:
+    build:
+      context: .
+      dockerfile: alogrithm-service/alogrithm-user-service/Dockerfile
+    image: alogrithm-user-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: alogrithm-user-service
+    restart: always
+    ports:
+      - "${USER_SERVICE_PORT_EXTERNAL}:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_USERNAME=${NACOS_USERNAME}
+      - SPRING_CLOUD_NACOS_PASSWORD=${NACOS_PASSWORD}
+      - SPRING_MAIN_LAZY_INITIALIZATION=true
+      - JAVA_TOOL_OPTIONS=-Xss256k -XX:MaxMetaspaceSize=128m -XX:MaxRAMPercentage=60.0 -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Dnacos.logging.default.config.enabled=false
+    deploy:
+      resources:
+        limits:
+          memory: 448M
+    networks:
+      - alogrithm-network
+
+  # 帖子服务
+  alogrithm-post-service:
+    build:
+      context: .
+      dockerfile: alogrithm-service/alogrithm-post-service/Dockerfile
+    image: alogrithm-post-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: alogrithm-post-service
+    restart: always
+    ports:
+      - "${POST_SERVICE_PORT_EXTERNAL}:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_USERNAME=${NACOS_USERNAME}
+      - SPRING_CLOUD_NACOS_PASSWORD=${NACOS_PASSWORD}
+      - SPRING_MAIN_LAZY_INITIALIZATION=true
+      - JAVA_TOOL_OPTIONS=-Xss256k -XX:MaxMetaspaceSize=128m -XX:MaxRAMPercentage=60.0 -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Dnacos.logging.default.config.enabled=false
+    deploy:
+      resources:
+        limits:
+          memory: 448M
+    networks:
+      - alogrithm-network
+
+  # 文件服务
+  alogrithm-file-service:
+    build:
+      context: .
+      dockerfile: alogrithm-service/alogrithm-file-service/Dockerfile
+    image: alogrithm-file-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: alogrithm-file-service
+    restart: always
+    ports:
+      - "${FILE_SERVICE_PORT_EXTERNAL}:8085"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_USERNAME=${NACOS_USERNAME}
+      - SPRING_CLOUD_NACOS_PASSWORD=${NACOS_PASSWORD}
+      - SPRING_MAIN_LAZY_INITIALIZATION=true
+      - JAVA_TOOL_OPTIONS=-Xss256k -XX:MaxMetaspaceSize=128m -XX:MaxRAMPercentage=60.0 -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Dnacos.logging.default.config.enabled=false
+    deploy:
+      resources:
+        limits:
+          memory: 448M
+    networks:
+      - alogrithm-network
+
+  # 邮件服务
+  alogrithm-mail-service:
+    build:
+      context: .
+      dockerfile: alogrithm-service/alogrithm-mail-service/Dockerfile
+    image: alogrithm-mail-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: alogrithm-mail-service
+    restart: always
+    ports:
+      - "${MAIL_SERVICE_PORT_EXTERNAL}:8087"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_USERNAME=${NACOS_USERNAME}
+      - SPRING_CLOUD_NACOS_PASSWORD=${NACOS_PASSWORD}
+      - SPRING_MAIN_LAZY_INITIALIZATION=true
+      - JAVA_TOOL_OPTIONS=-Xss256k -XX:MaxMetaspaceSize=128m -XX:MaxRAMPercentage=60.0 -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Dnacos.logging.default.config.enabled=false
+    deploy:
+      resources:
+        limits:
+          memory: 448M
+    networks:
+      - alogrithm-network
+
+  # 通知服务
+  alogrithm-notification-service:
+    build:
+      context: .
+      dockerfile: alogrithm-service/alogrithm-notification-service/Dockerfile
+    image: alogrithm-notification-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: alogrithm-notification-service
+    restart: always
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT_EXTERNAL}:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_USERNAME=${NACOS_USERNAME}
+      - SPRING_CLOUD_NACOS_PASSWORD=${NACOS_PASSWORD}
+      - SPRING_MAIN_LAZY_INITIALIZATION=true
+      - JAVA_TOOL_OPTIONS=-Xss256k -XX:MaxMetaspaceSize=128m -XX:MaxRAMPercentage=60.0 -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Dnacos.logging.default.config.enabled=false
+    deploy:
+      resources:
+        limits:
+          memory: 448M
+    networks:
+      - alogrithm-network
+
+  # 搜索服务
+  alogrithm-search-service:
+    build:
+      context: .
+      dockerfile: alogrithm-service/alogrithm-search-service/Dockerfile
+    image: alogrithm-search-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: alogrithm-search-service
+    restart: always
+    ports:
+      - "${SEARCH_SERVICE_PORT_EXTERNAL}:8084"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_USERNAME=${NACOS_USERNAME}
+      - SPRING_CLOUD_NACOS_PASSWORD=${NACOS_PASSWORD}
+      - SPRING_MAIN_LAZY_INITIALIZATION=true
+      - JAVA_TOOL_OPTIONS=-Xss256k -XX:MaxMetaspaceSize=128m -XX:MaxRAMPercentage=60.0 -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Dnacos.logging.default.config.enabled=false
+    deploy:
+      resources:
+        limits:
+          memory: 448M
+    networks:
+      - alogrithm-network
+
+  # 日志服务
+  alogrithm-log-service:
+    build:
+      context: .
+      dockerfile: alogrithm-service/alogrithm-log-service/Dockerfile
+    image: alogrithm-log-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: alogrithm-log-service
+    restart: always
+    ports:
+      - "${LOG_SERVICE_PORT_EXTERNAL}:8086"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_USERNAME=${NACOS_USERNAME}
+      - SPRING_CLOUD_NACOS_PASSWORD=${NACOS_PASSWORD}
+      - SPRING_MAIN_LAZY_INITIALIZATION=true
+      - JAVA_TOOL_OPTIONS=-Xss256k -XX:MaxMetaspaceSize=128m -XX:MaxRAMPercentage=60.0 -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Dnacos.logging.default.config.enabled=false
+    deploy:
+      resources:
+        limits:
+          memory: 448M
+    networks:
+      - alogrithm-network
+
+  # AI 服务
+  alogrithm-ai-service:
+    build:
+      context: .
+      dockerfile: alogrithm-service/alogrithm-ai-service/Dockerfile
+    image: alogrithm-ai-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: alogrithm-ai-service
+    restart: always
+    ports:
+      - "${AI_SERVICE_PORT_EXTERNAL}:8089"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}
+      - SPRING_CLOUD_NACOS_USERNAME=${NACOS_USERNAME}
+      - SPRING_CLOUD_NACOS_PASSWORD=${NACOS_PASSWORD}
+      - SPRING_MAIN_LAZY_INITIALIZATION=true
+      - JAVA_TOOL_OPTIONS=-Xss256k -XX:MaxMetaspaceSize=128m -XX:MaxRAMPercentage=60.0 -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Dnacos.logging.default.config.enabled=false
+    deploy:
+      resources:
+        limits:
+          memory: 448M
+    networks:
+      - alogrithm-network
+
+networks:
+  alogrithm-network:
+    external: true

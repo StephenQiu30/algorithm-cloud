@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  统一日志配置（logback-spring.xml）
+  - 本地/默认环境：仅控制台输出，不连接 Logstash，避免未部署 ELK 时报错。
+  - 生产环境（spring.profiles.active=prod）：控制台 + 异步 TCP 输出到 Logstash，由 ELK 汇聚到 ES/Kibana。
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProperty scope="context" name="spring.application.name" source="spring.application.name"/>
+    <springProperty scope="context" name="logstash.host" source="logstash.host" defaultValue="localhost"/>
+    <springProperty scope="context" name="logstash.port" source="logstash.port" defaultValue="5000"/>
+
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 仅 prod 启用：TCP 输出到 Logstash，供 ELK 汇聚 -->
+    <springProfile name="prod">
+        <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+            <destination>${logstash.host}:${logstash.port}</destination>
+            <connectionTimeout>5 seconds</connectionTimeout>
+            <keepAliveDuration>5 minutes</keepAliveDuration>
+            <writeBufferSize>16384</writeBufferSize>
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <timestamp><timeZone>UTC</timeZone></timestamp>
+                    <pattern>
+                        <pattern>{"severity":"%level","service":"${spring.application.name:-}","traceId":"%X{traceId:-}","userId":"%X{userId:-}","pid":"${PID:-}","thread":"%thread","class":"%logger{40}","rest":"%message"}</pattern>
+                    </pattern>
+                    <stackTrace>
+                        <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                            <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                            <maxLength>2048</maxLength>
+                            <shortenedClassNameLength>20</shortenedClassNameLength>
+                            <exclude>sun\.reflect\..*</exclude>
+                            <exclude>java\.lang\.reflect\..*</exclude>
+                            <exclude>net\.sf\.cglib\..*</exclude>
+                            <rootCauseFirst>true</rootCauseFirst>
+                        </throwableConverter>
+                    </stackTrace>
+                </providers>
+            </encoder>
+        </appender>
+        <appender name="ASYNC_LOGSTASH" class="ch.qos.logback.classic.AsyncAppender">
+            <discardingThreshold>0</discardingThreshold>
+            <queueSize>1024</queueSize>
+            <neverBlock>true</neverBlock>
+            <appender-ref ref="LOGSTASH"/>
+        </appender>
+    </springProfile>
+
+    <!-- 生产：控制台 + Logstash -->
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_LOGSTASH"/>
+        </root>
+    </springProfile>
+    <!-- 非生产：仅控制台，不连 Logstash（避免本地无 Logstash 时报错） -->
+    <springProfile name="!prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <logger name="com.stephen.cloud" level="DEBUG"/>
+</configuration>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.alogrithm.cloud</groupId>
+        <artifactId>alogrithm-service</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>alogrithm-log-service</artifactId>
+    <name>alogrithm-log-service</name>
+    <description>Algorithm RAG-Enhanced Interactive Teaching System</description>
+
+    <dependencies>
+
+        <!-- Common MySQL -->
+        <dependency>
+            <groupId>com.alogrithm.cloud</groupId>
+            <artifactId>alogrithm-common-mysql</artifactId>
+        </dependency>
+
+        <!-- Common Cache -->
+        <dependency>
+            <groupId>com.alogrithm.cloud</groupId>
+            <artifactId>alogrithm-common-cache</artifactId>
+        </dependency>
+
+        <!-- Common Auth -->
+        <dependency>
+            <groupId>com.alogrithm.cloud</groupId>
+            <artifactId>alogrithm-common-auth</artifactId>
+        </dependency>
+
+        <!-- API Log -->
+        <dependency>
+            <groupId>com.alogrithm.cloud</groupId>
+            <artifactId>alogrithm-api-log</artifactId>
+        </dependency>
+
+        <!-- API User -->
+        <dependency>
+            <groupId>com.alogrithm.cloud</groupId>
+            <artifactId>alogrithm-api-user</artifactId>
+        </dependency>
+
+        <!-- RabbitMQ Common -->
+        <dependency>
+            <groupId>com.alogrithm.cloud</groupId>
+            <artifactId>alogrithm-common-rabbitmq</artifactId>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

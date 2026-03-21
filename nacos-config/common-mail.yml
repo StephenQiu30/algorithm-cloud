@@ -1,0 +1,22 @@
+# Mail (163 邮箱端口 465（为加密授权码）)
+mail:
+  from: ${dev.mail.username}
+  from-name: StephenQiu30
+spring:
+  mail:
+    host: ${dev.mail.host}
+    port: ${dev.mail.port}
+    username: ${dev.mail.username}
+    password: ${dev.mail.password}
+    default-encoding: UTF-8
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+          ssl:
+            enable: true
+            trust: smtp.163.com

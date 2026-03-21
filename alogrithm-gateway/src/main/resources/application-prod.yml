@@ -1,0 +1,167 @@
+# 网关服务配置
+server:
+  port: 8080
+
+spring:
+  application:
+    name: alogrithm-gateway
+  main:
+    web-application-type: reactive
+  config:
+    activate:
+      on-profile: prod
+    import:
+      - nacos:common-secret-prod.properties?group=DEFAULT_GROUP&refresh=true
+      - nacos:common-web-prod.yml?group=DEFAULT_GROUP&refresh=true
+      - nacos:common-cache-prod.yml?group=DEFAULT_GROUP&refresh=true
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:${prod.nacos.addr:localhost:8848}}
+        namespace: alogrithm-cloud
+        group: DEFAULT_GROUP
+        username: ${SPRING_CLOUD_NACOS_USERNAME:${prod.nacos.username:nacos}}
+        password: ${SPRING_CLOUD_NACOS_PASSWORD:${prod.nacos.password:nacos}}
+      config:
+        server-addr: ${SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR:${prod.nacos.addr:localhost:8848}}
+        namespace: alogrithm-cloud
+        group: DEFAULT_GROUP
+        file-extension: yml
+        username: ${SPRING_CLOUD_NACOS_USERNAME:${prod.nacos.username:nacos}}
+        password: ${SPRING_CLOUD_NACOS_PASSWORD:${prod.nacos.password:nacos}}
+    gateway:
+      auth:
+        white-list:
+          - /api/user/register
+          - /api/user/wx/mp/portal
+          - /api/user/login/wx/qrcode
+          - /api/user/login/wx/status
+          - /api/user/login/github/**
+          - /api/user/login/email/**
+          - /api/user/get/login
+          - /api/search/post/page
+          - /api/search/all
+          - /api/post/list/page/vo
+          - /api/post/get/vo
+          - /api/notification/page
+          - /doc.html
+          - /swagger-ui/**
+          - /swagger-resources/**
+          - /v3/api-docs/**
+          - /webjars/**
+          - /api/*/v3/api-docs/**
+      filter:
+        request-rate-limiter:
+          # 默认限流 KeyResolver（避免多 KeyResolver Bean 冲突）
+          key-resolver: "#{@ipKeyResolver}"
+      server:
+        webflux:
+          # 路由配置
+          routes:
+            - id: alogrithm-user-service
+              uri: lb://alogrithm-user-service
+              predicates:
+                - Path=/api/user/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    key-resolver: "#{@ipKeyResolver}"
+
+            - id: alogrithm-post-service
+              uri: lb://alogrithm-post-service
+              predicates:
+                - Path=/api/post/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 20
+                    redis-rate-limiter.burstCapacity: 40
+                    key-resolver: "#{@userKeyResolver}"
+
+            - id: alogrithm-websocket-service
+              uri: lb://alogrithm-notification-service
+              predicates:
+                - Path=/api/websocket/**
+
+            - id: alogrithm-notification-service
+              uri: lb://alogrithm-notification-service
+              predicates:
+                - Path=/api/notification/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 20
+                    redis-rate-limiter.burstCapacity: 40
+                    key-resolver: "#{@userKeyResolver}"
+
+            - id: alogrithm-file-service
+              uri: lb://alogrithm-file-service
+              predicates:
+                - Path=/api/file/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    key-resolver: "#{@userKeyResolver}"
+
+            - id: alogrithm-search-service
+              uri: lb://alogrithm-search-service
+              predicates:
+                - Path=/api/search/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 20
+                    redis-rate-limiter.burstCapacity: 40
+                    key-resolver: "#{@userKeyResolver}"
+
+            - id: alogrithm-mail-service
+              uri: lb://alogrithm-mail-service
+              predicates:
+                - Path=/api/mail/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 5
+                    redis-rate-limiter.burstCapacity: 10
+                    key-resolver: "#{@ipKeyResolver}"
+
+            - id: alogrithm-ai-service
+              uri: lb://alogrithm-ai-service
+              predicates:
+                - Path=/api/ai/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 5
+                    redis-rate-limiter.burstCapacity: 10
+                    key-resolver: "#{@userKeyResolver}"
+
+            - id: alogrithm-log-service
+              uri: lb://alogrithm-log-service
+              predicates:
+                - Path=/api/log/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    key-resolver: "#{@userKeyResolver}"
+          
+          # 全局跨域配置
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                # allowCredentials=true requires explicit origins or allowed-origin-patterns
+                allowed-origin-patterns: "*"
+                allowed-methods: "*"
+                allowed-headers: "*"
+                allow-credentials: true
+                max-age: 3600
+          
+          # 默认过滤器
+          default-filters:
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE

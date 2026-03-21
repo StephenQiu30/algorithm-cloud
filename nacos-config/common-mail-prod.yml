@@ -1,0 +1,22 @@
+# 邮件通用配置 (Production) - 163 端口 465 用 SSL
+mail:
+  from: ${prod.mail.username}
+  from-name: StephenQiu30
+spring:
+  mail:
+    host: ${prod.mail.host}
+    port: ${prod.mail.port}
+    username: ${prod.mail.username}
+    password: ${prod.mail.password}
+    default-encoding: UTF-8
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+          ssl:
+            enable: true
+            trust: smtp.163.com

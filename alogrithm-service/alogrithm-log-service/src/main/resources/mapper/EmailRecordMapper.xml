@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.stephen.cloud.log.mapper.EmailRecordMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.stephen.cloud.log.model.entity.EmailRecord">
+        <id column="id" property="id"/>
+        <result column="msg_id" property="msgId"/>
+        <result column="biz_id" property="bizId"/>
+        <result column="biz_type" property="bizType"/>
+        <result column="to_email" property="toEmail"/>
+        <result column="subject" property="subject"/>
+        <result column="content" property="content"/>
+        <result column="is_html" property="isHtml"/>
+        <result column="status" property="status"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="provider" property="provider"/>
+        <result column="send_time" property="sendTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+</mapper>

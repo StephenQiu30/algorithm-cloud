@@ -1,0 +1,2 @@
+*.xdb filter=lfs diff=lfs merge=lfs -text
+*.xdb !text !filter !merge !diff

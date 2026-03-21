@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.alogrithm.cloud</groupId>
+        <artifactId>alogrithm-service</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>alogrithm-mail-service</artifactId>
+    <name>alogrithm-mail-service</name>
+    <description>Algorithm RAG-Enhanced Interactive Teaching System</description>
+
+    <dependencies>
+
+        <!-- Common Cache -->
+        <dependency>
+            <groupId>com.alogrithm.cloud</groupId>
+            <artifactId>alogrithm-common-cache</artifactId>
+        </dependency>
+
+        <!-- Common RabbitMQ -->
+        <dependency>
+            <groupId>com.alogrithm.cloud</groupId>
+            <artifactId>alogrithm-common-rabbitmq</artifactId>
+        </dependency>
+
+        <!-- API Mail -->
+        <dependency>
+            <groupId>com.alogrithm.cloud</groupId>
+            <artifactId>alogrithm-api-mail</artifactId>
+        </dependency>
+
+        <!-- API Log -->
+        <dependency>
+            <groupId>com.alogrithm.cloud</groupId>
+            <artifactId>alogrithm-api-log</artifactId>
+        </dependency>
+        
+        <!-- alogrithm-common-auth -->
+        <dependency>
+            <groupId>com.alogrithm.cloud</groupId>
+            <artifactId>alogrithm-common-auth</artifactId>
+        </dependency>
+
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- Spring Mail -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <!-- Thymeleaf for Email Templates -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

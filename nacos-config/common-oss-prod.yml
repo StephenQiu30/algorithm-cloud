@@ -1,0 +1,32 @@
+# 对象存储公共配置 (Prod)
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+# 腾讯云 COS 对象存储配置
+cos:
+  client:
+    enable: true
+    accessKey: ${prod.cos.client.accessKey}
+    secretKey: ${prod.cos.client.secretKey}
+    region: ${prod.cos.client.region}
+    bucket: ${prod.cos.client.bucket}
+
+# MinIO 对象存储配置
+minio:
+  client:
+    enable: true
+    endpoint: ${prod.minio.endpoint}
+    accessKey: ${prod.minio.accessKey}
+    secretKey: ${prod.minio.secretKey}
+    bucket: ${prod.minio.bucket}
+
+# 阿里云 OSS 对象存储配置
+oss:
+  client:
+    enable: true
+    endpoint: ${prod.aliyun.oss.endpoint}
+    accessKey: ${prod.aliyun.oss.accessKey}
+    secretKey: ${prod.aliyun.oss.secretKey}
+    bucket: ${prod.aliyun.oss.bucket}

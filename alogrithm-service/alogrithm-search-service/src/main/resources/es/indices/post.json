@@ -1,0 +1,88 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "analysis": {
+        "analyzer": {
+          "default": {
+            "type": "ik_max_word"
+          },
+          "default_search": {
+            "type": "ik_smart"
+          }
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "id": {
+        "type": "long"
+      },
+      "title": {
+        "type": "text",
+        "analyzer": "ik_max_word",
+        "search_analyzer": "ik_smart",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "content": {
+        "type": "text",
+        "analyzer": "ik_max_word",
+        "search_analyzer": "ik_smart",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "cover": {
+        "type": "keyword",
+        "index": false
+      },
+      "tags": {
+        "type": "keyword"
+      },
+      "thumbNum": {
+        "type": "integer"
+      },
+      "favourNum": {
+        "type": "integer"
+      },
+      "userId": {
+        "type": "keyword"
+      },
+      "createTime": {
+        "type": "date",
+        "format": "epoch_millis"
+      },
+      "updateTime": {
+        "type": "date",
+        "format": "epoch_millis"
+      },
+      "isDelete": {
+        "type": "integer"
+      },
+      "reviewStatus": {
+        "type": "integer"
+      },
+      "reviewMessage": {
+        "type": "text",
+        "analyzer": "ik_max_word",
+        "search_analyzer": "ik_smart",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      }
+    }
+  }
+}

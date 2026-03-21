@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.alogrithm.cloud</groupId>
+        <artifactId>alogrithm-cloud</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>alogrithm-api</artifactId>
+    <packaging>pom</packaging>
+    <name>alogrithm-api</name>
+    <description>Algorithm RAG-Enhanced Interactive Teaching System</description>
+
+    <modules>
+        <module>alogrithm-api-user</module>
+        <module>alogrithm-api-post</module>
+        <module>alogrithm-api-file</module>
+        <module>alogrithm-api-notification</module>
+        <module>alogrithm-api-search</module>
+        <module>alogrithm-api-mail</module>
+        <module>alogrithm-api-log</module>
+        <module>alogrithm-api-ai</module>
+    </modules>
+    <dependencies>
+        <!-- MyBatis Plus Extension -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-extension</artifactId>
+        </dependency>
+    </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+
+        </dependencies>
+    </dependencyManagement>
+
+</project>

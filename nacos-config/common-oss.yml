@@ -1,0 +1,23 @@
+# 对象存储公共配置 (Default)
+spring:
+  config:
+    activate:
+      on-profile: default
+
+# 腾讯云 COS 对象存储配置
+cos:
+  client:
+    enable: true
+    accessKey: ${dev.cos.client.accessKey}
+    secretKey: ${dev.cos.client.secretKey}
+    region: ${dev.cos.client.region}
+    bucket: ${dev.cos.client.bucket}
+
+# 腾讯云 COS 对象存储配置
+cos:
+  client:
+    enable: true
+    accessKey: ${dev.cos.client.accessKey}
+    secretKey: ${dev.cos.client.secretKey}
+    region: ${dev.cos.client.region}
+    bucket: ${dev.cos.client.bucket}

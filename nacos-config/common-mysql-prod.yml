@@ -1,0 +1,30 @@
+# MySQL 数据源配置 (Production)
+spring:
+  datasource:
+    username: ${prod.mysql.datasource.username}
+    password: ${prod.mysql.datasource.password}
+    url: ${prod.mysql.datasource.url}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      auto-commit: true
+      idle-timeout: 30000
+      pool-name: HikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
+
+# MyBatis-Plus 配置 (Prod)
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: '' # Disable console logging in prod
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: isDelete
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:mapper/**/*.xml

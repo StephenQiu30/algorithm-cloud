@@ -1,0 +1,138 @@
+# 公共Web/业务配置文件 (Default)
+
+server:
+  servlet:
+    context-path: /api
+
+spring:
+  config:
+    activate:
+      on-profile: default
+  # MVC 配置
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  # Session 配置
+  session:
+    store-type: redis
+    timeout: 2592000
+  # 缓存配置
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterAccess=600s
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 5000
+            readTimeout: 10000
+      circuitbreaker:
+        enabled: true
+
+# springdoc 相关配置
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: com.stephen.cloud
+
+# 接口文档配置
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+    enable-swagger-models: true
+    enable-document-manage: true
+
+# 统一日志配置（本地/默认：仅控制台；生产见 common-web-prod.yml 与 logback-spring.xml）
+logging:
+  config: classpath:logback-spring.xml
+
+# Logstash（ELK）：本地默认不启用，避免未部署 Logstash 时连接报错；仅 prod 在 logback 中启用
+logstash:
+  host: localhost
+  port: 5000
+
+# WebSocket（notification-service 使用，从 common-secret 的 dev.websocket.* 注入）
+websocket:
+  port: ${dev.websocket.port:9090}
+  boss-thread: ${dev.websocket.boss-thread:4}
+  worker-thread: ${dev.websocket.worker-thread:16}
+
+# Sa-Token 配置 (Dev)
+sa-token:
+  enable-sa: true
+  enable-jwt: true
+  token-name: Authorization
+  timeout: 2592000
+  active-timeout: 604800
+  token-prefix: Bearer
+  is-concurrent: true
+  is-share: true
+  token-style: jwt
+  is-log: false
+  jwt-secret-key: ${prod.sa-token.jwt-secret-key}
+  alone-redis:
+    database: ${prod.redis.database}
+    host: ${prod.redis.host}
+    port: ${prod.redis.port}
+    password: ${prod.redis.password}
+    timeout: 5000
+
+# 请求参数加密校验配置
+encrypt:
+  enable: true
+  rsa-key-length: length4096
+  aes-key-length: length32
+
+# 登录验证码配置（user-service 使用）
+login:
+  email:
+    code:
+      expire-time: 300
+      length: 6
+      send-limit: 60
+      ip-limit: 10
+
+# Feign 熔断 Resilience4j
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 100
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 10
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 10s
+
+# 监控配置: Actuator & Prometheus
+management:
+  endpoints:
+    web:
+      exposure:
+        include: 'health,info,prometheus'
+  endpoint:
+    health:
+      show-details: always
+  health:
+    elasticsearch:
+      enabled: false
+    redis:
+      enabled: true
+    rabbit:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}

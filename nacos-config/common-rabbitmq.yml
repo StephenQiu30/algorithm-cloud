@@ -1,0 +1,35 @@
+# RabbitMQ 配置 (Default)
+spring:
+  config:
+    activate:
+      on-profile: default
+  rabbitmq:
+    host: ${dev.rabbitmq.host}
+    port: ${dev.rabbitmq.port}
+    username: ${dev.rabbitmq.username}
+    password: ${dev.rabbitmq.password}
+    virtual-host: /
+    # 消息确认（ACK）
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    # 监听器配置
+    listener:
+      type: simple
+      simple:
+        # 手动 ACK 模式（由 MqConsumerDispatcher 统一进行确认）
+        acknowledge-mode: manual
+        # 每次预取消息数，防止消费者被大量未确认消息压垮
+        prefetch: 5
+        # 并发消费者数（默认 1 个，流量峰值时最大扩展至 5 个）
+        concurrency: 1
+        max-concurrency: 5
+        # 业务异常不重新入队，走死信队列，防止无限重试
+        default-requeue-rejected: false
+
+# 自定义 MQ 告警阈值
+mq:
+  consumer:
+    # 单条消息消费耗时告警阈值（毫秒），超过此值输出 WARN 日志
+    slow-consume-threshold-ms: 5000

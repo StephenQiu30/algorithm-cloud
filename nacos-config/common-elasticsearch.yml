@@ -1,0 +1,14 @@
+spring:
+  # Elasticsearch 配置
+  elasticsearch:
+    enable: true
+    recreate-on-conflict: false
+    uris: ${dev.elasticsearch.uris}
+    username: ${dev.elasticsearch.username}
+    password: ${dev.elasticsearch.password}
+
+# 监控配置
+management:
+  health:
+    elasticsearch:
+      enabled: false

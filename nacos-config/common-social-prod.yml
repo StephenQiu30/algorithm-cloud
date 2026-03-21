@@ -1,0 +1,28 @@
+# 社交登录配置文件 (Prod)
+
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+
+wx:
+  # 微信公众平台配置
+  mp:
+    app-id: ${prod.wx.mp.appId}
+    secret: ${prod.wx.mp.secret}
+    token: ${prod.wx.mp.token}
+    aes-key: ${prod.wx.mp.aesKey}
+  # 微信扫码登录配置
+  qrcode:
+    enable: false
+    app-id: ${prod.wx.qrcode.app-id}
+    app-secret: ${prod.wx.qrcode.app-secret}
+    redirect-uri: ${prod.wx.qrcode.redirect-uri}
+
+# GitHub OAuth2 配置
+github:
+  oauth2:
+    client-id: ${prod.github.oauth2.client-id}
+    client-secret: ${prod.github.oauth2.client-secret}
+    redirect-uri: ${prod.github.oauth2.redirect-uri}
