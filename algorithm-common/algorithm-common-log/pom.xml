@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.algorithm.cloud</groupId>
+        <artifactId>algorithm-common</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>algorithm-common-log</artifactId>
+    <name>algorithm-common-log</name>
+    <description>Algorithm RAG-Enhanced Interactive Teaching System</description>
+
+    <dependencies>
+        <!-- algorithm-api-log -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-api-log</artifactId>
+        </dependency>
+
+        <!-- algorithm-common-core -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-core</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Starter AOP -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Starter Web (for HttpServletRequest) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Hutool (for JSONUtil) -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+</project>

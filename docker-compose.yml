@@ -6,12 +6,12 @@ version: '3.8'
 
 services:
   # API 网关
-  alogrithm-gateway:
+  algorithm-gateway:
     build:
       context: .
-      dockerfile: alogrithm-gateway/Dockerfile
-    image: alogrithm-gateway:${ALOGRITHM_CLOUD_VERSION:-latest}
-    container_name: alogrithm-gateway
+      dockerfile: algorithm-gateway/Dockerfile
+    image: algorithm-gateway:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: algorithm-gateway
     restart: always
     ports:
       - "${GATEWAY_PORT_EXTERNAL}:8080"
@@ -28,15 +28,15 @@ services:
         limits:
           memory: 448M
     networks:
-      - alogrithm-network
+      - algorithm-network
 
   # 用户服务
-  alogrithm-user-service:
+  algorithm-user-service:
     build:
       context: .
-      dockerfile: alogrithm-service/alogrithm-user-service/Dockerfile
-    image: alogrithm-user-service:${ALOGRITHM_CLOUD_VERSION:-latest}
-    container_name: alogrithm-user-service
+      dockerfile: algorithm-service/algorithm-user-service/Dockerfile
+    image: algorithm-user-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: algorithm-user-service
     restart: always
     ports:
       - "${USER_SERVICE_PORT_EXTERNAL}:8081"
@@ -53,15 +53,15 @@ services:
         limits:
           memory: 448M
     networks:
-      - alogrithm-network
+      - algorithm-network
 
   # 帖子服务
-  alogrithm-post-service:
+  algorithm-post-service:
     build:
       context: .
-      dockerfile: alogrithm-service/alogrithm-post-service/Dockerfile
-    image: alogrithm-post-service:${ALOGRITHM_CLOUD_VERSION:-latest}
-    container_name: alogrithm-post-service
+      dockerfile: algorithm-service/algorithm-post-service/Dockerfile
+    image: algorithm-post-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: algorithm-post-service
     restart: always
     ports:
       - "${POST_SERVICE_PORT_EXTERNAL}:8082"
@@ -78,15 +78,15 @@ services:
         limits:
           memory: 448M
     networks:
-      - alogrithm-network
+      - algorithm-network
 
   # 文件服务
-  alogrithm-file-service:
+  algorithm-file-service:
     build:
       context: .
-      dockerfile: alogrithm-service/alogrithm-file-service/Dockerfile
-    image: alogrithm-file-service:${ALOGRITHM_CLOUD_VERSION:-latest}
-    container_name: alogrithm-file-service
+      dockerfile: algorithm-service/algorithm-file-service/Dockerfile
+    image: algorithm-file-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: algorithm-file-service
     restart: always
     ports:
       - "${FILE_SERVICE_PORT_EXTERNAL}:8085"
@@ -103,15 +103,15 @@ services:
         limits:
           memory: 448M
     networks:
-      - alogrithm-network
+      - algorithm-network
 
   # 邮件服务
-  alogrithm-mail-service:
+  algorithm-mail-service:
     build:
       context: .
-      dockerfile: alogrithm-service/alogrithm-mail-service/Dockerfile
-    image: alogrithm-mail-service:${ALOGRITHM_CLOUD_VERSION:-latest}
-    container_name: alogrithm-mail-service
+      dockerfile: algorithm-service/algorithm-mail-service/Dockerfile
+    image: algorithm-mail-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: algorithm-mail-service
     restart: always
     ports:
       - "${MAIL_SERVICE_PORT_EXTERNAL}:8087"
@@ -128,15 +128,15 @@ services:
         limits:
           memory: 448M
     networks:
-      - alogrithm-network
+      - algorithm-network
 
   # 通知服务
-  alogrithm-notification-service:
+  algorithm-notification-service:
     build:
       context: .
-      dockerfile: alogrithm-service/alogrithm-notification-service/Dockerfile
-    image: alogrithm-notification-service:${ALOGRITHM_CLOUD_VERSION:-latest}
-    container_name: alogrithm-notification-service
+      dockerfile: algorithm-service/algorithm-notification-service/Dockerfile
+    image: algorithm-notification-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: algorithm-notification-service
     restart: always
     ports:
       - "${NOTIFICATION_SERVICE_PORT_EXTERNAL}:8083"
@@ -153,15 +153,15 @@ services:
         limits:
           memory: 448M
     networks:
-      - alogrithm-network
+      - algorithm-network
 
   # 搜索服务
-  alogrithm-search-service:
+  algorithm-search-service:
     build:
       context: .
-      dockerfile: alogrithm-service/alogrithm-search-service/Dockerfile
-    image: alogrithm-search-service:${ALOGRITHM_CLOUD_VERSION:-latest}
-    container_name: alogrithm-search-service
+      dockerfile: algorithm-service/algorithm-search-service/Dockerfile
+    image: algorithm-search-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: algorithm-search-service
     restart: always
     ports:
       - "${SEARCH_SERVICE_PORT_EXTERNAL}:8084"
@@ -178,15 +178,15 @@ services:
         limits:
           memory: 448M
     networks:
-      - alogrithm-network
+      - algorithm-network
 
   # 日志服务
-  alogrithm-log-service:
+  algorithm-log-service:
     build:
       context: .
-      dockerfile: alogrithm-service/alogrithm-log-service/Dockerfile
-    image: alogrithm-log-service:${ALOGRITHM_CLOUD_VERSION:-latest}
-    container_name: alogrithm-log-service
+      dockerfile: algorithm-service/algorithm-log-service/Dockerfile
+    image: algorithm-log-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: algorithm-log-service
     restart: always
     ports:
       - "${LOG_SERVICE_PORT_EXTERNAL}:8086"
@@ -203,15 +203,15 @@ services:
         limits:
           memory: 448M
     networks:
-      - alogrithm-network
+      - algorithm-network
 
   # AI 服务
-  alogrithm-ai-service:
+  algorithm-ai-service:
     build:
       context: .
-      dockerfile: alogrithm-service/alogrithm-ai-service/Dockerfile
-    image: alogrithm-ai-service:${ALOGRITHM_CLOUD_VERSION:-latest}
-    container_name: alogrithm-ai-service
+      dockerfile: algorithm-service/algorithm-ai-service/Dockerfile
+    image: algorithm-ai-service:${ALOGRITHM_CLOUD_VERSION:-latest}
+    container_name: algorithm-ai-service
     restart: always
     ports:
       - "${AI_SERVICE_PORT_EXTERNAL}:8089"
@@ -228,8 +228,8 @@ services:
         limits:
           memory: 448M
     networks:
-      - alogrithm-network
+      - algorithm-network
 
 networks:
-  alogrithm-network:
+  algorithm-network:
     external: true

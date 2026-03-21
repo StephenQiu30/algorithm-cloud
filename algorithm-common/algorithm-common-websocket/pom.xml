@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.algorithm.cloud</groupId>
+        <artifactId>algorithm-common</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>algorithm-common-websocket</artifactId>
+    <name>algorithm-common-websocket</name>
+    <description>Algorithm RAG-Enhanced Interactive Teaching System</description>
+
+    <dependencies>
+        <!-- algorithm-common-core -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-core</artifactId>
+        </dependency>
+
+        <!-- algorithm-common-cache -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-cache</artifactId>
+        </dependency>
+
+        <!-- algorithm-common-auth -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-auth</artifactId>
+        </dependency>
+
+        <!-- algorithm-common-rabbitmq -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-rabbitmq</artifactId>
+        </dependency>
+
+        <!-- Netty -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>

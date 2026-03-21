@@ -2,7 +2,7 @@
 -- 用户表
 -- ============================================
 
-USE alogrithm_cloud;
+USE algorithm_cloud;
 
 DROP TABLE IF EXISTS `user`;
 

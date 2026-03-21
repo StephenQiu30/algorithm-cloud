@@ -8,7 +8,7 @@ services:
   # MySQL 数据库
   mysql:
     image: mysql:8.0
-    container_name: alogrithm-mysql
+    container_name: algorithm-mysql
     restart: always
     ports:
       - "3306:3306"
@@ -24,7 +24,7 @@ services:
       - --collation-server=utf8mb4_unicode_ci
       - --max_connections=1000
     networks:
-      - alogrithm-network
+      - algorithm-network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -34,7 +34,7 @@ services:
   # Redis 缓存
   redis:
     image: redis:7.0
-    container_name: alogrithm-redis
+    container_name: algorithm-redis
     restart: always
     ports:
       - "6379:6379"
@@ -42,7 +42,7 @@ services:
       - redis-data:/data
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     networks:
-      - alogrithm-network
+      - algorithm-network
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
@@ -52,7 +52,7 @@ services:
   # Nacos 注册中心和配置中心
   nacos:
     image: nacos/nacos-server:v3.1.1
-    container_name: alogrithm-nacos
+    container_name: algorithm-nacos
     restart: always
     environment:
       - MODE=standalone
@@ -75,7 +75,7 @@ services:
       - "9848:9848"
       - "9849:9849"
     networks:
-      - alogrithm-network
+      - algorithm-network
     deploy:
       resources:
         limits:
@@ -89,7 +89,7 @@ services:
   # RabbitMQ 消息队列
   rabbitmq:
     image: rabbitmq:3.12-management
-    container_name: alogrithm-rabbitmq
+    container_name: algorithm-rabbitmq
     restart: always
     ports:
       - "5672:5672"
@@ -101,7 +101,7 @@ services:
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     networks:
-      - alogrithm-network
+      - algorithm-network
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 30s
@@ -111,7 +111,7 @@ services:
   # Elasticsearch 搜索引擎
   elasticsearch:
     image: elasticsearch:8.19.10
-    container_name: alogrithm-elasticsearch
+    container_name: algorithm-elasticsearch
     restart: always
     ports:
       - "9200:9200"
@@ -124,7 +124,7 @@ services:
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
     networks:
-      - alogrithm-network
+      - algorithm-network
     deploy:
       resources:
         limits:
@@ -138,7 +138,7 @@ services:
   # ELK 日志汇聚：接收各服务 logback TCP 5000 上报，写入 ES；仅 prod 环境启用 logback 输出
   logstash:
     image: logstash:8.19.0
-    container_name: alogrithm-logstash
+    container_name: algorithm-logstash
     restart: always
     ports:
       - "5000:5000"
@@ -148,14 +148,14 @@ services:
     environment:
       LS_JAVA_OPTS: -Xms256m -Xmx256m
     networks:
-      - alogrithm-network
+      - algorithm-network
     depends_on:
       elasticsearch:
         condition: service_healthy
 
   prometheus:
     image: prom/prometheus:v2.54.1
-    container_name: alogrithm-prometheus
+    container_name: algorithm-prometheus
     restart: always
     ports:
       - "9090:9090"
@@ -166,11 +166,11 @@ services:
       - --storage.tsdb.path=/prometheus
       - --web.enable-lifecycle
     networks:
-      - alogrithm-network
+      - algorithm-network
 
   grafana:
     image: grafana/grafana:11.4.0
-    container_name: alogrithm-grafana
+    container_name: algorithm-grafana
     restart: always
     ports:
       - "3000:3000"
@@ -182,7 +182,7 @@ services:
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     networks:
-      - alogrithm-network
+      - algorithm-network
 
 volumes:
   mysql-data:
@@ -199,6 +199,6 @@ volumes:
     driver: local
 
 networks:
-  alogrithm-network:
-    name: alogrithm-network
+  algorithm-network:
+    name: algorithm-network
     driver: bridge

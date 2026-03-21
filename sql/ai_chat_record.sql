@@ -3,7 +3,7 @@
 -- ============================================
 
 USE
-stephen_ai;
+algorithm_ai;
 
 DROP TABLE IF EXISTS `ai_chat_record`;
 

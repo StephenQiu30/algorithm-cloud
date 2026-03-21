@@ -1,6 +1,6 @@
 # Nacos 配置管理与导入工具
 
-本目录作为 `alogrithm-cloud` 的配置中心源，存放全系统的 Nacos 配置文件模板。通过标准化的配置管理，实现微服务环境的快速迁移与统一管理。
+本目录作为 `algorithm-cloud` 的配置中心源，存放全系统的 Nacos 配置文件模板。通过标准化的配置管理，实现微服务环境的快速迁移与统一管理。
 
 ## 📁 目录结构
 
@@ -35,7 +35,7 @@ chmod +x import-config.sh
 
 1. **敏感信息**: 导入前请务必根据 `common-secret.properties.example` 创建 `common-secret.properties`，并修改其中的数据库、Redis、Nacos、AI API Key 等敏感信息。
     - **注意**: `common-secret.properties` 已在 `.gitignore` 中忽略，不会被提交。
-2. **命名空间**: 脚本默认导入到命名空间 `alogrithm-cloud`（与各服务 application(-prod).yml 中 `spring.cloud.nacos.config.namespace` 一致），首次导入会自动创建该命名空间。
+2. **命名空间**: 脚本默认导入到命名空间 `algorithm-cloud`（与各服务 application(-prod).yml 中 `spring.cloud.nacos.config.namespace` 一致），首次导入会自动创建该命名空间。
 3. **数据分组**: 统一使用 `DEFAULT_GROUP`。
 
 ## 生产/服务器部署

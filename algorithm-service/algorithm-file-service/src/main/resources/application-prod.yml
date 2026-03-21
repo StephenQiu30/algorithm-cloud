@@ -1,0 +1,41 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: algorithm-file-service
+  config:
+    activate:
+      on-profile: prod
+    import:
+      - nacos:common-secret-prod.properties?group=DEFAULT_GROUP&refresh=true
+      - nacos:common-web-prod.yml?group=DEFAULT_GROUP&refresh=true
+      - nacos:common-cache-prod.yml?group=DEFAULT_GROUP&refresh=true
+      - nacos:common-oss-prod.yml?group=DEFAULT_GROUP&refresh=true
+  cloud:
+    nacos:
+      config:
+        server-addr: ${SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR:${prod.nacos.addr:localhost:8848}}
+        namespace: algorithm-cloud
+        group: DEFAULT_GROUP
+        file-extension: yml
+        username: ${SPRING_CLOUD_NACOS_USERNAME:${prod.nacos.username:nacos}}
+        password: ${SPRING_CLOUD_NACOS_PASSWORD:${prod.nacos.password:nacos}}
+      discovery:
+        server-addr: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:${prod.nacos.addr:localhost:8848}}
+        namespace: algorithm-cloud
+        group: DEFAULT_GROUP
+        username: ${SPRING_CLOUD_NACOS_USERNAME:${prod.nacos.username:nacos}}
+        password: ${SPRING_CLOUD_NACOS_PASSWORD:${prod.nacos.password:nacos}}
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# 文件存储配置
+file:
+  storage:
+    # 存储类型：cos, minio, oss
+    type: cos
+    # 路径前缀
+    path-prefix: stephen

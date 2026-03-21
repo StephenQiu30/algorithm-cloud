@@ -3,7 +3,7 @@
 NACOS_HOST="localhost"
 NACOS_PORT="8848"
 NACOS_ADDR="http://${NACOS_HOST}:${NACOS_PORT}"
-NAMESPACE="alogrithm-cloud"
+NAMESPACE="algorithm-cloud"
 GROUP="DEFAULT_GROUP"
 USERNAME="nacos"
 PASSWORD="nacos"

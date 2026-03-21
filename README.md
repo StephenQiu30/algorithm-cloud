@@ -40,15 +40,15 @@ graph TD
 
 | 模块名称                           | 功能描述                    | 端口   |
 |:-------------------------------|:------------------------|:-----|
-| `alogrithm-gateway`              | API 网关：路由转发、鉴权、限流       | 8080 |
-| `alogrithm-user-service`         | 用户服务：账号、权限、多端登录         | 8081 |
-| `alogrithm-post-service`         | 帖子服务：内容、互动、数据统计         | 8082 |
-| `alogrithm-notification-service` | 通知服务：系统消息、实时推送          | 8083 |
-| `alogrithm-search-service`       | 搜索服务：基于 ES 的聚合检索        | 8084 |
-| `alogrithm-file-service`         | 文件服务：对象存储 (COS)   | 8085 |
-| `alogrithm-log-service`          | 日志服务：全链路日志采集与存储         | 8086 |
-| `alogrithm-mail-service`         | 邮件服务：验证码、告警发送           | 8087 |
-| `alogrithm-ai-service`           | AI 服务：Spring AI 大模型集成 | 8089 |
+| `algorithm-gateway`              | API 网关：路由转发、鉴权、限流       | 8080 |
+| `algorithm-user-service`         | 用户服务：账号、权限、多端登录         | 8081 |
+| `algorithm-post-service`         | 帖子服务：内容、互动、数据统计         | 8082 |
+| `algorithm-notification-service` | 通知服务：系统消息、实时推送          | 8083 |
+| `algorithm-search-service`       | 搜索服务：基于 ES 的聚合检索        | 8084 |
+| `algorithm-file-service`         | 文件服务：对象存储 (COS)   | 8085 |
+| `algorithm-log-service`          | 日志服务：全链路日志采集与存储         | 8086 |
+| `algorithm-mail-service`         | 邮件服务：验证码、告警发送           | 8087 |
+| `algorithm-ai-service`           | AI 服务：Spring AI 大模型集成 | 8089 |
 
 ## 🎯 技术栈
 
@@ -70,7 +70,7 @@ graph TD
 
 ## 📮 消息队列 use 指南
 
-项目通过 `alogrithm-common-rabbitmq` 模块对 RabbitMQ 进行了封装，实现了**生产端统一发送**与**消费端自动化分发**。
+项目通过 `algorithm-common-rabbitmq` 模块对 RabbitMQ 进行了封装，实现了**生产端统一发送**与**消费端自动化分发**。
 
 ### 1. 生产者 (Producer)
 注入 `RabbitMqSender` 即可发送消息。
@@ -81,17 +81,17 @@ graph TD
 1. **定义 Handler**：实现 `RabbitMqHandler<T>` 接口并注入为 Bean，标记 `@RabbitMqDedupeLock` 进行分布式去重。
 2. **统一调度**：在具体的 `@RabbitListener` 中调用 `mqConsumerDispatcher.dispatch(rabbitMessage, channel, msg)`，系统将根据 `bizType` 自动匹配 Handler 及其对应的 DTO 类型。
 
-> 更多细节请参考 [RabbitMQ 模块文档](alogrithm-common/alogrithm-common-rabbitmq/README.md)。
+> 更多细节请参考 [RabbitMQ 模块文档](algorithm-common/algorithm-common-rabbitmq/README.md)。
 
 ## 📋 日志与多环境
 
 - **两类日志**
   - **ELK（运行时）**：各服务通过 `logback-spring.xml` 输出到控制台；**生产环境**下 additionally 通过 TCP 上报到 Logstash → ES → Kibana，用于运维排障与监控。
-  - **业务审计**：操作日志、登录日志、API 访问日志、邮件/文件记录由 **alogrithm-log-service** 接收并落库 MySQL，供管理端分页查询。
+  - **业务审计**：操作日志、登录日志、API 访问日志、邮件/文件记录由 **algorithm-log-service** 接收并落库 MySQL，供管理端分页查询。
 - **多环境**
   - **本地/默认**（未设置 `spring.profiles.active=prod`）：仅控制台输出，**不连接 Logstash**，本地不部署 ELK 也不会报错。
   - **生产**（`spring.profiles.active=prod`）：控制台 + 异步 TCP 输出到 Logstash；需保证与 `docker-compose-env.yml` 中的 `logstash` 服务同网，且 Nacos 使用 `common-web-prod.yml` 中的 `logstash.host: logstash`。
-- **配置位置**：`alogrithm-common-core/src/main/resources/logback-spring.xml`（按 profile 启用 Logstash）；Nacos：`common-web.yml` / `common-web-prod.yml` 中的 `logstash.*`。
+- **配置位置**：`algorithm-common-core/src/main/resources/logback-spring.xml`（按 profile 启用 Logstash）；Nacos：`common-web.yml` / `common-web-prod.yml` 中的 `logstash.*`。
 
 ## 🚀 快速启动
 
@@ -126,7 +126,7 @@ mvn clean install -DskipTests
 
 - 使用 **docker-compose** 时：先启动基础设施 `docker-compose -f docker-compose-env.yml up -d`，确认 Nacos/MySQL/Redis 等就绪后，在 `.env` 中配置 `NACOS_HOST`、`NACOS_PORT` 等，再 `docker-compose up -d` 启动各微服务；所有服务已设置 `SPRING_PROFILES_ACTIVE=prod` 并从 Nacos 拉取 prod 配置。
 - **非 Docker 部署**：启动时加 `--spring.profiles.active=prod`，并必须设置环境变量 `SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR`、`SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR` 为实际 Nacos 地址（如 `192.168.1.10:8848`），否则会使用 localhost 无法连接。
-- 生产 Nacos 中需已导入并维护好 `common-secret-prod.properties` 及各项 `*-prod.yml`；Logstash 仅 prod 启用，需与应用同网（如 docker-compose-env 中 logstash 与应用同属 `alogrithm-network`）。详见 `nacos-config/README.md`。
+- 生产 Nacos 中需已导入并维护好 `common-secret-prod.properties` 及各项 `*-prod.yml`；Logstash 仅 prod 启用，需与应用同网（如 docker-compose-env 中 logstash 与应用同属 `algorithm-network`）。详见 `nacos-config/README.md`。
 
 ---
 

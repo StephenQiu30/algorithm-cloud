@@ -2,7 +2,7 @@
 -- 文件上传记录表
 -- ============================================
 
-USE alogrithm_cloud;
+USE algorithm_cloud;
 
 DROP TABLE IF EXISTS `file_upload_record`;
 

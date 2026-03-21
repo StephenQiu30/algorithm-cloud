@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.algorithm.cloud</groupId>
+        <artifactId>algorithm-service</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>algorithm-ai-service</artifactId>
+    <description>Algorithm RAG-Enhanced Interactive Teaching System</description>
+
+    <dependencies>
+        <!-- algorithm-api-ai -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-api-ai</artifactId>
+        </dependency>
+
+        <!-- algorithm-api-user -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-api-user</artifactId>
+        </dependency>
+
+        <!-- algorithm-api-log -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-api-log</artifactId>
+        </dependency>
+
+        <!-- algorithm-api-search -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-api-search</artifactId>
+        </dependency>
+
+        <!-- algorithm-api-post -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-api-post</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.alibaba.cloud.ai</groupId>
+            <artifactId>spring-ai-alibaba-starter-dashscope</artifactId>
+            <version>1.1.2.2</version>
+        </dependency>
+
+        <!-- Common Auth -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-auth</artifactId>
+        </dependency>
+
+        <!-- Common Log -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-log</artifactId>
+        </dependency>
+
+        <!-- Common MySQL -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-mysql</artifactId>
+        </dependency>
+
+        <!-- Common Cache (Rate Limiting) -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-cache</artifactId>
+        </dependency>
+
+        <!-- Common RabbitMQ -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-rabbitmq</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

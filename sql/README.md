@@ -1,10 +1,10 @@
 # SQL 数据库初始化脚本
 
-本目录包含 `alogrithm-cloud` 全系统所需的数据库定义（DDL）。建议在项目启动初期，按照本指南完成数据库环境的初始化。
+本目录包含 `algorithm-cloud` 全系统所需的数据库定义（DDL）。建议在项目启动初期，按照本指南完成数据库环境的初始化。
 
 ## 🗄️ 数据库
 
-当前为单库 `alogrithm_cloud`，各业务表在同一库内按表名前缀区分，例如：`user`、`post`、`post_comment`、`post_thumb`、`post_favour`、`notification`、`ai_chat_record`、`api_access_log`、`operation_log`、`user_login_log`、`email_record`、`file_upload_record` 等。
+当前为单库 `algorithm_cloud`，各业务表在同一库内按表名前缀区分，例如：`user`、`post`、`post_comment`、`post_thumb`、`post_favour`、`notification`、`ai_chat_record`、`api_access_log`、`operation_log`、`user_login_log`、`email_record`、`file_upload_record` 等。
 
 ## 🛠️ 初始化步骤
 

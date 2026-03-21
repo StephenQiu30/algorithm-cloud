@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.algorithm.cloud</groupId>
+        <artifactId>algorithm-cloud</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>algorithm-api</artifactId>
+    <packaging>pom</packaging>
+    <name>algorithm-api</name>
+    <description>Algorithm RAG-Enhanced Interactive Teaching System</description>
+
+    <modules>
+        <module>algorithm-api-user</module>
+        <module>algorithm-api-post</module>
+        <module>algorithm-api-file</module>
+        <module>algorithm-api-notification</module>
+        <module>algorithm-api-search</module>
+        <module>algorithm-api-mail</module>
+        <module>algorithm-api-log</module>
+        <module>algorithm-api-ai</module>
+    </modules>
+    <dependencies>
+        <!-- MyBatis Plus Extension -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-extension</artifactId>
+        </dependency>
+    </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+
+        </dependencies>
+    </dependencyManagement>
+
+</project>

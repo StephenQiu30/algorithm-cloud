@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.algorithm.cloud</groupId>
+        <artifactId>algorithm-service</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>algorithm-user-service</artifactId>
+    <name>algorithm-user-service</name>
+    <description>Algorithm RAG-Enhanced Interactive Teaching System</description>
+
+    <dependencies>
+
+        <!-- algorithm-api-user -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-api-user</artifactId>
+        </dependency>
+
+
+        <!-- algorithm-common-mysql -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-mysql</artifactId>
+        </dependency>
+
+        <!-- algorithm-common-cache -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-cache</artifactId>
+        </dependency>
+
+        <!-- algorithm-common-auth -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-auth</artifactId>
+        </dependency>
+
+        <!-- algorithm-common-rabbitmq -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-rabbitmq</artifactId>
+        </dependency>
+
+
+        <!-- Stephen Common Log (包含AOP依赖) -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-log</artifactId>
+        </dependency>
+
+
+        <!-- API Mail -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-api-mail</artifactId>
+        </dependency>
+
+        <!-- API Log -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-api-log</artifactId>
+        </dependency>
+
+        <!-- Search API -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-api-search</artifactId>
+        </dependency>
+
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

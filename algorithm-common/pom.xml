@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.algorithm.cloud</groupId>
+        <artifactId>algorithm-cloud</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>algorithm-common</artifactId>
+    <packaging>pom</packaging>
+
+    <name>algorithm-common</name>
+    <description>Algorithm RAG-Enhanced Interactive Teaching System</description>
+
+    <modules>
+        <module>algorithm-common-core</module>
+        <module>algorithm-common-cache</module>
+        <module>algorithm-common-mysql</module>
+        <module>algorithm-common-auth</module>
+        <module>algorithm-common-web</module>
+        <module>algorithm-common-rabbitmq</module>
+        <module>algorithm-common-websocket</module>
+        <module>algorithm-common-log</module>
+    </modules>
+
+</project>

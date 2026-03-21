@@ -2,7 +2,7 @@
 -- 邮件记录表（支持分布式事务补偿）
 -- ============================================
 
-USE alogrithm_cloud;
+USE algorithm_cloud;
 
 DROP TABLE IF EXISTS `email_record`;
 

@@ -1,0 +1,170 @@
+# 网关服务配置
+server:
+  port: 8080
+
+spring:
+  application:
+    name: algorithm-gateway
+  profiles:
+    active: default
+  main:
+    web-application-type: reactive
+  config:
+    activate:
+      on-profile: default
+    import:
+      - nacos:common-secret.properties?group=DEFAULT_GROUP&refresh=true
+      - nacos:common-web.yml?group=DEFAULT_GROUP&refresh=true
+      - nacos:common-cache.yml?group=DEFAULT_GROUP&refresh=true
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        namespace: algorithm-cloud
+        group: DEFAULT_GROUP
+        username: nacos
+        password: nacos
+      config:
+        server-addr: localhost:8848
+        namespace: algorithm-cloud
+        group: DEFAULT_GROUP
+        file-extension: yml
+        username: nacos
+        password: nacos
+    gateway:
+      auth:
+        white-list:
+          - /api/user/register
+          - /api/user/wx/mp/portal
+          - /api/user/login/wx/qrcode
+          - /api/user/login/wx/status
+          - /api/user/login/github/**
+          - /api/user/login/email/**
+          - /api/user/get/login
+          - /api/search/post/page
+          - /api/search/all
+          - /api/post/list/page/vo
+          - /api/post/get/vo
+          - /api/notification/page
+          - /doc.html
+          - /swagger-ui/**
+          - /swagger-resources/**
+          - /v3/api-docs/**
+          - /webjars/**
+          - /api/*/v3/api-docs/**
+      filter:
+        request-rate-limiter:
+          # 默认限流 KeyResolver（避免多 KeyResolver Bean 冲突）
+          key-resolver: "#{@ipKeyResolver}"
+      server:
+        webflux:
+          # 路由配置
+          routes:
+            - id: algorithm-user-service
+              uri: lb://algorithm-user-service
+              predicates:
+                - Path=/api/user/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    key-resolver: "#{@ipKeyResolver}"
+
+            - id: algorithm-post-service
+              uri: lb://algorithm-post-service
+              predicates:
+                - Path=/api/post/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 20
+                    redis-rate-limiter.burstCapacity: 40
+                    key-resolver: "#{@userKeyResolver}"
+
+            - id: algorithm-websocket-service
+              uri: lb://algorithm-notification-service
+              predicates:
+                - Path=/api/websocket/**
+
+            - id: algorithm-notification-service
+              uri: lb://algorithm-notification-service
+              predicates:
+                - Path=/api/notification/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 20
+                    redis-rate-limiter.burstCapacity: 40
+                    key-resolver: "#{@userKeyResolver}"
+
+            - id: algorithm-file-service
+              uri: lb://algorithm-file-service
+              predicates:
+                - Path=/api/file/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    key-resolver: "#{@userKeyResolver}"
+
+            - id: algorithm-search-service
+              uri: lb://algorithm-search-service
+              predicates:
+                - Path=/api/search/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 20
+                    redis-rate-limiter.burstCapacity: 40
+                    key-resolver: "#{@userKeyResolver}"
+
+            - id: algorithm-mail-service
+              uri: lb://algorithm-mail-service
+              predicates:
+                - Path=/api/mail/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 5
+                    redis-rate-limiter.burstCapacity: 10
+                    key-resolver: "#{@ipKeyResolver}"
+
+            - id: algorithm-ai-service
+              uri: lb://algorithm-ai-service
+              predicates:
+                - Path=/api/ai/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 5
+                    redis-rate-limiter.burstCapacity: 10
+                    key-resolver: "#{@userKeyResolver}"
+
+            - id: algorithm-log-service
+              uri: lb://algorithm-log-service
+              predicates:
+                - Path=/api/log/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    key-resolver: "#{@userKeyResolver}"
+          
+          # 全局跨域配置
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                # 生产环境建议配置具体域名，开发环境可使用 "*"
+                # 使用 allowedOriginPatterns 而非 allowedOrigins，以支持 allowCredentials=true
+                allowed-origin-patterns: "*"
+                allowed-methods: "*"
+                allowed-headers: "*"
+                allow-credentials: true
+                max-age: 3600
+          
+          # 默认过滤器
+          default-filters:
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE

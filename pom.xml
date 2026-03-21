@@ -5,19 +5,19 @@
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.alogrithm.cloud</groupId>
-    <artifactId>alogrithm-cloud</artifactId>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-cloud</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
 
-    <name>alogrithm-cloud</name>
+    <name>algorithm-cloud</name>
     <description>面向排序算法教学的 RAG 增强型交互式系统</description>
 
     <modules>
-        <module>alogrithm-common</module>
-        <module>alogrithm-api</module>
-        <module>alogrithm-gateway</module>
-        <module>alogrithm-service</module>
+        <module>algorithm-common</module>
+        <module>algorithm-api</module>
+        <module>algorithm-gateway</module>
+        <module>algorithm-service</module>
     </modules>
 
     <properties>
@@ -29,7 +29,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- 项目版本 -->
-        <alogrithm-cloud.version>1.0.0</alogrithm-cloud.version>
+        <algorithm-cloud.version>1.0.0</algorithm-cloud.version>
 
         <spring-boot.version>3.5.9</spring-boot.version>
         <spring-cloud.version>2025.0.0</spring-cloud.version>
@@ -364,155 +364,155 @@
             <!-- 内部模块版本管理 -->
             <!-- Common 模块 -->
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-common-core</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-common-core</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-common-web</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-common-web</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-common-mysql</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-common-mysql</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-common-cache</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-common-cache</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-common-auth</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-common-auth</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-common-rabbitmq</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-common-rabbitmq</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-common-websocket</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-common-websocket</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-common-log</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-common-log</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <!-- API 模块 -->
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-api-user</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-api-user</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-api-post</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-api-post</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-api-file</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-api-file</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-api-notification</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-api-notification</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-api-search</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-api-search</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-api-mail</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-api-mail</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-api-log</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-api-log</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-api-ai</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-api-ai</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <!-- Service 模块 -->
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-gateway</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-gateway</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-user-service</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-user-service</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-post-service</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-post-service</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-notification-service</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-notification-service</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-file-service</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-file-service</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-search-service</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-search-service</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-mail-service</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-mail-service</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-log-service</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-log-service</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>com.alogrithm.cloud</groupId>
-                <artifactId>alogrithm-ai-service</artifactId>
-                <version>${alogrithm-cloud.version}</version>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-ai-service</artifactId>
+                <version>${algorithm-cloud.version}</version>
             </dependency>
 
         </dependencies>
