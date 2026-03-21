@@ -2,7 +2,7 @@
 -- 用户登录日志表
 -- ============================================
 
-USE algorithm_cloud;
+USE algorithm;
 
 DROP TABLE IF EXISTS `user_login_log`;
 

@@ -2,7 +2,7 @@
 -- 操作日志表
 -- ============================================
 
-USE algorithm_cloud;
+USE algorithm;
 
 DROP TABLE IF EXISTS `operation_log`;
 

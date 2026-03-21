@@ -2,8 +2,7 @@
 -- AI 对话记录表
 -- ============================================
 
-USE
-algorithm_ai;
+USE algorithm;
 
 DROP TABLE IF EXISTS `ai_chat_record`;
 

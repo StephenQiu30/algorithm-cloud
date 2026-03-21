@@ -4,7 +4,7 @@
 
 ## 🗄️ 数据库
 
-当前为单库 `algorithm_cloud`，各业务表在同一库内按表名前缀区分，例如：`user`、`post`、`post_comment`、`post_thumb`、`post_favour`、`notification`、`ai_chat_record`、`api_access_log`、`operation_log`、`user_login_log`、`email_record`、`file_upload_record` 等。
+当前为单库 `algorithm`，各业务表在同一库内按表名前缀区分，例如：`user`、`post`、`post_comment`、`post_thumb`、`post_favour`、`notification`、`ai_chat_record`、`api_access_log`、`operation_log`、`user_login_log`、`email_record`、`file_upload_record` 等。
 
 ## 🛠️ 初始化步骤
 

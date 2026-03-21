@@ -2,7 +2,7 @@
 -- 帖子收藏表
 -- ============================================
 
-USE algorithm_cloud;
+USE algorithm;
 
 DROP TABLE IF EXISTS `post_favour`;
 

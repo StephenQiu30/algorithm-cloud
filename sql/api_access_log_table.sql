@@ -2,7 +2,7 @@
 -- 接口访问日志表
 -- ============================================
 
-USE algorithm_cloud;
+USE algorithm;
 
 DROP TABLE IF EXISTS `api_access_log`;
 
