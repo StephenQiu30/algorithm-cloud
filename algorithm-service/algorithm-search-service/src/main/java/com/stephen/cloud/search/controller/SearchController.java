@@ -2,6 +2,7 @@ package com.stephen.cloud.search.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.api.post.model.dto.post.PostQueryRequest;
+import com.stephen.cloud.api.post.model.enums.PostContentTypeEnum;
 import com.stephen.cloud.api.search.model.SearchRequest;
 import com.stephen.cloud.api.search.model.SearchVO;
 import com.stephen.cloud.api.search.model.entity.PostEsDTO;
@@ -65,6 +66,9 @@ public class SearchController {
             HttpServletRequest request) {
         long size = postQueryRequest.getPageSize();
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
+        if (postQueryRequest.getContentType() == null) {
+            postQueryRequest.setContentType(PostContentTypeEnum.POST.getValue());
+        }
         Page<PostEsDTO> postPage = (Page<PostEsDTO>) postEsService.searchFromEs(postQueryRequest);
         return ResultUtils.success(postPage);
     }

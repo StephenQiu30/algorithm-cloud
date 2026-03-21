@@ -78,6 +78,12 @@ public class PostEsDTO extends BaseEsDTO {
         private Long userId;
 
         /**
+         * 内容类型（0-帖子，1-算法知识库）
+         */
+        @Field(type = FieldType.Integer)
+        private Integer contentType;
+
+        /**
          * 审核状态（0-待审核，1-通过，2-拒绝）
          */
         @Field(type = FieldType.Integer)

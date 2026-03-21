@@ -45,6 +45,8 @@ spring:
           - /api/search/all
           - /api/post/list/page/vo
           - /api/post/get/vo
+          - /api/post/knowledge/list/page/vo
+          - /api/post/knowledge/get/vo
           - /api/notification/page
           - /doc.html
           - /swagger-ui/**

@@ -77,6 +77,7 @@ public class PostEsServiceImpl implements PostEsService {
         List<String> orTags = queryRequest.getOrTags();
         Long userId = queryRequest.getUserId();
         Integer reviewStatus = queryRequest.getReviewStatus();
+        Integer contentType = queryRequest.getContentType();
 
         BoolQuery.Builder boolBuilder = new BoolQuery.Builder();
 
@@ -95,6 +96,9 @@ public class PostEsServiceImpl implements PostEsService {
         }
         if (reviewStatus != null) {
             boolBuilder.filter(f -> f.term(t -> t.field("reviewStatus").value(reviewStatus)));
+        }
+        if (contentType != null) {
+            boolBuilder.filter(f -> f.term(t -> t.field("contentType").value(contentType)));
         }
         // 关键词检索
         if (StringUtils.isNotBlank(searchText)) {

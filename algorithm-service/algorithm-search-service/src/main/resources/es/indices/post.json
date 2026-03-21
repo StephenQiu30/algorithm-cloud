@@ -58,6 +58,9 @@
       "userId": {
         "type": "keyword"
       },
+      "contentType": {
+        "type": "integer"
+      },
       "createTime": {
         "type": "date",
         "format": "epoch_millis"

@@ -13,6 +13,9 @@
         <result property="thumbNum" column="thumb_num" jdbcType="INTEGER"/>
         <result property="favourNum" column="favour_num" jdbcType="INTEGER"/>
         <result property="userId" column="user_id" jdbcType="BIGINT"/>
+        <result property="contentType" column="content_type" jdbcType="TINYINT"/>
+        <result property="reviewStatus" column="review_status" jdbcType="TINYINT"/>
+        <result property="reviewMessage" column="review_message" jdbcType="VARCHAR"/>
         <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
         <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
         <result property="isDelete" column="is_delete" jdbcType="TINYINT"/>
@@ -21,7 +24,8 @@
     <sql id="Base_Column_List">
         id
         ,title,content,cover,tags,
-        thumb_num,favour_num,user_id,
+        thumb_num,favour_num,user_id,content_type,
+        review_status,review_message,
         create_time,update_time,is_delete
     </sql>
 
