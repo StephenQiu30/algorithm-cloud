@@ -6,7 +6,7 @@ NACOS_ADDR="http://${NACOS_HOST}:${NACOS_PORT}"
 NAMESPACE="alogrithm-cloud"
 GROUP="DEFAULT_GROUP"
 USERNAME="nacos"
-PASSWORD="your_nacos_password"
+PASSWORD="nacos"
 
 echo "=============================================="
 echo "   Nacos Configuration Importer"

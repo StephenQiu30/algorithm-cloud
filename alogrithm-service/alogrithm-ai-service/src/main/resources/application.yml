@@ -30,9 +30,6 @@ spring:
         file-extension: yml
         username: nacos
         password: nacos
-
-# Spring AI 配置
-spring:
   ai:
     dashscope:
       api-key: ${dev.aliyun.dashscope.api-key}
