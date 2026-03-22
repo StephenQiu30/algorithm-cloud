@@ -10,6 +10,9 @@ import java.io.Serializable;
 
 /**
  * AI 对话记录查询请求
+ * <p>
+ * 支持根据 ID、会话 ID、用户 ID、模型类型以及关键字对对话内容和响应进行全面搜索。
+ * </p>
  *
  * @author StephenQiu30
  */
@@ -40,14 +43,14 @@ public class AiChatRecordQueryRequest extends PageRequest implements Serializabl
     private String sessionId;
 
     /**
-     * 模型类型
+     * 模型类型 (如 dashscope, ollama 等)
      */
     @Schema(description = "模型类型")
     private String modelType;
 
     /**
-     * 搜索词
+     * 搜索关键词 (模糊查询 message 或 response)
      */
-    @Schema(description = "搜索词 (匹配消息内容或响应)")
+    @Schema(description = "搜索关键词")
     private String searchText;
 }

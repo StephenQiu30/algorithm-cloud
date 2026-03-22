@@ -23,6 +23,7 @@
         <module>algorithm-api-mail</module>
         <module>algorithm-api-log</module>
         <module>algorithm-api-ai</module>
+        <module>algorithm-api-knowledge</module>
     </modules>
     <dependencies>
         <!-- MyBatis Plus Extension -->

@@ -11,6 +11,9 @@ import java.io.Serializable;
 
 /**
  * AI 对话响应
+ * <p>
+ * 包含模型生成的文本回复及各阶段 Token 消耗统计。
+ * </p>
  *
  * @author StephenQiu30
  */
@@ -25,7 +28,7 @@ public class AiChatResponse implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 回答内容
+     * 回答内容 (结果文本)
      */
     @Schema(description = "AI 回答的结果文本")
     private String content;
@@ -37,13 +40,13 @@ public class AiChatResponse implements Serializable {
     private Integer totalTokens;
 
     /**
-     * 提示消耗 token
+     * 提示 (User + System) 消耗 token
      */
     @Schema(description = "提示消耗 token")
     private Integer promptTokens;
 
     /**
-     * 生成消耗 token
+     * 生成 (Assistant) 消耗 token
      */
     @Schema(description = "生成消耗 token")
     private Integer completionTokens;

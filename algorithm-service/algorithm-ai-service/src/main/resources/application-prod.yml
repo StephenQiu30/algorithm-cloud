@@ -13,6 +13,7 @@ spring:
       - nacos:common-web-prod.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-cache-prod.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-mysql-prod.yml?group=DEFAULT_GROUP&refresh=true
+      - nacos:common-elasticsearch-prod.yml?group=DEFAULT_GROUP&refresh=true
   cloud:
     nacos:
       discovery:
@@ -28,8 +29,24 @@ spring:
         file-extension: yml
         username: ${SPRING_CLOUD_NACOS_USERNAME:${prod.nacos.username:nacos}}
         password: ${SPRING_CLOUD_NACOS_PASSWORD:${prod.nacos.password:nacos}}
+  ai:
+    dashscope:
+      api-key: ${prod.aliyun.dashscope.api-key}
+      options:
+        model: ${prod.aliyun.dashscope.model-name}
+      embedding:
+        enabled: true
+        options:
+          model: text-embedding-v2
 
-# AI 模型配置
+app:
+  knowledge:
+    vector-index: algorithm-knowledge-vectors
+    embedding-dimension: 1536
+    chunk-size: 800
+    chunk-overlap: 100
+    default-top-k: 5
+
 ai:
   dashscope:
     apiKey: ${prod.aliyun.dashscope.api-key}

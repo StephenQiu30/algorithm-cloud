@@ -1,5 +1,6 @@
 package com.stephen.cloud.api.ai.model.vo;
 
+import com.stephen.cloud.api.user.model.vo.UserVO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -9,6 +10,9 @@ import java.util.Date;
 
 /**
  * AI 对话记录 VO
+ * <p>
+ * 给前端展示的对话详细信息，关联了发起对话的用户视图对象。
+ * </p>
  *
  * @author StephenQiu30
  */
@@ -38,7 +42,7 @@ public class AiChatRecordVO implements Serializable {
     private String sessionId;
 
     /**
-     * 对话消息
+     * 对话消息 (用户提问)
      */
     @Schema(description = "对话消息")
     private String message;
@@ -50,7 +54,7 @@ public class AiChatRecordVO implements Serializable {
     private String response;
 
     /**
-     * 模型类型
+     * 模型类型 (dashscope, ollama 等)
      */
     @Schema(description = "模型类型")
     private String modelType;
@@ -66,4 +70,10 @@ public class AiChatRecordVO implements Serializable {
      */
     @Schema(description = "更新时间")
     private Date updateTime;
+
+    /**
+     * 用户详细脱敏信息
+     */
+    @Schema(description = "用户信息")
+    private UserVO userVO;
 }

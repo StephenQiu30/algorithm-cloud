@@ -93,7 +93,10 @@ public enum MqBizTypeEnum {
      * AI 对话记录同步
      */
     AI_CHAT_RECORD("AI_CHAT_RECORD", RabbitMqConstant.AI_CHAT_RECORD_EXCHANGE,
-            RabbitMqConstant.AI_CHAT_RECORD_ROUTING_KEY);
+            RabbitMqConstant.AI_CHAT_RECORD_ROUTING_KEY),
+
+    KNOWLEDGE_DOC_INGEST("KNOWLEDGE_DOC_INGEST", RabbitMqConstant.KNOWLEDGE_DOC_INGEST_EXCHANGE,
+            RabbitMqConstant.KNOWLEDGE_DOC_INGEST_ROUTING_KEY);
 
     /**
      * 业务类型唯一标识，由 Listener/Handler 使用 @MqHandler(bizType = "...") 进行订阅匹配

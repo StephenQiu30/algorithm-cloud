@@ -15,6 +15,7 @@ spring:
       - nacos:common-web.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-cache.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-mysql.yml?group=DEFAULT_GROUP&refresh=true
+      - nacos:common-elasticsearch.yml?group=DEFAULT_GROUP&refresh=true
   cloud:
     nacos:
       discovery:
@@ -35,6 +36,18 @@ spring:
       api-key: ${dev.aliyun.dashscope.api-key}
       options:
         model: ${dev.aliyun.dashscope.model-name}
+      embedding:
+        enabled: true
+        options:
+          model: text-embedding-v2
+
+app:
+  knowledge:
+    vector-index: algorithm-knowledge-vectors
+    embedding-dimension: 1536
+    chunk-size: 800
+    chunk-overlap: 100
+    default-top-k: 5
 
 # MyBatis-Plus 业务配置
 mybatis-plus:

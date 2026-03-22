@@ -2,7 +2,6 @@ package com.stephen.cloud.search.datasource;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.api.post.model.dto.post.PostQueryRequest;
-import com.stephen.cloud.api.post.model.enums.PostContentTypeEnum;
 import com.stephen.cloud.api.search.model.SearchRequest;
 import com.stephen.cloud.api.search.model.entity.PostEsDTO;
 import com.stephen.cloud.search.annotation.DataSourceType;
@@ -38,9 +37,6 @@ public class PostDataSource implements DataSource<Object> {
     public Page<Object> doSearch(SearchRequest searchRequest, HttpServletRequest request) {
         PostQueryRequest queryRequest = new PostQueryRequest(); // Renamed postQueryRequest to queryRequest
         BeanUtils.copyProperties(searchRequest, queryRequest); // Used queryRequest
-        if (queryRequest.getContentType() == null) {
-            queryRequest.setContentType(PostContentTypeEnum.POST.getValue());
-        }
         Page<PostEsDTO> page = (Page<PostEsDTO>) postEsService.searchFromEs(queryRequest); // Renamed method, changed
         // variable name, added cast,
         // used queryRequest

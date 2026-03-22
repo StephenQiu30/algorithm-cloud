@@ -133,8 +133,6 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         queryWrapper.eq(ObjectUtils.isNotEmpty(userId), Post::getUserId, userId);
         queryWrapper.eq(ObjectUtils.isNotEmpty(postQueryRequest.getReviewStatus()), Post::getReviewStatus,
                 postQueryRequest.getReviewStatus());
-        queryWrapper.eq(ObjectUtils.isNotEmpty(postQueryRequest.getContentType()), Post::getContentType,
-                postQueryRequest.getContentType());
 
         if (SqlUtils.validSortField(sortField)) {
             boolean isAsc = CommonConstant.SORT_ORDER_ASC.equalsIgnoreCase(sortOrder);

@@ -87,10 +87,4 @@ public class PostQueryRequest extends PageRequest implements Serializable {
      */
     @Schema(description = "审核信息")
     private String reviewMessage;
-
-    /**
-     * 内容类型(0-帖子 1-算法知识库)
-     */
-    @Schema(description = "内容类型(0-帖子 1-算法知识库)")
-    private Integer contentType;
 }

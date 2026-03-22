@@ -2,17 +2,11 @@ package com.stephen.cloud.ai.controller;
 
 import com.stephen.cloud.ai.service.AiChatService;
 import com.stephen.cloud.api.ai.model.dto.AiChatRequest;
-import com.stephen.cloud.api.ai.model.enums.AiModelTypeEnum;
 import com.stephen.cloud.api.ai.model.vo.AiChatResponse;
 import com.stephen.cloud.api.ai.model.vo.AiModelVO;
-import com.stephen.cloud.common.cache.model.TimeModel;
-import com.stephen.cloud.common.cache.utils.ratelimit.RateLimitUtils;
 import com.stephen.cloud.common.common.BaseResponse;
-import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ResultUtils;
-import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.log.annotation.OperationLog;
-import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -21,91 +15,68 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
- * AI 对话接口
+ * AI 对话交互接口
+ * <p>
+ * 支持标准 HTTP 对话、实时 SSE 流式对话及可用模型能力列表。
+ * </p>
  *
  * @author StephenQiu30
  */
 @RestController
-@RequestMapping("/ai")
+@RequestMapping("/chat")
 @Slf4j
-@Tag(name = "AiChatController", description = "AI 对话管理")
+@Tag(name = "AiChatController", description = "AI 核心对话交互接口")
 public class AiChatController {
 
     @Resource
     private AiChatService aiChatService;
 
-    @Resource
-    private RateLimitUtils rateLimitUtils;
-
     /**
-     * AI 对话 (标准)
-     * <p>
-     * 发送问题并同步等待 AI 返回完整回答。
+     * 标准同步对话 (等待 AI 全部回复完成后返回)
      *
      * @param aiChatRequest 对话请求
-     * @param request       HTTP 请求
-     * @return 包含 AI 回答的响应结果
+     * @param request       请求对象
+     * @return AI 完整回答
      */
-    @PostMapping("/chat")
-    @OperationLog(module = "AI 管理", action = "AI 标准对话")
-    @Operation(summary = "AI 对话 (标准)", description = "发送消息并等待 AI 返回完整回答")
-    public BaseResponse<AiChatResponse> doAiChat(@RequestBody AiChatRequest aiChatRequest, HttpServletRequest request) {
-        log.info("AI 对话请求: {}", aiChatRequest);
-        ThrowUtils.throwIf(aiChatRequest == null, ErrorCode.PARAMS_ERROR);
-        // 限流：每个用户每分钟最多 10 次对话
-        Long userId = SecurityUtils.getLoginUserId();
-        rateLimitUtils.doRateLimit("ai:chat:" + userId, new TimeModel(1L, TimeUnit.MINUTES), 10L, 1L);
-        AiChatResponse response = aiChatService.chat(aiChatRequest, request);
-        log.info("AI 对话响应完成: {}", response);
-        return ResultUtils.success(response);
+    @PostMapping("/doChat")
+    @Operation(summary = "标准同步 AI 对话")
+    @OperationLog(module = "AI 对话模块", action = "标准 AI 对话")
+    public BaseResponse<AiChatResponse> doChat(@RequestBody AiChatRequest aiChatRequest, HttpServletRequest request) {
+        return ResultUtils.success(aiChatService.chat(aiChatRequest, request));
     }
 
     /**
-     * AI 对话 (流式)
-     * <p>
-     * 发送问题并通过 SSE (Server-Sent Events) 逐字获取 AI 的回答。
+     * 实时流式对话 (基于 SSE 实现，逐字输出)
      *
      * @param aiChatRequest 对话请求
-     * @param request       HTTP 请求
-     * @return 用于流式传输的 SSE 发射器
+     * @param request       请求对象
+     * @return SSE 发射器
      */
-    @PostMapping("/chat/stream")
-    @OperationLog(module = "AI 管理", action = "AI 流式对话")
-    @Operation(summary = "AI 对话 (流式)", description = "发送消息并通过 SSE 获取 AI 逐字返回的内容")
-    public SseEmitter doStreamAiChat(@RequestBody AiChatRequest aiChatRequest, HttpServletRequest request) {
-        log.info("AI 对话流处理已启动");
-        ThrowUtils.throwIf(aiChatRequest == null, ErrorCode.PARAMS_ERROR);
-        // 限流
-        Long userId = SecurityUtils.getLoginUserId();
-        rateLimitUtils.doRateLimit("ai:chat:" + userId, new TimeModel(1L, TimeUnit.MINUTES), 10L, 1L);
+    @PostMapping("/streamChat")
+    @Operation(summary = "流式实时 AI 对话")
+    @OperationLog(module = "AI 对话模块", action = "流式 AI 对话")
+    public SseEmitter streamChat(@RequestBody AiChatRequest aiChatRequest, HttpServletRequest request) {
+        // SSE 默认 1 分钟超时，满足大多数模型往返时间
         SseEmitter emitter = new SseEmitter(60000L);
         aiChatService.streamChat(aiChatRequest, emitter, request);
         return emitter;
     }
 
     /**
-     * 获取支持的 AI 模型列表
-     * <p>
-     * 获取系统当前支持的所有 AI 模型及其描述。
+     * 获取系统支持的 AI 模型列表
      *
-     * @return 包含 AI 模型信息的列表
+     * @return 模型信息列表
      */
     @GetMapping("/models")
-    @Operation(summary = "获取支持的模型列表", description = "获取系统当前支持的所有 AI 模型及其描述")
+    @Operation(summary = "获取支持的 AI 模型列表")
     public BaseResponse<List<AiModelVO>> listModels() {
-        List<AiModelVO> modelList = Arrays.stream(AiModelTypeEnum.values())
-                .map(type -> AiModelVO.builder()
-                        .name(type.getValue())
-                        .description(type.getText())
-                        .build())
-                .collect(Collectors.toList());
-        return ResultUtils.success(modelList);
+        List<AiModelVO> models = List.of(
+                AiModelVO.builder().name("dashscope").description("通义千问 (阿里巴巴)").build(),
+                AiModelVO.builder().name("ollama").description("本地 Ollama 模型").build()
+        );
+        return ResultUtils.success(models);
     }
-
 }

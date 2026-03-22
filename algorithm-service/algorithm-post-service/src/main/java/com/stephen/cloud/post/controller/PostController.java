@@ -8,7 +8,6 @@ import com.stephen.cloud.api.post.model.dto.post.PostEditRequest;
 import com.stephen.cloud.api.post.model.dto.post.PostQueryRequest;
 import com.stephen.cloud.api.post.model.dto.post.PostUpdateRequest;
 import com.stephen.cloud.api.post.model.dto.review.PostReviewRequest;
-import com.stephen.cloud.api.post.model.enums.PostContentTypeEnum;
 import com.stephen.cloud.api.post.model.enums.PostReviewStatusEnum;
 import com.stephen.cloud.api.post.model.vo.PostVO;
 import com.stephen.cloud.common.common.*;
@@ -56,7 +55,6 @@ public class PostController {
             HttpServletRequest request) {
         Post post = PostConvert.addRequestToObj(postAddRequest);
         postService.validPost(post, true);
-        post.setContentType(PostContentTypeEnum.POST.getValue());
 
         // 初始帖子状态设为待审核，需经过人工审核或自动过滤后才对公众可见
         post.setReviewStatus(PostReviewStatusEnum.REVIEWING.getValue());
@@ -97,8 +95,6 @@ public class PostController {
         if (oldPost == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
         }
-        ThrowUtils.throwIf(PostContentTypeEnum.ALGO_KB.getValue().equals(oldPost.getContentType()),
-                ErrorCode.NOT_FOUND_ERROR);
         // 仅本人或管理员可删除
         if (!oldPost.getUserId().equals(userId) && !SecurityUtils.isAdmin()) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
@@ -156,8 +152,6 @@ public class PostController {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
         Post post = postService.getById(id);
         ThrowUtils.throwIf(post == null, ErrorCode.NOT_FOUND_ERROR);
-        ThrowUtils.throwIf(PostContentTypeEnum.ALGO_KB.getValue().equals(post.getContentType()),
-                ErrorCode.NOT_FOUND_ERROR);
         return ResultUtils.success(postService.getPostVO(post, request));
     }
 
@@ -203,9 +197,6 @@ public class PostController {
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
         // 公开列表仅展示已审核通过的帖子，确保内容安全合规
         postQueryRequest.setReviewStatus(PostReviewStatusEnum.PASS.getValue());
-        if (postQueryRequest.getContentType() == null) {
-            postQueryRequest.setContentType(PostContentTypeEnum.POST.getValue());
-        }
         Page<Post> postPage = postService.page(new Page<>(current, size),
                 postService.getQueryWrapper(postQueryRequest));
         return ResultUtils.success(postService.getPostVOPage(postPage, request));
@@ -258,8 +249,6 @@ public class PostController {
         if (oldPost == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
         }
-        ThrowUtils.throwIf(PostContentTypeEnum.ALGO_KB.getValue().equals(oldPost.getContentType()),
-                ErrorCode.NOT_FOUND_ERROR);
         // 仅本人或管理员可编辑
         ThrowUtils.throwIf(!oldPost.getUserId().equals(userId) && !StpUtil.hasRole(UserConstant.ADMIN_ROLE),
                 ErrorCode.NO_AUTH_ERROR);
@@ -267,7 +256,6 @@ public class PostController {
         // 编辑后重置为待审核状态
         post.setReviewStatus(PostReviewStatusEnum.REVIEWING.getValue());
         post.setReviewMessage("内容已更新，等待人工复审");
-        post.setContentType(oldPost.getContentType());
 
         boolean result = postService.updateById(post);
 

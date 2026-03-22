@@ -238,4 +238,10 @@ public interface RabbitMqConstant {
      * AI 对话记录路由键
      */
     String AI_CHAT_RECORD_ROUTING_KEY = "algorithm.ai.chat.record.create";
+
+    String KNOWLEDGE_DOC_INGEST_EXCHANGE = "algorithm.knowledge.doc.ingest.exchange";
+
+    String KNOWLEDGE_DOC_INGEST_QUEUE = "algorithm.knowledge.doc.ingest.queue";
+
+    String KNOWLEDGE_DOC_INGEST_ROUTING_KEY = "algorithm.knowledge.doc.ingest";
 }

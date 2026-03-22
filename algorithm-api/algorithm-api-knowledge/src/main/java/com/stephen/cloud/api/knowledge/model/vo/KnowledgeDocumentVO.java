@@ -1,0 +1,72 @@
+package com.stephen.cloud.api.knowledge.model.vo;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serial;
+import java.io.Serializable;
+import java.util.Date;
+
+/**
+ * 知识文档视图
+ * <p>
+ * 包含文档的基本信息、解析状态及错误提示信息。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Schema(description = "知识文档视图")
+public class KnowledgeDocumentVO implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * id
+     */
+    @Schema(description = "id")
+    private Long id;
+
+    /**
+     * 知识库 id
+     */
+    @Schema(description = "知识库 id")
+    private Long knowledgeBaseId;
+
+    /**
+     * 原始文件名
+     */
+    @Schema(description = "原始文件名")
+    private String originalName;
+
+    /**
+     * 解析状态 (0-待解析, 1-解析中, 2-解析成功, 3-解析失败等)
+     */
+    @Schema(description = "解析状态")
+    private Integer parseStatus;
+
+    /**
+     * 错误信息 (解析失败时的原因)
+     */
+    @Schema(description = "错误信息")
+    private String errorMsg;
+
+    /**
+     * 文件大小 (字节)
+     */
+    @Schema(description = "文件大小 (字节)")
+    private Long sizeBytes;
+
+    /**
+     * 创建时间
+     */
+    @Schema(description = "创建时间")
+    private Date createTime;
+}

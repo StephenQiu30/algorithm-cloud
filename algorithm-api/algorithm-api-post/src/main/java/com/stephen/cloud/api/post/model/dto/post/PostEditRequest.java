@@ -51,12 +51,6 @@ public class PostEditRequest implements Serializable {
     @Schema(description = "标签列表")
     private List<String> tags;
 
-    /**
-     * 内容类型(0-帖子 1-算法知识库)
-     */
-    @Schema(description = "内容类型(0-帖子 1-算法知识库)")
-    private Integer contentType;
-
     @Serial
     private static final long serialVersionUID = 1L;
 }

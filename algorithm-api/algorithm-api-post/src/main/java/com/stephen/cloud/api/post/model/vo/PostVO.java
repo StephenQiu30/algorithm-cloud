@@ -64,12 +64,6 @@ public class PostVO implements Serializable {
     private Long userId;
 
     /**
-     * 内容类型(0-帖子 1-算法知识库)
-     */
-    @Schema(description = "内容类型(0-帖子 1-算法知识库)")
-    private Integer contentType;
-
-    /**
      * 创建时间
      */
     @Schema(description = "创建时间")

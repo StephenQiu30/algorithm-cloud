@@ -12,7 +12,7 @@ import java.io.Serializable;
 /**
  * AI 对话记录持久化 DTO
  * <p>
- * 用于封装需要异步持久化到数据库的对话信息及 Token 用量。
+ * 用于封装需要异步发送到消息队列并最终持久化到数据库的对话详情。
  * </p>
  *
  * @author StephenQiu30
@@ -28,7 +28,7 @@ public class AiChatRecordDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 用户 ID
+     * 发起对话的用户 ID
      */
     @Schema(description = "用户 ID")
     private Long userId;
@@ -40,25 +40,25 @@ public class AiChatRecordDTO implements Serializable {
     private String sessionId;
 
     /**
-     * 对话消息 (用户提问)
+     * 对话消息 (用户提问原文)
      */
     @Schema(description = "对话消息")
     private String message;
 
     /**
-     * AI 响应内容
+     * AI 响应内容 (模型回答原文)
      */
     @Schema(description = "AI 响应内容")
     private String response;
 
     /**
-     * 模型类型
+     * 模型类型代码
      */
     @Schema(description = "模型类型")
     private String modelType;
 
     /**
-     * 帖子 ID (可选，用于同步总结)
+     * 关联业务 ID (如帖子 ID)
      */
     @Schema(description = "帖子 ID")
     private Long postId;
@@ -70,13 +70,13 @@ public class AiChatRecordDTO implements Serializable {
     private Integer totalTokens;
 
     /**
-     * 提示消耗 token
+     * 提示消耗 token (上文累积)
      */
     @Schema(description = "提示消耗 token")
     private Integer promptTokens;
 
     /**
-     * 生成消耗 token
+     * 生成消耗 token (本次输出)
      */
     @Schema(description = "生成消耗 token")
     private Integer completionTokens;
