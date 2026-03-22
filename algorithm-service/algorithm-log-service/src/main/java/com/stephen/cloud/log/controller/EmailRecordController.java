@@ -5,7 +5,7 @@ import com.stephen.cloud.common.auth.annotation.InternalAuth;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordAddRequest;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordQueryRequest;
-import com.stephen.cloud.api.log.model.dto.email.EmailRecordUpdateStatusRequest;
+
 import com.stephen.cloud.api.log.model.vo.EmailRecordVO;
 import com.stephen.cloud.common.common.*;
 import com.stephen.cloud.common.constants.UserConstant;
@@ -50,34 +50,6 @@ public class EmailRecordController {
     @Operation(summary = "创建邮件记录", description = "记录邮件发送信息")
     public BaseResponse<Boolean> addEmailRecord(@RequestBody EmailRecordAddRequest request) {
         boolean result = emailRecordService.addRecord(request);
-        return ResultUtils.success(result);
-    }
-
-    /**
-     * 创建邮件记录并返回 ID
-     *
-     * @param request 创建请求
-     * @return 邮件记录 ID
-     */
-    @PostMapping("/add/id")
-    @InternalAuth
-    @Operation(summary = "创建邮件记录并返回 ID", description = "记录邮件发送信息并返回记录 ID")
-    public BaseResponse<Long> addEmailRecordReturnId(@RequestBody EmailRecordAddRequest request) {
-        Long id = emailRecordService.addRecordReturnId(request);
-        return ResultUtils.success(id);
-    }
-
-    /**
-     * 更新邮件记录状态
-     *
-     * @param request 更新请求
-     * @return 是否成功
-     */
-    @PostMapping("/update/status")
-    @InternalAuth
-    @Operation(summary = "更新邮件记录状态", description = "更新指定邮件记录的状态")
-    public BaseResponse<Boolean> updateRecordStatus(@RequestBody EmailRecordUpdateStatusRequest request) {
-        boolean result = emailRecordService.updateRecordStatus(request);
         return ResultUtils.success(result);
     }
 

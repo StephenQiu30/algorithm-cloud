@@ -5,7 +5,7 @@ import com.stephen.cloud.api.log.model.dto.access.ApiAccessLogAddRequest;
 import com.stephen.cloud.api.log.model.dto.access.ApiAccessLogQueryRequest;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordAddRequest;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordQueryRequest;
-import com.stephen.cloud.api.log.model.dto.email.EmailRecordUpdateStatusRequest;
+
 import com.stephen.cloud.api.log.model.dto.file.FileUploadRecordAddRequest;
 import com.stephen.cloud.api.log.model.dto.file.FileUploadRecordQueryRequest;
 import com.stephen.cloud.api.log.model.dto.login.UserLoginLogAddRequest;
@@ -62,23 +62,7 @@ public interface LogFeignClient {
     @PostMapping("/email/add")
     BaseResponse<Boolean> addEmailRecord(@RequestBody EmailRecordAddRequest request);
 
-    /**
-     * 创建邮件记录并返回 ID
-     *
-     * @param request 邮件记录创建请求
-     * @return 邮件记录 ID
-     */
-    @PostMapping("/email/add/id")
-    BaseResponse<Long> addEmailRecordReturnId(@RequestBody EmailRecordAddRequest request);
 
-    /**
-     * 更新邮件记录状态
-     *
-     * @param request 邮件状态更新请求
-     * @return 是否更新成功
-     */
-    @PostMapping("/email/update/status")
-    BaseResponse<Boolean> updateEmailRecordStatus(@RequestBody EmailRecordUpdateStatusRequest request);
 
     /**
      * 创建文件上传记录

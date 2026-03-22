@@ -2,12 +2,12 @@ package com.stephen.cloud.mail.service.impl;
 
 import com.stephen.cloud.api.log.client.LogFeignClient;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordAddRequest;
-import com.stephen.cloud.api.log.model.dto.email.EmailRecordUpdateStatusRequest;
+
 import com.stephen.cloud.api.mail.model.dto.EmailAttachment;
 import com.stephen.cloud.api.mail.model.enums.EmailStatusEnum;
 import com.stephen.cloud.api.mail.model.dto.MailSendCodeRequest;
 import com.stephen.cloud.api.mail.model.dto.MailSendRequest;
-import com.stephen.cloud.common.common.BaseResponse;
+
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.exception.BusinessException;
@@ -372,73 +372,5 @@ public class MailServiceImpl implements MailService {
                 .build());
     }
 
-    /**
-     * 预创建邮件记录 (PENDING 状态)
-     * <p>
-     * 适用于分布式事务场景，先确保存储，再进行发送。
-     * </p>
-     *
-     * @param request 邮件记录创建请求
-     * @return 邮件记录唯一 ID
-     */
-    @Override
-    public Long createPendingEmail(EmailRecordAddRequest request) {
-        ThrowUtils.throwIf(request == null || StringUtils.isBlank(request.getToEmail()),
-                ErrorCode.PARAMS_ERROR, "待创建记录参数非法");
-        try {
-            if (StringUtils.isBlank(request.getMsgId())) {
-                request.setMsgId(UUID.randomUUID().toString());
-            }
-            request.setStatus(EmailStatusEnum.PENDING.getValue());
-            request.setRetryCount(0);
-            request.setMaxRetry(3);
-            request.setSendTime(new Date());
-            BaseResponse<Long> response = logFeignClient.addEmailRecordReturnId(request);
-            return (response != null && response.getData() != null) ? response.getData() : null;
-        } catch (Exception e) {
-            log.error("[MailServiceImpl] 创建待发送记录异常", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "创建预备记录失败");
-        }
-    }
 
-    /**
-     * 成功状态回填
-     *
-     * @param emailRecordId 邮件记录 ID
-     */
-    @Override
-    public void updateEmailStatusToSuccess(Long emailRecordId) {
-        if (emailRecordId == null) {
-            return;
-        }
-        try {
-            EmailRecordUpdateStatusRequest request = EmailRecordUpdateStatusRequest.builder()
-                    .id(emailRecordId).status(EmailStatusEnum.SUCCESS.getValue()).build();
-            logFeignClient.updateEmailRecordStatus(request);
-            log.info("[MailServiceImpl] 记录状态已更新为 Success, id: {}", emailRecordId);
-        } catch (Exception e) {
-            log.error("[MailServiceImpl] 回填成功状态失败, id: {}", emailRecordId, e);
-        }
-    }
-
-    /**
-     * 失败状态与错误原因回填
-     *
-     * @param emailRecordId 邮件记录 ID
-     * @param errorMessage  错误详情
-     */
-    @Override
-    public void updateEmailStatusToFailed(Long emailRecordId, String errorMessage) {
-        if (emailRecordId == null) {
-            return;
-        }
-        try {
-            EmailRecordUpdateStatusRequest request = EmailRecordUpdateStatusRequest.builder()
-                    .id(emailRecordId).status(EmailStatusEnum.FAILED.getValue()).errorMessage(errorMessage).build();
-            logFeignClient.updateEmailRecordStatus(request);
-            log.info("[MailServiceImpl] 记录状态已更新为 Failed, id: {}", emailRecordId);
-        } catch (Exception e) {
-            log.error("[MailServiceImpl] 回填失败状态失败, id: {}", emailRecordId, e);
-        }
-    }
 }

@@ -48,29 +48,7 @@ public interface MailService {
      */
     void sendVerificationCode(MailSendCodeRequest mailSendCodeRequest);
 
-    /**
-     * 预创建邮件记录（用于分布式事务补偿）
-     * 先创建记录（状态 PENDING），发送成功后更新状态为 SUCCESS
-     *
-     * @param request 邮件记录创建请求
-     * @return 邮件记录 ID
-     */
-    Long createPendingEmail(EmailRecordAddRequest request);
 
-    /**
-     * 更新邮件记录状态为成功
-     *
-     * @param emailRecordId 邮件记录 ID
-     */
-    void updateEmailStatusToSuccess(Long emailRecordId);
-
-    /**
-     * 更新邮件记录状态为失败
-     *
-     * @param emailRecordId 邮件记录 ID
-     * @param errorMessage  错误信息
-     */
-    void updateEmailStatusToFailed(Long emailRecordId, String errorMessage);
 
     /**
      * 记录邮件发送日志

@@ -5,9 +5,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordAddRequest;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordQueryRequest;
-import com.stephen.cloud.api.log.model.dto.email.EmailRecordUpdateStatusRequest;
-import com.stephen.cloud.common.common.ErrorCode;
-import com.stephen.cloud.common.common.ThrowUtils;
+
+
 import com.stephen.cloud.common.constants.CommonConstant;
 import com.stephen.cloud.common.mysql.utils.SqlUtils;
 import com.stephen.cloud.log.mapper.EmailRecordMapper;
@@ -34,14 +33,9 @@ public class EmailRecordServiceImpl extends ServiceImpl<EmailRecordMapper, Email
 
     @Override
     public boolean addRecord(EmailRecordAddRequest request) {
-        return addRecordReturnId(request) != null;
-    }
-
-    @Override
-    public Long addRecordReturnId(EmailRecordAddRequest request) {
         if (request == null) {
             log.warn("邮件记录创建请求为空");
-            return null;
+            return false;
         }
         EmailRecord emailRecord = new EmailRecord();
         BeanUtils.copyProperties(request, emailRecord);
@@ -59,39 +53,20 @@ public class EmailRecordServiceImpl extends ServiceImpl<EmailRecordMapper, Email
             if (existingRecord != null) {
                 log.info("邮件记录已存在，执行更新操作, msgId: {}", msgId);
                 emailRecord.setId(existingRecord.getId());
-                this.updateById(emailRecord);
-                return existingRecord.getId();
+                return this.updateById(emailRecord);
             } else {
-                boolean saved = this.save(emailRecord);
-                if (saved) {
-                    return emailRecord.getId();
-                }
+                return this.save(emailRecord);
             }
         } catch (DuplicateKeyException e) {
             log.warn("邮件记录主键/唯一索引冲突，尝试获取已存在的记录，msgId: {}", msgId);
-            EmailRecord existingRecord = this.getOne(queryWrapper);
-            if (existingRecord != null) {
-                return existingRecord.getId();
-            }
+            return this.getOne(queryWrapper) != null;
         } catch (Exception e) {
             log.error("邮件记录保存失败, msgId: {}, error: {}", msgId, e.getMessage(), e);
         }
-        return null;
+        return false;
     }
 
-    @Override
-    public boolean updateRecordStatus(EmailRecordUpdateStatusRequest request) {
-        Long id = request.getId();
-        ThrowUtils.throwIf(id == null || id <= 0, ErrorCode.PARAMS_ERROR, "邮件记录ID不能为空");
-        EmailRecord oldRecord = this.getById(id);
-        ThrowUtils.throwIf(oldRecord == null, ErrorCode.NOT_FOUND_ERROR, "邮件记录不存在");
 
-        EmailRecord updateRecord = new EmailRecord();
-        updateRecord.setId(id);
-        updateRecord.setStatus(request.getStatus());
-        updateRecord.setErrorMessage(request.getErrorMessage());
-        return this.updateById(updateRecord);
-    }
 
     @Override
     public LambdaQueryWrapper<EmailRecord> getQueryWrapper(EmailRecordQueryRequest queryRequest) {
