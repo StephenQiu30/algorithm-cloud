@@ -32,7 +32,7 @@ public interface LogFeignClient {
      * @param request 登录日志创建请求
      * @return 是否创建成功
      */
-    @PostMapping("/log/login/add")
+    @PostMapping("/login/add")
     BaseResponse<Boolean> addUserLoginLog(@RequestBody UserLoginLogAddRequest request);
 
     /**
@@ -41,7 +41,7 @@ public interface LogFeignClient {
      * @param request 操作日志创建请求
      * @return 是否创建成功
      */
-    @PostMapping("/log/operation/add")
+    @PostMapping("/operation/add")
     BaseResponse<Boolean> addOperationLog(@RequestBody OperationLogAddRequest request);
 
     /**
@@ -50,7 +50,7 @@ public interface LogFeignClient {
      * @param request API访问日志创建请求
      * @return 是否创建成功
      */
-    @PostMapping("/log/access/add")
+    @PostMapping("/access/add")
     BaseResponse<Boolean> addApiAccessLog(@RequestBody ApiAccessLogAddRequest request);
 
     /**
@@ -59,7 +59,7 @@ public interface LogFeignClient {
      * @param request 邮件记录创建请求
      * @return 是否创建成功
      */
-    @PostMapping("/log/email/add")
+    @PostMapping("/email/add")
     BaseResponse<Boolean> addEmailRecord(@RequestBody EmailRecordAddRequest request);
 
     /**
@@ -68,7 +68,7 @@ public interface LogFeignClient {
      * @param request 邮件记录创建请求
      * @return 邮件记录 ID
      */
-    @PostMapping("/log/email/add/id")
+    @PostMapping("/email/add/id")
     BaseResponse<Long> addEmailRecordReturnId(@RequestBody EmailRecordAddRequest request);
 
     /**
@@ -77,7 +77,7 @@ public interface LogFeignClient {
      * @param request 邮件状态更新请求
      * @return 是否更新成功
      */
-    @PostMapping("/log/email/update/status")
+    @PostMapping("/email/update/status")
     BaseResponse<Boolean> updateEmailRecordStatus(@RequestBody EmailRecordUpdateStatusRequest request);
 
     /**
@@ -86,7 +86,7 @@ public interface LogFeignClient {
      * @param request 文件上传记录创建请求
      * @return 是否创建成功
      */
-    @PostMapping("/log/file/upload/add")
+    @PostMapping("/file/upload/add")
     BaseResponse<Boolean> addFileUploadRecord(@RequestBody FileUploadRecordAddRequest request);
 
     /**
@@ -95,7 +95,7 @@ public interface LogFeignClient {
      * @param request 查询请求
      * @return 分页结果
      */
-    @PostMapping("/log/login/list/page")
+    @PostMapping("/login/list/page")
     BaseResponse<Page<UserLoginLogVO>> listUserLoginLogByPage(@RequestBody UserLoginLogQueryRequest request);
 
     /**
@@ -104,7 +104,7 @@ public interface LogFeignClient {
      * @param request 查询请求
      * @return 分页结果
      */
-    @PostMapping("/log/operation/list/page")
+    @PostMapping("/operation/list/page")
     BaseResponse<Page<OperationLogVO>> listOperationLogByPage(@RequestBody OperationLogQueryRequest request);
 
     /**
@@ -113,7 +113,7 @@ public interface LogFeignClient {
      * @param request 查询请求
      * @return 分页结果
      */
-    @PostMapping("/log/access/list/page")
+    @PostMapping("/access/list/page")
     BaseResponse<Page<ApiAccessLogVO>> listApiAccessLogByPage(@RequestBody ApiAccessLogQueryRequest request);
 
     /**
@@ -122,7 +122,7 @@ public interface LogFeignClient {
      * @param request 查询请求
      * @return 分页结果
      */
-    @PostMapping("/log/email/list/page")
+    @PostMapping("/email/list/page")
     BaseResponse<Page<EmailRecordVO>> listEmailRecordByPage(@RequestBody EmailRecordQueryRequest request);
 
     /**
@@ -131,7 +131,7 @@ public interface LogFeignClient {
      * @param request 查询请求
      * @return 分页结果
      */
-    @PostMapping("/log/file/upload/list/page")
+    @PostMapping("/file/upload/list/page")
     BaseResponse<Page<FileUploadRecordVO>> listFileUploadRecordByPage(
             @RequestBody FileUploadRecordQueryRequest request);
 }
