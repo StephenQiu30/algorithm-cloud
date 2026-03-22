@@ -7,10 +7,7 @@ import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public final class TextChunker {
-
-    private TextChunker() {
-    }
+public class TextChunker {
 
     public static List<String> splitWithOverlap(String text, int chunkSize, int overlap) {
         if (StringUtils.isBlank(text)) {

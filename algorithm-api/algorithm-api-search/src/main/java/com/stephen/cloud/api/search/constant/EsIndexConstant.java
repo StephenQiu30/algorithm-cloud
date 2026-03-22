@@ -5,19 +5,16 @@ package com.stephen.cloud.api.search.constant;
  *
  * @author stephen
  */
-public final class EsIndexConstant {
-
-    private EsIndexConstant() {
-    }
+public interface EsIndexConstant {
 
     /**
      * 帖子索引
      */
-    public static final String POST_INDEX = "algorithm_post";
+    String POST_INDEX = "post";
 
     /**
      * 用户索引
      */
-    public static final String USER_INDEX = "algorithm_user";
+    String USER_INDEX = "algorithm_user";
 
 }

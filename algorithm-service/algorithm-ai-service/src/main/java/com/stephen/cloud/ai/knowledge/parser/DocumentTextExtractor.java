@@ -22,10 +22,7 @@ import java.util.stream.Collectors;
  * 并针对 CSV 等结构化数据进行优化提取。
  * </p>
  */
-public final class DocumentTextExtractor {
-
-    private DocumentTextExtractor() {
-    }
+public class DocumentTextExtractor {
 
     /**
      * 提取文档文本

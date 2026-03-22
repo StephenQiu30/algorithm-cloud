@@ -20,7 +20,10 @@ import java.util.List;
  * 知识检索测试接口
  * <p>
  * 提供面向管理员或开发者的知识检索诊断能力。
+ * 支持在指定知识库内执行语义搜索，并查看向量匹配评分及源片段。
  * </p>
+ *
+ * @author StephenQiu30
  */
 @RestController
 @RequestMapping("/retrieval")

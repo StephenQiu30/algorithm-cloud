@@ -41,12 +41,12 @@ public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentM
         implements KnowledgeDocumentService {
 
     /**
-     * 最大文件限制：20MB
+     * 最大文件限制：20MB (避免大文件处理导致的 OOM)
      */
     private static final long MAX_BYTES = 20 * 1024 * 1024;
 
     /**
-     * 支持并允许上传的文件后缀
+     * 系统支持的文档格式，由 {@link KnowledgeDocumentTypeEnum} 统一管理
      */
     private static final Set<String> ALLOWED_EXT = Set.copyOf(KnowledgeDocumentTypeEnum.getValues());
 

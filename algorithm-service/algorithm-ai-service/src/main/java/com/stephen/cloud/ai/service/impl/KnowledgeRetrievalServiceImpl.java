@@ -20,6 +20,11 @@ import java.util.List;
 
 /**
  * 知识检索服务实现
+ * <p>
+ * 对接向量数据库执行语义搜索，并支持基于 Metadata 的多租户（知识库隔离）过滤。
+ * </p>
+ *
+ * @author StephenQiu30
  */
 @Service
 public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService {
@@ -33,6 +38,13 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
     @Resource
     private KnowledgeProperties knowledgeProperties;
 
+    /**
+     * 执行语义检索
+     *
+     * @param request 检索请求（包含 query, kbId, topK 等）
+     * @param userId  执行用户 ID（用于鉴权）
+     * @return 命中的分片列表封装
+     */
     @Override
     public List<ChunkSourceVO> search(KnowledgeRetrievalRequest request, Long userId) {
         if (request == null || StringUtils.isBlank(request.getQuery())) {

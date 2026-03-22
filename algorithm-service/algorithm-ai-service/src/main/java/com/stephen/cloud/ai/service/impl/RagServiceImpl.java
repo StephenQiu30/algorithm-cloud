@@ -27,7 +27,8 @@ import java.util.List;
 /**
  * RAG 服务实现
  * <p>
- * 整合向量数据库检索 (Retrieval) 与大语言模型生成 (Generation)，实现基于私有知识库的问答。
+ * 整合向量数据库检索 (Retrieval) 与大语言模型生成 (Generation)，实现基于私有知识库的语义增强问答。
+ * 该服务支持动态 TopK 调节、相似度阈值过滤以及多维度的来源溯源信息展示。
  * </p>
  *
  * @author StephenQiu30

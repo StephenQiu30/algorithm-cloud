@@ -49,7 +49,6 @@ public interface MailService {
     void sendVerificationCode(MailSendCodeRequest mailSendCodeRequest);
 
 
-
     /**
      * 记录邮件发送日志
      *

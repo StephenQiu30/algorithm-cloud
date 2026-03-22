@@ -30,6 +30,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 知识入库服务实现
+ * <p>
+ * 处理文档解析、切片、向量化，并同步更新数据库与向量引擎。支持本地缓存以优化二次处理性能。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Service
 @Slf4j
 public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
@@ -49,6 +57,14 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
     @Resource
     private KnowledgeProperties knowledgeProperties;
 
+    /**
+     * 异步分析并入库文档
+     * <p>
+     * 流程：下载/定位文件 -> 提取文本 -> 清理旧数据 -> 对话切片 -> 向量化 -> 批量保存。
+     * </p>
+     *
+     * @param message MQ 消息体（包含文档 ID 及存储路径）
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void ingestDocument(KnowledgeDocIngestMessage message) {
