@@ -13,7 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
  *
  * @author StephenQiu30
  */
-@FeignClient(name = "stephen-file-service", path = "/api/file", contextId = "fileFeignClient")
+@FeignClient(name = "algorithm-file-service", path = "/api/file", contextId = "fileFeignClient")
 public interface FileFeignClient {
 
     /**

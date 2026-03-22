@@ -29,7 +29,7 @@ spring:
             connectTimeout: 5000
             readTimeout: 10000
       circuitbreaker:
-        enabled: true
+        enabled: false
 
 # 统一日志配置（prod 下 logback-spring.xml 会向 Logstash 输出，需与 docker-compose-env 中 logstash 服务同网）
 logging:

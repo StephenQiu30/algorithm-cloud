@@ -17,7 +17,7 @@ import java.util.List;
  *
  * @author StephenQiu30
  */
-@FeignClient(name = "stephen-post-service", path = "/api/post", contextId = "postFeignClient")
+@FeignClient(name = "algorithm-post-service", path = "/api/post", contextId = "postFeignClient")
 public interface PostFeignClient {
 
     /**

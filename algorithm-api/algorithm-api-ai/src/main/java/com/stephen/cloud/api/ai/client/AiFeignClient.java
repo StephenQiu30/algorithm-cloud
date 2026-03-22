@@ -20,7 +20,7 @@ import java.util.List;
  *
  * @author StephenQiu30
  */
-@FeignClient(name = "stephen-ai-service", path = "/api/ai", contextId = "aiFeignClient")
+@FeignClient(name = "algorithm-ai-service", path = "/api/ai", contextId = "aiFeignClient")
 public interface AiFeignClient {
 
     /**

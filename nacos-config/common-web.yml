@@ -29,7 +29,7 @@ spring:
             connectTimeout: 5000
             readTimeout: 10000
       circuitbreaker:
-        enabled: true
+        enabled: false
 
 # springdoc 相关配置
 springdoc:

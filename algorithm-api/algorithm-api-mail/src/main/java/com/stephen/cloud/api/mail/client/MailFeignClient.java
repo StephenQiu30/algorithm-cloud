@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
  *
  * @author StephenQiu30
  */
-@FeignClient(name = "stephen-mail-service", path = "/api/mail", contextId = "mailFeignClient")
+@FeignClient(name = "algorithm-mail-service", path = "/api/mail", contextId = "mailFeignClient")
 public interface MailFeignClient {
 
     @PostMapping("/send/sync")

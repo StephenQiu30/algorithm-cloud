@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  *
  * @author StephenQiu30
  */
-@FeignClient(name = "stephen-notification-service", path = "/api/notification", contextId = "notificationFeignClient")
+@FeignClient(name = "algorithm-notification-service", path = "/api/notification", contextId = "notificationFeignClient")
 public interface NotificationFeignClient {
 
     /**

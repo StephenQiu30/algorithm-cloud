@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
  *
  * @author StephenQiu30
  */
-@FeignClient(name = "stephen-log-service", path = "/api")
+@FeignClient(name = "algorithm-log-service", path = "/api/log", contextId = "logFeignClient")
 public interface LogFeignClient {
 
     /**
