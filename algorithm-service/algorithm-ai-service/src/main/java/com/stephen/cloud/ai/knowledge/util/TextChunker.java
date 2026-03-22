@@ -1,9 +1,11 @@
 package com.stephen.cloud.ai.knowledge.util;
 
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public final class TextChunker {
 
@@ -11,25 +13,20 @@ public final class TextChunker {
     }
 
     public static List<String> splitWithOverlap(String text, int chunkSize, int overlap) {
-        List<String> out = new ArrayList<>();
         if (StringUtils.isBlank(text)) {
-            return out;
+            return List.of();
         }
-        String t = text.replace("\r\n", "\n").trim();
-        if (t.isEmpty()) {
-            return out;
-        }
-        int step = Math.max(1, chunkSize - overlap);
-        for (int i = 0; i < t.length(); i += step) {
-            int end = Math.min(t.length(), i + chunkSize);
-            String piece = t.substring(i, end).trim();
-            if (!piece.isEmpty()) {
-                out.add(piece);
-            }
-            if (end >= t.length()) {
-                break;
-            }
-        }
-        return out;
+
+        // 使用 Spring AI 的 TokenTextSplitter 进行智能分片 (语义化更强)
+        // chunkSize 代表 Token 数量，overlap 为重叠 Token 数
+        TokenTextSplitter splitter = new TokenTextSplitter(chunkSize, overlap, 5, 10000, true);
+        
+        List<Document> chunks = splitter.split(new Document(text));
+        
+        return chunks.stream()
+                .map(Document::getText)
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toList());
     }
 }

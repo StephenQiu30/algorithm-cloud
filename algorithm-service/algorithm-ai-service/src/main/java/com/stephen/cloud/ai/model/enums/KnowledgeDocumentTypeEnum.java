@@ -1,4 +1,4 @@
-package com.stephen.cloud.api.file.model.enums;
+package com.stephen.cloud.ai.model.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,18 +9,22 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 文件上传业务类型枚举
+ * 知识库文档类型枚举
  *
  * @author StephenQiu30
  */
 @Getter
 @AllArgsConstructor
-public enum FileUploadBizEnum {
+public enum KnowledgeDocumentTypeEnum {
 
-    USER_AVATAR("用户头像", "user_avatar"),
-    POST_COVER("帖子封面", "post_cover"),
-    POST_IMAGE_COVER("帖子上传图片", "post_image_cover"),
-    KNOWLEDGE("知识库文档", "knowledge");
+    PDF("PDF文档", "pdf"),
+    DOCX("Word文档", "docx"),
+    TXT("文本文件", "txt"),
+    MD("Markdown文件", "md"),
+    MARKDOWN("Markdown文件", "markdown"),
+    CSV("CSV文件", "csv"),
+    XLSX("Excel文件", "xlsx"),
+    XLS("Excel文件", "xls");
 
     private final String text;
 
@@ -39,13 +43,13 @@ public enum FileUploadBizEnum {
      * 根据 value 获取枚举
      *
      * @param value value
-     * @return {@link FileUploadBizEnum}
+     * @return {@link KnowledgeDocumentTypeEnum}
      */
-    public static FileUploadBizEnum getEnumByValue(String value) {
+    public static KnowledgeDocumentTypeEnum getEnumByValue(String value) {
         if (ObjectUtils.isEmpty(value)) {
             return null;
         }
-        for (FileUploadBizEnum anEnum : FileUploadBizEnum.values()) {
+        for (KnowledgeDocumentTypeEnum anEnum : KnowledgeDocumentTypeEnum.values()) {
             if (anEnum.value.equals(value)) {
                 return anEnum;
             }

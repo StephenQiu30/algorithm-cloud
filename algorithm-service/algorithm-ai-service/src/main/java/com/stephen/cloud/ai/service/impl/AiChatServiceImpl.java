@@ -4,14 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.stephen.cloud.ai.model.entity.AiChatRecord;
 import com.stephen.cloud.ai.service.AiChatRecordService;
 import com.stephen.cloud.ai.service.AiChatService;
-import com.stephen.cloud.common.rabbitmq.enums.MqBizTypeEnum;
-import com.stephen.cloud.common.rabbitmq.producer.RabbitMqSender;
 import com.stephen.cloud.api.ai.model.dto.AiChatRecordDTO;
 import com.stephen.cloud.api.ai.model.dto.AiChatRequest;
 import com.stephen.cloud.api.ai.model.vo.AiChatResponse;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ThrowUtils;
-import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -50,9 +47,6 @@ public class AiChatServiceImpl implements AiChatService {
     @Resource
     private AiChatRecordService aiChatRecordService;
 
-    @Resource
-    private RabbitMqSender mqSender;
-
     /**
      * AI 标准同步对话
      *
@@ -79,8 +73,17 @@ public class AiChatServiceImpl implements AiChatService {
         String responseText = response.getResult().getOutput().getText();
         Usage usage = response.getMetadata().getUsage();
 
-        // 异步持久化对话记录到数据库 (通过 MQ 解耦)
-        saveChatRecordAsync(aiChatRequest, message, responseText, usage);
+        // 异步持久化对话记录
+        aiChatRecordService.saveAiChatRecordAsync(AiChatRecordDTO.builder()
+                .sessionId(aiChatRequest.getSessionId())
+                .postId(aiChatRequest.getPostId())
+                .message(message)
+                .response(responseText)
+                .modelType(aiChatRequest.getModelType())
+                .totalTokens(usage != null ? usage.getTotalTokens().intValue() : 0)
+                .promptTokens(usage != null ? usage.getPromptTokens().intValue() : 0)
+                .completionTokens(usage != null ? usage.getCompletionTokens().intValue() : 0)
+                .build());
 
         return AiChatResponse.builder()
                 .content(responseText)
@@ -125,7 +128,13 @@ public class AiChatServiceImpl implements AiChatService {
                 .doOnComplete(() -> {
                     log.info("AI 流式生成完成");
                     // 结束后异步保存完整记录
-                    saveChatRecordAsync(aiChatRequest, message, fullResponse.toString(), null);
+                    aiChatRecordService.saveAiChatRecordAsync(AiChatRecordDTO.builder()
+                            .sessionId(aiChatRequest.getSessionId())
+                            .postId(aiChatRequest.getPostId())
+                            .message(message)
+                            .response(fullResponse.toString())
+                            .modelType(aiChatRequest.getModelType())
+                            .build());
                     emitter.complete();
                 })
                 .doOnError(error -> {
@@ -165,29 +174,5 @@ public class AiChatServiceImpl implements AiChatService {
             }
         }
         return memory;
-    }
-
-    /**
-     * 包装并发送持久化消息到 MQ
-     */
-    private void saveChatRecordAsync(AiChatRequest aiChatRequest, String message, String response, Usage usage) {
-        try {
-            Long userId = SecurityUtils.getLoginUserIdPermitNull();
-            AiChatRecordDTO aiChatRecordDTO = AiChatRecordDTO.builder()
-                    .userId(userId)
-                    .sessionId(aiChatRequest.getSessionId())
-                    .postId(aiChatRequest.getPostId())
-                    .message(message)
-                    .response(response)
-                    .modelType(aiChatRequest.getModelType())
-                    .totalTokens(usage != null ? usage.getTotalTokens().intValue() : 0)
-                    .promptTokens(usage != null ? usage.getPromptTokens().intValue() : 0)
-                    .completionTokens(usage != null ? usage.getCompletionTokens().intValue() : 0)
-                    .build();
-            String bizId = "ai_chat:" + System.currentTimeMillis();
-            mqSender.send(MqBizTypeEnum.AI_CHAT_RECORD, bizId, aiChatRecordDTO);
-        } catch (Exception e) {
-            log.error("异步同步 AI 对话记录失败", e);
-        }
     }
 }

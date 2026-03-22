@@ -1,9 +1,12 @@
 package com.stephen.cloud.ai.service.impl;
 
+import cn.hutool.core.convert.Convert;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
+import com.stephen.cloud.ai.service.AiChatRecordService;
 import com.stephen.cloud.ai.service.KnowledgeService;
 import com.stephen.cloud.ai.service.RagService;
 import com.stephen.cloud.ai.service.VectorStoreService;
+import com.stephen.cloud.api.ai.model.dto.AiChatRecordDTO;
 import com.stephen.cloud.api.knowledge.model.dto.RagChatRequest;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
@@ -12,6 +15,7 @@ import com.stephen.cloud.common.exception.BusinessException;
 import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -32,21 +36,35 @@ import java.util.List;
 public class RagServiceImpl implements RagService {
 
     /**
-     * 系统提示词模版
+     * 系统提示词模版 - 面向算法教学的教育专家
      */
     private static final String SYS = """
-            你是企业知识库问答助手。仅根据「参考资料」作答；资料不足以回答时请明确说明「根据现有资料无法回答」，不要编造。
+            你是一位资深的数据结构与算法教育专家。你的任务是根据「参考资料」为学生讲解排序算法。
+
             --------
             参考资料：
             %s
             --------
-            要求：简洁、专业；可引用参考资料编号。""";
+
+            要求：
+            1. **专业且通俗**：使用专业的术语，但能用生动的比喻或步骤说明让初学者理解。
+            2. **结构化回答**：
+               - **基本原理**：简述算法的核心思想。
+               - **执行流程**：给出该算法的关键步骤。
+               - **复杂度分析**：明确指出最好、最坏、平均时间复杂度和空间复杂度。
+               - **代码示例**：如果可能，提供简洁的伪代码或 Java 实现。
+            3. **交互鼓励**：在回答结束时，可以引导学生思考，例如：“你想看看这个算法在特定数组上的执行过程吗？”
+            4. **资料约束**：仅依赖提供的「参考资料」作答。如果资料不足以回答，请礼貌地说明，并根据你的通用算法知识给出基础性建议，但需注明“补充知识”。
+            """;
 
     @Resource
     private ChatClient chatClient;
 
     @Resource
     private VectorStoreService vectorStoreService;
+
+    @Resource
+    private AiChatRecordService aiChatRecordService;
 
     @Resource
     private KnowledgeService knowledgeService;
@@ -57,13 +75,13 @@ public class RagServiceImpl implements RagService {
     /**
      * 执行 RAG 对话
      *
-     * @param knowledgeBaseId 对应知识库 ID
      * @param request         问答请求参数
      * @param userId          当前操作用户 ID
      * @return RAG 问答结果封装
      */
     @Override
-    public RagChatResponseVO ragChat(Long knowledgeBaseId, RagChatRequest request, Long userId) {
+    public RagChatResponseVO ragChat(RagChatRequest request, Long userId) {
+        Long knowledgeBaseId = request.getKnowledgeBaseId();
         if (request == null || StringUtils.isBlank(request.getQuestion())) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "提问内容不能为空");
         }
@@ -104,7 +122,7 @@ public class RagServiceImpl implements RagService {
             String text = d.getText();
             ctx.append("[").append(n).append("] ").append(text).append("\n");
             // 封装来源信息
-            Long chunkId = parseLong(d.getMetadata().get("chunkId"));
+            Long chunkId = Convert.toLong(d.getMetadata().get("chunkId"));
             double score = d.getScore() != null ? d.getScore() : 0.0;
             sources.add(ChunkSourceVO.builder().chunkId(chunkId).content(text).score(score).build());
             n++;
@@ -119,26 +137,23 @@ public class RagServiceImpl implements RagService {
                 .chatResponse();
 
         String answer = resp.getResult().getOutput().getText();
+        Usage usage = resp.getMetadata().getUsage();
+
+        // 异步持久化对话记录
+        aiChatRecordService.saveAiChatRecordAsync(AiChatRecordDTO.builder()
+                .userId(userId)
+                .sessionId(request.getSessionId())
+                .message(request.getQuestion().trim())
+                .response(answer)
+                .modelType("RAG")
+                .totalTokens(usage != null ? usage.getTotalTokens().intValue() : 0)
+                .promptTokens(usage != null ? usage.getPromptTokens().intValue() : 0)
+                .completionTokens(usage != null ? usage.getCompletionTokens().intValue() : 0)
+                .build());
+
         return RagChatResponseVO.builder()
                 .answer(answer)
                 .sources(sources)
                 .build();
-    }
-
-    /**
-     * 解析 Metadata 中的长整型
-     *
-     * @param o 对象
-     * @return Long
-     */
-    private static Long parseLong(Object o) {
-        if (o == null) {
-            return null;
-        }
-        try {
-            return Long.parseLong(o.toString());
-        } catch (NumberFormatException e) {
-            return null;
-        }
     }
 }

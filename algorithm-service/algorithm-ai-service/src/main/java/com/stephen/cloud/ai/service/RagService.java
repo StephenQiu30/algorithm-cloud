@@ -5,5 +5,5 @@ import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
 
 public interface RagService {
 
-    RagChatResponseVO ragChat(Long knowledgeBaseId, RagChatRequest request, Long userId);
+    RagChatResponseVO ragChat(RagChatRequest request, Long userId);
 }

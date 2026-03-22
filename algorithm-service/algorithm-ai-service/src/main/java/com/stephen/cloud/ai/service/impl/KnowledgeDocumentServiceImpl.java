@@ -1,26 +1,29 @@
 package com.stephen.cloud.ai.service.impl;
 
 import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.mapper.KnowledgeDocumentMapper;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
+import com.stephen.cloud.ai.model.enums.KnowledgeDocumentTypeEnum;
 import com.stephen.cloud.ai.model.enums.KnowledgeParseStatusEnum;
 import com.stephen.cloud.ai.service.KnowledgeDocumentService;
 import com.stephen.cloud.ai.service.KnowledgeService;
+import com.stephen.cloud.ai.service.VectorStoreService;
+import com.stephen.cloud.api.file.client.FileFeignClient;
+import com.stephen.cloud.api.file.model.enums.FileUploadBizEnum;
 import com.stephen.cloud.api.knowledge.model.dto.KnowledgeDocIngestMessage;
+import com.stephen.cloud.common.common.BaseResponse;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.rabbitmq.enums.MqBizTypeEnum;
 import com.stephen.cloud.common.rabbitmq.producer.RabbitMqSender;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.Locale;
 import java.util.Set;
 
@@ -33,6 +36,7 @@ import java.util.Set;
  * @author StephenQiu30
  */
 @Service
+@Slf4j
 public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentMapper, KnowledgeDocument>
         implements KnowledgeDocumentService {
 
@@ -44,7 +48,7 @@ public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentM
     /**
      * 支持并允许上传的文件后缀
      */
-    private static final Set<String> ALLOWED_EXT = Set.of("pdf", "docx", "txt", "md", "markdown");
+    private static final Set<String> ALLOWED_EXT = Set.copyOf(KnowledgeDocumentTypeEnum.getValues());
 
     @Resource
     private KnowledgeService knowledgeService;
@@ -54,6 +58,12 @@ public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentM
 
     @Resource
     private RabbitMqSender rabbitMqSender;
+
+    @Resource
+    private FileFeignClient fileFeignClient;
+
+    @Resource
+    private VectorStoreService vectorStoreService;
 
     /**
      * 上传并处理文档
@@ -77,28 +87,25 @@ public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentM
         String original = file.getOriginalFilename();
         String ext = FileUtil.extName(original);
         if (StringUtils.isBlank(ext) || !ALLOWED_EXT.contains(ext.toLowerCase(Locale.ROOT))) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "目前仅支持 PDF, Word, Markdown 及纯文本");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "目前支持 PDF, Word, Markdown, CSV, 及 Excel");
         }
         
         // 3. 权限预检
         knowledgeService.getAndCheckAccess(knowledgeBaseId, userId);
 
-        // 4. 内容存储：保存至本地存储目录
-        File dir = FileUtil.mkdir(knowledgeProperties.getStorageDir());
-        String safeName = IdUtil.simpleUUID() + "." + ext;
-        File dest = new File(dir, safeName);
-        try {
-            file.transferTo(dest);
-        } catch (IOException e) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "保存物理文件失败");
+        // 4. 内容存储：上传至 COS
+        BaseResponse<String> uploadResponse = fileFeignClient.uploadFile(file, FileUploadBizEnum.KNOWLEDGE.getValue());
+        if (uploadResponse == null || uploadResponse.getData() == null) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "上传到云存储失败");
         }
+        String cosUrl = uploadResponse.getData();
 
         // 5. 数据库记录落盘
         KnowledgeDocument doc = new KnowledgeDocument();
         doc.setKnowledgeBaseId(knowledgeBaseId);
         doc.setUserId(userId);
         doc.setOriginalName(StringUtils.defaultString(original));
-        doc.setStoragePath(dest.getAbsolutePath());
+        doc.setStoragePath(cosUrl);
         doc.setMimeType(file.getContentType());
         doc.setSizeBytes(file.getSize());
         doc.setParseStatus(KnowledgeParseStatusEnum.PENDING.getValue());
@@ -107,12 +114,12 @@ public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentM
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "写入文档记录失败");
         }
 
-        // 6. 发送异步分析消息，交由消费者进行文本提取与向量化
+        // 6. 发送异步分析消息
         KnowledgeDocIngestMessage payload = KnowledgeDocIngestMessage.builder()
                 .documentId(doc.getId())
                 .knowledgeBaseId(knowledgeBaseId)
                 .userId(userId)
-                .storagePath(dest.getAbsolutePath())
+                .storagePath(cosUrl)
                 .build();
         rabbitMqSender.send(MqBizTypeEnum.KNOWLEDGE_DOC_INGEST, payload);
         
@@ -138,5 +145,39 @@ public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentM
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "该文档在指定库中不存在");
         }
         return doc;
+    }
+
+    /**
+     * 删除文档并同步清除向量库中的切片
+     *
+     * @param documentId 文档 ID
+     * @param userId     用户 ID
+     * @return 是否成功
+     */
+    @Override
+    public boolean deleteDocument(Long documentId, Long userId) {
+        // 1. 获取文档并检查归属权
+        KnowledgeDocument doc = this.getById(documentId);
+        if (doc == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "文档不存在");
+        }
+        // 检查用户对该知识库的访问权
+        knowledgeService.getAndCheckAccess(doc.getKnowledgeBaseId(), userId);
+
+        // 2. 数据库逻辑删除
+        boolean removed = this.removeById(documentId);
+        if (!removed) {
+            return false;
+        }
+
+        // 3. 同步清理向量库中的关联切片
+        try {
+            vectorStoreService.deleteByDocumentId(documentId);
+        } catch (Exception e) {
+            log.error("Failed to delete vector nodes for documentId: {}", documentId, e);
+            // 向量库删除失败暂不阻塞主流程，通常需要补偿机制或重试
+        }
+
+        return true;
     }
 }

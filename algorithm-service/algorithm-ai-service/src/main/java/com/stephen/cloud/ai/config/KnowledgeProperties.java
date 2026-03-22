@@ -20,4 +20,6 @@ public class KnowledgeProperties {
     private String storageDir = System.getProperty("java.io.tmpdir") + "/algorithm-kb-uploads";
 
     private String embeddingModelName = "text-embedding-v2";
+
+    private Long sseTimeout = 60000L;
 }

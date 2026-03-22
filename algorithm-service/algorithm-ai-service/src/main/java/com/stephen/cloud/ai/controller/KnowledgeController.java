@@ -19,10 +19,12 @@ import com.stephen.cloud.common.constants.UserConstant;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.log.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -167,27 +169,47 @@ public class KnowledgeController {
      * @param file            二进制文件
      * @return 记录 ID
      */
-    @PostMapping("/document/upload")
+    @PostMapping(value = "/document/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "上传知识库文档")
     @OperationLog(module = "知识库模块", action = "上传文档到知识库")
-    public BaseResponse<Long> uploadDocument(@RequestParam("knowledgeBaseId") Long knowledgeBaseId, @RequestParam("file") MultipartFile file) {
+    public BaseResponse<Long> uploadDocument(
+            @Parameter(description = "所属知识库 ID") @RequestParam("knowledgeBaseId") Long knowledgeBaseId,
+            @Parameter(description = "二进制文件") @RequestParam("file") MultipartFile file) {
         Long userId = SecurityUtils.getLoginUserId();
         Long documentId = knowledgeDocumentService.uploadDocument(knowledgeBaseId, file, userId);
         return ResultUtils.success(documentId);
     }
 
     /**
+     * 删除知识库文档
+     *
+     * @param deleteRequest 包含文档 ID 的请求
+     * @return 是否成功
+     */
+    @PostMapping("/document/delete")
+    @Operation(summary = "删除知识库文档")
+    @OperationLog(module = "知识库模块", action = "删除知识库文档")
+    public BaseResponse<Boolean> deleteDocument(@RequestBody DeleteRequest deleteRequest) {
+        if (deleteRequest == null || deleteRequest.getId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        Long userId = SecurityUtils.getLoginUserId();
+        boolean result = knowledgeDocumentService.deleteDocument(deleteRequest.getId(), userId);
+        return ResultUtils.success(result);
+    }
+
+    /**
      * 发起 RAG 对话提问
      *
-     * @param knowledgeBaseId 对应知识库 ID
-     * @param request         问答内容
+     * @param request 问答内容 (包含知识库 ID)
      * @return RAG 完整答复视图 (含源切片)
      */
-    @PostMapping("/chat/{knowledgeBaseId}")
+    @PostMapping("/chat")
     @Operation(summary = "发起 RAG 知识库问答")
-    public BaseResponse<RagChatResponseVO> ragChat(@PathVariable Long knowledgeBaseId, @RequestBody RagChatRequest request) {
+    @OperationLog(module = "知识库模块", action = "发起 RAG 问答")
+    public BaseResponse<RagChatResponseVO> ragChat(@RequestBody RagChatRequest request) {
         Long userId = SecurityUtils.getLoginUserId();
-        RagChatResponseVO response = ragService.ragChat(knowledgeBaseId, request, userId);
+        RagChatResponseVO response = ragService.ragChat(request, userId);
         return ResultUtils.success(response);
     }
 }

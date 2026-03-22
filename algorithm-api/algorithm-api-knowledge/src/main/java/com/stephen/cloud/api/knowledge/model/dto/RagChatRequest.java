@@ -22,6 +22,12 @@ public class RagChatRequest implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
+     * 知识库 ID
+     */
+    @Schema(description = "知识库 ID")
+    private Long knowledgeBaseId;
+
+    /**
      * 问题内容
      */
     @Schema(description = "问题内容", example = "什么是 RAG？")

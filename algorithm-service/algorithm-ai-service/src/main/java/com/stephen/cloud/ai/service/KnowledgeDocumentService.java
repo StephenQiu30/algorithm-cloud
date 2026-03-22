@@ -25,6 +25,15 @@ public interface KnowledgeDocumentService extends IService<KnowledgeDocument> {
     Long uploadDocument(Long knowledgeBaseId, MultipartFile file, Long userId);
 
     /**
+     * 删除文档并同步清除向量库中的切片
+     *
+     * @param documentId 文档 ID
+     * @param userId     用户 ID
+     * @return 是否成功
+     */
+    boolean deleteDocument(Long documentId, Long userId);
+
+    /**
      * 获取指定文档并校验操作权限
      *
      * @param knowledgeBaseId 知识库 ID

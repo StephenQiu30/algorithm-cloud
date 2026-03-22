@@ -1,5 +1,6 @@
 package com.stephen.cloud.ai.controller;
 
+import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.service.AiChatService;
 import com.stephen.cloud.api.ai.model.dto.AiChatRequest;
 import com.stephen.cloud.api.ai.model.vo.AiChatResponse;
@@ -34,6 +35,9 @@ public class AiChatController {
     @Resource
     private AiChatService aiChatService;
 
+    @Resource
+    private KnowledgeProperties knowledgeProperties;
+
     /**
      * 标准同步对话 (等待 AI 全部回复完成后返回)
      *
@@ -59,8 +63,8 @@ public class AiChatController {
     @Operation(summary = "流式实时 AI 对话")
     @OperationLog(module = "AI 对话模块", action = "流式 AI 对话")
     public SseEmitter streamChat(@RequestBody AiChatRequest aiChatRequest, HttpServletRequest request) {
-        // SSE 默认 1 分钟超时，满足大多数模型往返时间
-        SseEmitter emitter = new SseEmitter(60000L);
+        // 使用配置的超时时间
+        SseEmitter emitter = new SseEmitter(knowledgeProperties.getSseTimeout());
         aiChatService.streamChat(aiChatRequest, emitter, request);
         return emitter;
     }

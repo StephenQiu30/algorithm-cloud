@@ -8,14 +8,18 @@ import com.stephen.cloud.ai.convert.AiChatRecordConvert;
 import com.stephen.cloud.ai.mapper.AiChatRecordMapper;
 import com.stephen.cloud.ai.model.entity.AiChatRecord;
 import com.stephen.cloud.ai.service.AiChatRecordService;
+import com.stephen.cloud.api.ai.model.dto.AiChatRecordDTO;
 import com.stephen.cloud.api.ai.model.dto.AiChatRecordQueryRequest;
 import com.stephen.cloud.api.ai.model.vo.AiChatRecordVO;
 import com.stephen.cloud.api.user.client.UserFeignClient;
 import com.stephen.cloud.api.user.model.vo.UserVO;
+import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.constants.CommonConstant;
 import com.stephen.cloud.common.exception.BusinessException;
+import com.stephen.cloud.common.rabbitmq.enums.MqBizTypeEnum;
+import com.stephen.cloud.common.rabbitmq.producer.RabbitMqSender;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +44,32 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
 
     @Resource
     private UserFeignClient userFeignClient;
+
+    @Resource
+    private RabbitMqSender mqSender;
+
+    /**
+     * 包装并发送持久化消息到 MQ
+     * <p>
+     * 保持和其他微服务中实现风格的一致
+     * </p>
+     *
+     * @param aiChatRecordDTO 记录传输对象
+     */
+    @Override
+    public void saveAiChatRecordAsync(AiChatRecordDTO aiChatRecordDTO) {
+        if (aiChatRecordDTO == null) {
+            return;
+        }
+        try {
+            Long userId = SecurityUtils.getLoginUserIdPermitNull();
+            aiChatRecordDTO.setUserId(userId);
+            String bizId = "ai_chat:" + System.currentTimeMillis();
+            mqSender.send(MqBizTypeEnum.AI_CHAT_RECORD, bizId, aiChatRecordDTO);
+        } catch (Exception e) {
+            log.error("异步同步 AI 对话记录失败", e);
+        }
+    }
 
     /**
      * 校验对话记录

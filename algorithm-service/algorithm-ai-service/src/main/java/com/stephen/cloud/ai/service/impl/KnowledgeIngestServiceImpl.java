@@ -1,5 +1,7 @@
 package com.stephen.cloud.ai.service.impl;
 
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.http.HttpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.knowledge.parser.DocumentTextExtractor;
@@ -21,6 +23,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -65,9 +68,36 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
         knowledgeDocumentMapper.updateById(doc);
 
         try {
-            Path path = Path.of(message.getStoragePath());
-            String name = path.getFileName().toString().toLowerCase();
-            String text = DocumentTextExtractor.extract(path, name);
+            String storagePath = message.getStoragePath();
+            Path localPath;
+            boolean isRemote = storagePath.startsWith("http");
+            
+            if (isRemote) {
+                // 如果是远程 URL (COS)，先检查本地持久化缓存
+                String cacheDir = knowledgeProperties.getStorageDir() + "/cache";
+                FileUtil.mkdir(cacheDir);
+                
+                // 使用文档 ID 和原始文件名生成稳定的缓存文件名
+                String fileName = doc.getId() + "_" + doc.getOriginalName();
+                String localFilePath = cacheDir + "/" + fileName;
+                File localFile = new File(localFilePath);
+                
+                if (!localFile.exists()) {
+                    log.info("Downloading remote document to cache: docId={}, url={}", doc.getId(), storagePath);
+                    HttpUtil.downloadFile(storagePath, localFile);
+                } else {
+                    log.info("Using cached document: docId={}, path={}", doc.getId(), localFilePath);
+                }
+                localPath = localFile.toPath();
+            } else {
+                localPath = Path.of(storagePath);
+            }
+
+            String name = localPath.getFileName().toString().toLowerCase();
+            String text = DocumentTextExtractor.extract(localPath, name);
+            
+            // 下方移除自动删除逻辑，实现本地持久化缓存 (按用户建议优化)
+
             if (StringUtils.isBlank(text)) {
                 throw new IllegalStateException("文档无有效文本");
             }

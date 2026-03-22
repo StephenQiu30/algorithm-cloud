@@ -17,6 +17,8 @@ public class VectorStoreServiceImpl implements VectorStoreService {
     @Resource
     private VectorStore knowledgeVectorStore;
 
+    private final FilterExpressionTextParser parser = new FilterExpressionTextParser();
+
     @Override
     public void addDocuments(List<Document> documents) {
         if (documents == null || documents.isEmpty()) {
@@ -32,7 +34,6 @@ public class VectorStoreServiceImpl implements VectorStoreService {
 
     @Override
     public void deleteByDocumentId(long documentId) {
-        FilterExpressionTextParser parser = new FilterExpressionTextParser();
         Filter.Expression ex = parser.parse("documentId == '" + documentId + "'");
         knowledgeVectorStore.delete(ex);
     }
