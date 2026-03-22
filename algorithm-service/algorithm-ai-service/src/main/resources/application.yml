@@ -48,6 +48,14 @@ app:
     chunk-size: 800
     chunk-overlap: 100
     default-top-k: 5
+    similarity-threshold: 0.5
+    storage-dir: ./data/algorithm-kb-uploads
+    hybrid-search-enabled: true
+    hybrid-bm25-fetch-size: 30
+    rrf-rank-constant: 60
+    chunk-paragraph-merge-char-budget: 2500
+    rag-top-k-max: 20
+    retrieval-top-k-max: 50
 
 # MyBatis-Plus 业务配置
 mybatis-plus:

@@ -12,7 +12,6 @@ import com.stephen.cloud.api.knowledge.model.dto.KnowledgeBaseQueryRequest;
 import com.stephen.cloud.api.knowledge.model.vo.KnowledgeBaseVO;
 import com.stephen.cloud.api.user.client.UserFeignClient;
 import com.stephen.cloud.api.user.model.vo.UserVO;
-import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.constants.CommonConstant;
@@ -29,11 +28,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 知识库服务实现
- * <p>
- * 管理知识库元数据（名称、描述等），提供多维度列表查询、VO 封装以及细粒度的所有权/访问权限校验逻辑。
- * </p>
- *
  * @author StephenQiu30
  */
 @Service
@@ -88,7 +82,6 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeBaseMapper, Knowl
         qw.like(StringUtils.isNotBlank(name), KnowledgeBase::getName, name);
         qw.eq(ObjectUtils.isNotEmpty(userId), KnowledgeBase::getUserId, userId);
 
-        // 排序逻辑
         if (SqlUtils.validSortField(sortField)) {
             boolean isAsc = CommonConstant.SORT_ORDER_ASC.equalsIgnoreCase(sortOrder);
             switch (sortField) {
@@ -97,6 +90,8 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeBaseMapper, Knowl
                 default -> {
                 }
             }
+        } else {
+            qw.orderByDesc(KnowledgeBase::getUpdateTime);
         }
         return qw;
     }
@@ -160,25 +155,5 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeBaseMapper, Knowl
         
         voPage.setRecords(voList);
         return voPage;
-    }
-
-    /**
-     * 获取并检查知识库访问权限
-     *
-     * @param knowledgeBaseId 知识库 ID
-     * @param userId          用户 ID
-     * @return 知识库实体
-     */
-    @Override
-    public KnowledgeBase getAndCheckAccess(Long knowledgeBaseId, Long userId) {
-        KnowledgeBase kb = this.getById(knowledgeBaseId);
-        if (kb == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
-        }
-        // 权限检查：仅本人或管理员有权访问
-        if (!kb.getUserId().equals(userId) && !SecurityUtils.isAdmin()) {
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权访问该知识库");
-        }
-        return kb;
     }
 }

@@ -4,15 +4,16 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.http.HttpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
+import com.stephen.cloud.ai.knowledge.etl.ContentTextCleaner;
 import com.stephen.cloud.ai.knowledge.parser.DocumentTextExtractor;
 import com.stephen.cloud.ai.knowledge.util.TextChunker;
-import com.stephen.cloud.ai.mapper.DocumentChunkMapper;
-import com.stephen.cloud.ai.mapper.EmbeddingVectorMapper;
 import com.stephen.cloud.ai.mapper.KnowledgeDocumentMapper;
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.ai.model.entity.EmbeddingVector;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
 import com.stephen.cloud.ai.model.enums.KnowledgeParseStatusEnum;
+import com.stephen.cloud.ai.service.DocumentChunkService;
+import com.stephen.cloud.ai.service.EmbeddingVectorService;
 import com.stephen.cloud.ai.service.KnowledgeIngestService;
 import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.api.knowledge.model.dto.KnowledgeDocIngestMessage;
@@ -21,7 +22,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -31,9 +31,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 知识入库服务实现
+ * 知识入库服务实现：支撑排序算法教学等场景下上传或种子生成的文档进入向量库。
  * <p>
- * 处理文档解析、切片、向量化，并同步更新数据库与向量引擎。支持本地缓存以优化二次处理性能。
+ * 下载或定位文件 → {@link com.stephen.cloud.ai.knowledge.parser.DocumentTextExtractor} →
+ * {@link com.stephen.cloud.ai.knowledge.etl.ContentTextCleaner} → 清理旧分片 →
+ * {@link com.stephen.cloud.ai.knowledge.util.TextChunker} 分片 → 写 {@code document_chunk} →
+ * {@link VectorStoreService} 写 ES → 写 {@code embedding_vector}；不在方法上加本地事务，避免与 ES 写语义混淆。
  * </p>
  *
  * @author StephenQiu30
@@ -46,10 +49,10 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
     private KnowledgeDocumentMapper knowledgeDocumentMapper;
 
     @Resource
-    private DocumentChunkMapper documentChunkMapper;
+    private DocumentChunkService documentChunkService;
 
     @Resource
-    private EmbeddingVectorMapper embeddingVectorMapper;
+    private EmbeddingVectorService embeddingVectorService;
 
     @Resource
     private VectorStoreService vectorStoreService;
@@ -57,16 +60,18 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
     @Resource
     private KnowledgeProperties knowledgeProperties;
 
+    @Resource
+    private TextChunker textChunker;
+
+    @Resource
+    private ContentTextCleaner contentTextCleaner;
+
     /**
-     * 异步分析并入库文档
-     * <p>
-     * 流程：下载/定位文件 -> 提取文本 -> 清理旧数据 -> 对话切片 -> 向量化 -> 批量保存。
-     * </p>
+     * 解析并入库文档：更新状态为处理中，失败时写入 {@link KnowledgeDocument#errorMsg}
      *
-     * @param message MQ 消息体（包含文档 ID 及存储路径）
+     * @param message MQ 消息体
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void ingestDocument(KnowledgeDocIngestMessage message) {
         if (message == null || message.getDocumentId() == null) {
             return;
@@ -84,20 +89,19 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
         knowledgeDocumentMapper.updateById(doc);
 
         try {
+            // 1. 解析存储路径：远程 URL 落本地缓存目录，本地路径直接读取
             String storagePath = message.getStoragePath();
             Path localPath;
             boolean isRemote = storagePath.startsWith("http");
-            
+
             if (isRemote) {
-                // 如果是远程 URL (COS)，先检查本地持久化缓存
                 String cacheDir = knowledgeProperties.getStorageDir() + "/cache";
                 FileUtil.mkdir(cacheDir);
-                
-                // 使用文档 ID 和原始文件名生成稳定的缓存文件名
+
                 String fileName = doc.getId() + "_" + doc.getOriginalName();
                 String localFilePath = cacheDir + "/" + fileName;
                 File localFile = new File(localFilePath);
-                
+
                 if (!localFile.exists()) {
                     log.info("Downloading remote document to cache: docId={}, url={}", doc.getId(), storagePath);
                     HttpUtil.downloadFile(storagePath, localFile);
@@ -109,25 +113,26 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
                 localPath = Path.of(storagePath);
             }
 
+            // 2. 按后缀提取文本（Tika / CSV 等）
             String name = localPath.getFileName().toString().toLowerCase();
             String text = DocumentTextExtractor.extract(localPath, name);
-            
-            // 下方移除自动删除逻辑，实现本地持久化缓存 (按用户建议优化)
+            text = contentTextCleaner.clean(text);
 
             if (StringUtils.isBlank(text)) {
                 throw new IllegalStateException("文档无有效文本");
             }
 
-            removeOldChunksAndVectors(doc.getId());
+            // 3. 清理该文档历史分片与向量（幂等重跑）
+            removeChunksAndVectorsForDocument(doc.getId());
 
-            List<String> parts = TextChunker.splitWithOverlap(text, knowledgeProperties.getChunkSize(),
-                    knowledgeProperties.getChunkOverlap());
+            // 4. 分片并批量保存 document_chunk，再构建 Spring AI Document 写入向量库
+            List<String> parts = textChunker.splitWithOverlap(text);
             List<Document> vectorDocs = new ArrayList<>();
             long kbId = doc.getKnowledgeBaseId();
             long userId = doc.getUserId();
             long docId = doc.getId();
 
-            List<DocumentChunk> savedChunks = new ArrayList<>();
+            List<DocumentChunk> chunksToSave = new ArrayList<>();
             int idx = 0;
             for (String part : parts) {
                 DocumentChunk chunk = new DocumentChunk();
@@ -136,9 +141,14 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
                 chunk.setChunkIndex(idx++);
                 chunk.setContent(part);
                 chunk.setTokenEstimate(Math.min(part.length(), knowledgeProperties.getChunkSize()));
-                documentChunkMapper.insert(chunk);
-                savedChunks.add(chunk);
+                chunksToSave.add(chunk);
+            }
 
+            if (!chunksToSave.isEmpty()) {
+                documentChunkService.saveBatch(chunksToSave);
+            }
+
+            for (DocumentChunk chunk : chunksToSave) {
                 Map<String, Object> meta = new HashMap<>();
                 meta.put("knowledgeBaseId", String.valueOf(kbId));
                 meta.put("documentId", String.valueOf(docId));
@@ -147,20 +157,25 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
 
                 vectorDocs.add(Document.builder()
                         .id(String.valueOf(chunk.getId()))
-                        .text(part)
+                        .text(chunk.getContent())
                         .metadata(meta)
                         .build());
             }
 
             vectorStoreService.addDocuments(vectorDocs);
 
-            for (DocumentChunk chunk : savedChunks) {
+            // 5. 批量写入 embedding_vector 元数据（与 ES 文档 id 对齐）
+            List<EmbeddingVector> embeddingRows = new ArrayList<>();
+            for (DocumentChunk chunk : chunksToSave) {
                 EmbeddingVector ev = new EmbeddingVector();
                 ev.setChunkId(chunk.getId());
                 ev.setEmbeddingModel(knowledgeProperties.getEmbeddingModelName());
                 ev.setDimension(knowledgeProperties.getEmbeddingDimension());
                 ev.setEsDocId(String.valueOf(chunk.getId()));
-                embeddingVectorMapper.insert(ev);
+                embeddingRows.add(ev);
+            }
+            if (!embeddingRows.isEmpty()) {
+                embeddingVectorService.saveBatch(embeddingRows);
             }
 
             doc.setParseStatus(KnowledgeParseStatusEnum.DONE.getValue());
@@ -178,15 +193,23 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
         }
     }
 
-    private void removeOldChunksAndVectors(long documentId) {
+    /**
+     * 删除 ES 中该文档向量及 MySQL 中分片、向量元数据行
+     *
+     * @param documentId 文档 ID
+     */
+    @Override
+    public void removeChunksAndVectorsForDocument(long documentId) {
+        // 1. 按 metadata 删除 ES 文档
         vectorStoreService.deleteByDocumentId(documentId);
         LambdaQueryWrapper<DocumentChunk> qw = new LambdaQueryWrapper<>();
         qw.eq(DocumentChunk::getDocumentId, documentId);
-        List<DocumentChunk> old = documentChunkMapper.selectList(qw);
+        List<DocumentChunk> old = documentChunkService.list(qw);
+        // 2. 先删 embedding_vector（按 chunkId），再删 document_chunk
         for (DocumentChunk c : old) {
-            embeddingVectorMapper.delete(new LambdaQueryWrapper<EmbeddingVector>()
+            embeddingVectorService.remove(new LambdaQueryWrapper<EmbeddingVector>()
                     .eq(EmbeddingVector::getChunkId, c.getId()));
         }
-        documentChunkMapper.delete(qw);
+        documentChunkService.remove(qw);
     }
 }

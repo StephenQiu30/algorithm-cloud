@@ -28,18 +28,10 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * 知识库接口
- * <p>
- * 提供知识库的生命周期管理（CURD）、文档上传及基于库的 RAG 对话能力。
- * </p>
- *
- * @author StephenQiu30
- */
 @RestController
 @RequestMapping("/knowledge")
 @Slf4j
-@Tag(name = "KnowledgeController", description = "知识库管理及 RAG 接口")
+@Tag(name = "KnowledgeController", description = "知识库与 RAG")
 public class KnowledgeController {
 
     @Resource
@@ -51,15 +43,9 @@ public class KnowledgeController {
     @Resource
     private RagService ragService;
 
-    /**
-     * 创建知识库
-     *
-     * @param addRequest 创建参数
-     * @param request    请求对象
-     * @return 新知识库 ID
-     */
     @PostMapping("/add")
     @Operation(summary = "创建知识库")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @OperationLog(module = "知识库模块", action = "创建知识库")
     public BaseResponse<Long> addKnowledgeBase(@RequestBody KnowledgeBaseAddRequest addRequest, HttpServletRequest request) {
         if (addRequest == null) {
@@ -75,35 +61,22 @@ public class KnowledgeController {
         return ResultUtils.success(knowledgeBase.getId());
     }
 
-    /**
-     * 删除知识库
-     *
-     * @param deleteRequest 包含 ID 的删除请求
-     * @param request       请求对象
-     * @return 是否成功
-     */
     @PostMapping("/delete")
     @Operation(summary = "删除知识库")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @OperationLog(module = "知识库模块", action = "删除知识库")
     public BaseResponse<Boolean> deleteKnowledgeBase(@RequestBody DeleteRequest deleteRequest, HttpServletRequest request) {
         if (deleteRequest == null || deleteRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        Long userId = SecurityUtils.getLoginUserId();
         Long id = deleteRequest.getId();
-        // 校验是否存在并有删除权限
-        knowledgeService.getAndCheckAccess(id, userId);
+        if (knowledgeService.getById(id) == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
+        }
         boolean b = knowledgeService.removeById(id);
         return ResultUtils.success(b);
     }
 
-    /**
-     * 更新知识库 (管理员权限)
-     *
-     * @param updateRequest 更新请求
-     * @param request       请求对象
-     * @return 是否成功
-     */
     @PostMapping("/update")
     @Operation(summary = "管理员更新知识库")
     @SaCheckRole(UserConstant.ADMIN_ROLE)
@@ -112,18 +85,15 @@ public class KnowledgeController {
         if (updateRequest == null || updateRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
+        if (knowledgeService.getById(updateRequest.getId()) == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
+        }
         KnowledgeBase knowledgeBase = KnowledgeConvert.updateRequestToObj(updateRequest);
         knowledgeService.validKnowledgeBase(knowledgeBase, false);
         boolean result = knowledgeService.updateById(knowledgeBase);
         return ResultUtils.success(result);
     }
 
-    /**
-     * 根据 id 获取知识库视图
-     *
-     * @param id 知识库 ID
-     * @return 知识库视图
-     */
     @GetMapping("/get/vo")
     @Operation(summary = "根据 id 获取知识库详情")
     public BaseResponse<KnowledgeBaseVO> getKnowledgeBaseVOById(Long id, HttpServletRequest request) {
@@ -132,28 +102,19 @@ public class KnowledgeController {
         }
         KnowledgeBase knowledgeBase = knowledgeService.getById(id);
         if (knowledgeBase == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
         }
         return ResultUtils.success(knowledgeService.getKnowledgeBaseVO(knowledgeBase, request));
     }
 
-    /**
-     * 分页获取我的知识库列表
-     *
-     * @param queryRequest 分页查询请求
-     * @param request      请求对象
-     * @return 分页视图结果
-     */
     @PostMapping("/my/list/page/vo")
-    @Operation(summary = "分页获取我的知识库列表")
+    @Operation(summary = "分页获取知识库列表")
     public BaseResponse<Page<KnowledgeBaseVO>> listMyKnowledgeBaseVOByPage(@RequestBody KnowledgeBaseQueryRequest queryRequest, HttpServletRequest request) {
         if (queryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        queryRequest.setUserId(SecurityUtils.getLoginUserId());
         long current = queryRequest.getCurrent();
         long size = queryRequest.getPageSize();
-        // 限制爬虫或恶意大页查询
         if (size > 20) {
             size = 20;
         }
@@ -162,15 +123,9 @@ public class KnowledgeController {
         return ResultUtils.success(knowledgeService.getKnowledgeBaseVOPage(knowledgeBasePage, request));
     }
 
-    /**
-     * 知识库文档上传
-     *
-     * @param knowledgeBaseId 所属知识库 ID
-     * @param file            二进制文件
-     * @return 记录 ID
-     */
     @PostMapping(value = "/document/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "上传知识库文档")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @OperationLog(module = "知识库模块", action = "上传文档到知识库")
     public BaseResponse<Long> uploadDocument(
             @Parameter(description = "所属知识库 ID") @RequestParam("knowledgeBaseId") Long knowledgeBaseId,
@@ -180,14 +135,9 @@ public class KnowledgeController {
         return ResultUtils.success(documentId);
     }
 
-    /**
-     * 删除知识库文档
-     *
-     * @param deleteRequest 包含文档 ID 的请求
-     * @return 是否成功
-     */
     @PostMapping("/document/delete")
     @Operation(summary = "删除知识库文档")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @OperationLog(module = "知识库模块", action = "删除知识库文档")
     public BaseResponse<Boolean> deleteDocument(@RequestBody DeleteRequest deleteRequest) {
         if (deleteRequest == null || deleteRequest.getId() <= 0) {
@@ -198,12 +148,6 @@ public class KnowledgeController {
         return ResultUtils.success(result);
     }
 
-    /**
-     * 发起 RAG 对话提问
-     *
-     * @param request 问答内容 (包含知识库 ID)
-     * @return RAG 完整答复视图 (含源切片)
-     */
     @PostMapping("/chat")
     @Operation(summary = "发起 RAG 知识库问答")
     @OperationLog(module = "知识库模块", action = "发起 RAG 问答")

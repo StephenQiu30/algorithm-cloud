@@ -2,14 +2,13 @@ package com.stephen.cloud.ai.service.impl;
 
 import cn.hutool.core.io.FileUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.mapper.KnowledgeDocumentMapper;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
 import com.stephen.cloud.ai.model.enums.KnowledgeDocumentTypeEnum;
 import com.stephen.cloud.ai.model.enums.KnowledgeParseStatusEnum;
 import com.stephen.cloud.ai.service.KnowledgeDocumentService;
+import com.stephen.cloud.ai.service.KnowledgeIngestService;
 import com.stephen.cloud.ai.service.KnowledgeService;
-import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.api.file.client.FileFeignClient;
 import com.stephen.cloud.api.file.model.enums.FileUploadBizEnum;
 import com.stephen.cloud.api.knowledge.model.dto.KnowledgeDocIngestMessage;
@@ -54,16 +53,13 @@ public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentM
     private KnowledgeService knowledgeService;
 
     @Resource
-    private KnowledgeProperties knowledgeProperties;
-
-    @Resource
     private RabbitMqSender rabbitMqSender;
 
     @Resource
     private FileFeignClient fileFeignClient;
 
     @Resource
-    private VectorStoreService vectorStoreService;
+    private KnowledgeIngestService knowledgeIngestService;
 
     /**
      * 上传并处理文档
@@ -75,7 +71,9 @@ public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentM
      */
     @Override
     public Long uploadDocument(Long knowledgeBaseId, MultipartFile file, Long userId) {
-        // 1. 基础参数校验
+        if (knowledgeBaseId == null || knowledgeBaseId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "知识库 ID 无效");
+        }
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "上传文件不能为空");
         }
@@ -90,8 +88,9 @@ public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentM
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "目前支持 PDF, Word, Markdown, CSV, 及 Excel");
         }
         
-        // 3. 权限预检
-        knowledgeService.getAndCheckAccess(knowledgeBaseId, userId);
+        if (knowledgeService.getById(knowledgeBaseId) == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
+        }
 
         // 4. 内容存储：上传至 COS
         BaseResponse<String> uploadResponse = fileFeignClient.uploadFile(file, FileUploadBizEnum.KNOWLEDGE.getValue());
@@ -136,9 +135,10 @@ public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentM
      */
     @Override
     public KnowledgeDocument getDocumentForUser(Long knowledgeBaseId, Long documentId, Long userId) {
-        // 检查用户对该知识库的访问权
-        knowledgeService.getAndCheckAccess(knowledgeBaseId, userId);
-        
+        if (knowledgeService.getById(knowledgeBaseId) == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
+        }
+
         KnowledgeDocument doc = this.getById(documentId);
         // 核对文档是否存在且属于对应知识库
         if (doc == null || !doc.getKnowledgeBaseId().equals(knowledgeBaseId)) {
@@ -148,36 +148,31 @@ public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentM
     }
 
     /**
-     * 删除文档并同步清除向量库中的切片
+     * 删除文档：先清理 ES 向量及 {@code document_chunk}、{@code embedding_vector} 中关联数据，再逻辑删除文档记录
      *
      * @param documentId 文档 ID
      * @param userId     用户 ID
-     * @return 是否成功
+     * @return 是否删除成功
      */
     @Override
     public boolean deleteDocument(Long documentId, Long userId) {
-        // 1. 获取文档并检查归属权
+        // 1. 获取文档并校验知识库访问权限
         KnowledgeDocument doc = this.getById(documentId);
         if (doc == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "文档不存在");
         }
-        // 检查用户对该知识库的访问权
-        knowledgeService.getAndCheckAccess(doc.getKnowledgeBaseId(), userId);
-
-        // 2. 数据库逻辑删除
-        boolean removed = this.removeById(documentId);
-        if (!removed) {
-            return false;
+        if (knowledgeService.getById(doc.getKnowledgeBaseId()) == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
         }
 
-        // 3. 同步清理向量库中的关联切片
+        // 2. 同步清理向量与关系表（失败仅记录日志，不阻塞主流程删除）
         try {
-            vectorStoreService.deleteByDocumentId(documentId);
+            knowledgeIngestService.removeChunksAndVectorsForDocument(documentId);
         } catch (Exception e) {
-            log.error("Failed to delete vector nodes for documentId: {}", documentId, e);
-            // 向量库删除失败暂不阻塞主流程，通常需要补偿机制或重试
+            log.error("Failed to remove chunks/vectors for documentId: {}", documentId, e);
         }
 
-        return true;
+        // 3. 逻辑删除 knowledge_document
+        return this.removeById(documentId);
     }
 }

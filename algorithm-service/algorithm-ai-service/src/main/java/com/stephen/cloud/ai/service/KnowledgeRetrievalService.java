@@ -10,6 +10,8 @@ import java.util.List;
  * <p>
  * 提供针对知识库的语义检索能力，返回相似度评分和源文本切片，用于优化 RAG 效果。
  * </p>
+ *
+ * @author StephenQiu30
  */
 public interface KnowledgeRetrievalService {
 

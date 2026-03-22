@@ -51,13 +51,4 @@ public interface KnowledgeService extends IService<KnowledgeBase> {
      * @return 知识库视图分页
      */
     Page<KnowledgeBaseVO> getKnowledgeBaseVOPage(Page<KnowledgeBase> knowledgeBasePage, HttpServletRequest request);
-
-    /**
-     * 获取并检查访问权限 (本人或管理员)
-     *
-     * @param knowledgeBaseId 知识库 ID
-     * @param userId          用户 ID
-     * @return 知识库实体
-     */
-    KnowledgeBase getAndCheckAccess(Long knowledgeBaseId, Long userId);
 }

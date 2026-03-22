@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 知识检索测试接口
+ * 知识检索接口
  * <p>
  * 提供面向管理员或开发者的知识检索诊断能力。
  * 支持在指定知识库内执行语义搜索，并查看向量匹配评分及源片段。
