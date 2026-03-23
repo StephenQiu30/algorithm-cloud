@@ -14,6 +14,7 @@ import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ThrowUtils;
+import com.stephen.cloud.common.exception.BusinessException;
 import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.client.ChatClient;
@@ -109,15 +110,22 @@ public class RagServiceImpl implements RagService {
     @Override
     public RagChatResponseVO ragChat(RagChatRequest request, Long userId) {
         // 1. 严格参数校验
-        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR, "请求参数不能为空");
-        ThrowUtils.throwIf(StringUtils.isBlank(request.getQuestion()), ErrorCode.PARAMS_ERROR, "提问内容不能为空");
-        ThrowUtils.throwIf(StringUtils.isBlank(request.getSessionId()), ErrorCode.PARAMS_ERROR, "会话 ID 不能为空");
+        if (request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数不能为空");
+        }
+        String question = request.getQuestion();
+        String sessionId = request.getSessionId();
         Long knowledgeBaseId = request.getKnowledgeBaseId();
+        
+        ThrowUtils.throwIf(StringUtils.isBlank(question), ErrorCode.PARAMS_ERROR, "提问内容不能为空");
+        ThrowUtils.throwIf(StringUtils.isBlank(sessionId), ErrorCode.PARAMS_ERROR, "会话 ID 不能为空");
         ThrowUtils.throwIf(knowledgeBaseId == null || knowledgeBaseId <= 0, ErrorCode.PARAMS_ERROR, "知识库 ID 不能为空");
 
         // 2. 知识库合法性检查
         KnowledgeBase kb = knowledgeBaseService.getById(knowledgeBaseId);
-        ThrowUtils.throwIf(kb == null, ErrorCode.NOT_FOUND_ERROR, "指定的知识库不存在");
+        if (kb == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "指定的知识库不存在");
+        }
         String kbDesc = StringUtils.defaultIfBlank(kb.getDescription(), "通用排序算法知识库");
 
         // 3. 检索上下文预处理 (确保本次请求的 sources 不受之前请求干扰)

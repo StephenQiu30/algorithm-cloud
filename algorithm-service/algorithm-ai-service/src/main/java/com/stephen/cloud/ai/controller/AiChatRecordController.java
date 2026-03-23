@@ -116,7 +116,9 @@ public class AiChatRecordController {
         aiChatRecordService.validAiChatRecord(aiChatRecord, false);
         long id = editRequest.getId();
         AiChatRecord oldRecord = aiChatRecordService.getById(id);
-        ThrowUtils.throwIf(oldRecord == null, ErrorCode.NOT_FOUND_ERROR);
+        if (oldRecord == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+        }
         // 仅本人或管理员可编辑
         if (!oldRecord.getUserId().equals(SecurityUtils.getLoginUserId()) && !SecurityUtils.isAdmin()) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);

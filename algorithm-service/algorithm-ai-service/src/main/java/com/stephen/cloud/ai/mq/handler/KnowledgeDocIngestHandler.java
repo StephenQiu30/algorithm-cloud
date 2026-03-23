@@ -1,7 +1,7 @@
 package com.stephen.cloud.ai.mq.handler;
 
 import com.stephen.cloud.ai.service.KnowledgeIngestService;
-import com.stephen.cloud.api.knowledge.model.dto.KnowledgeDocIngestMessage;
+import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocIngestMessage;
 import com.stephen.cloud.common.rabbitmq.consumer.RabbitMqDedupeLock;
 import com.stephen.cloud.common.rabbitmq.consumer.RabbitMqHandler;
 import com.stephen.cloud.common.rabbitmq.enums.MqBizTypeEnum;

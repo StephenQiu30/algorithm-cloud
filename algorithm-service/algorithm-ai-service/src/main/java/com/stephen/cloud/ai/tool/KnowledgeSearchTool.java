@@ -4,7 +4,7 @@ import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.knowledge.context.RagSearchContext;
 import com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade;
 import com.stephen.cloud.api.ai.model.enums.AiToolEnum;
-import com.stephen.cloud.api.knowledge.model.dto.KnowledgeSearchRequest;
+import com.stephen.cloud.api.knowledge.model.dto.search.KnowledgeSearchRequest;
 import com.stephen.cloud.api.knowledge.model.vo.KnowledgeSearchVO;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import lombok.extern.slf4j.Slf4j;
