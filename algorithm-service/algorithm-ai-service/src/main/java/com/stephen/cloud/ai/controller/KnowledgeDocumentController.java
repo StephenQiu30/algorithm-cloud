@@ -17,9 +17,12 @@ import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.log.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -47,11 +50,21 @@ public class KnowledgeDocumentController {
      * @param file            二进制文档文件
      * @return 新建的文档 ID
      */
-    @PostMapping("/upload")
-    @Operation(summary = "上传文档", description = "上传二进制文件至特定知识库，并加入背景异步解析队列。")
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "上传文档",
+            description = "上传知识库文档并触发异步解析。")
     @OperationLog(module = "知识库文档模块", action = "上传知识库文档")
-    public BaseResponse<Long> uploadDocument(@Parameter(description = "关联的知识库 ID") @RequestParam("knowledgeBaseId") Long knowledgeBaseId,
-            @Parameter(description = "待上传的二进制文件") @RequestParam("file") MultipartFile file) {
+    public BaseResponse<Long> uploadDocument(
+            @Parameter(description = "关联的知识库 ID", required = true) @RequestParam("knowledgeBaseId") Long knowledgeBaseId,
+            @RequestPart("file")
+            @Parameter(
+                    description = "待上传的文档文件",
+                    required = true,
+                    content = @Content(mediaType = MediaType.APPLICATION_OCTET_STREAM_VALUE, schema = @Schema(type = "string", format = "binary")))
+            MultipartFile file) {
+        ThrowUtils.throwIf(knowledgeBaseId == null || knowledgeBaseId <= 0, ErrorCode.PARAMS_ERROR, "知识库 ID 无效");
+        ThrowUtils.throwIf(file == null || file.isEmpty(), ErrorCode.PARAMS_ERROR, "上传文件不能为空");
         Long userId = SecurityUtils.getLoginUserId();
         Long documentId = knowledgeBaseService.uploadDocument(knowledgeBaseId, file, userId);
         return ResultUtils.success(documentId);
