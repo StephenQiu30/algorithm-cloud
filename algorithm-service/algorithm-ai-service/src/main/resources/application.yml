@@ -32,6 +32,11 @@ spring:
         username: nacos
         password: nacos
   ai:
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: never
     dashscope:
       api-key: ${dev.aliyun.dashscope.api-key}
       options:

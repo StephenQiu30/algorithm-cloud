@@ -152,6 +152,7 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
                 Map<String, Object> meta = new HashMap<>();
                 meta.put("knowledgeBaseId", String.valueOf(kbId));
                 meta.put("documentId", String.valueOf(docId));
+                meta.put("documentName", doc.getOriginalName());
                 meta.put("chunkId", String.valueOf(chunk.getId()));
                 meta.put("userId", String.valueOf(userId));
 

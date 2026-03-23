@@ -14,7 +14,17 @@ public enum AiModelTypeEnum {
     /**
      * 通义千问 (阿里云 DashScope)
      */
-    DASHSCOPE("dashscope", "通义千问");
+    DASHSCOPE("dashscope", "通义千问"),
+
+    /**
+     * RAG (检索增强生成)
+     */
+    RAG("rag", "RAG"),
+
+    /**
+     * AGENTIC RAG (代理式 RAG)
+     */
+    AGENTIC_RAG("agentic_rag", "代理式 RAG");
 
     /**
      * 枚举值

@@ -6,14 +6,12 @@ import com.stephen.cloud.ai.service.KnowledgeService;
 import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import com.stephen.cloud.common.common.ErrorCode;
-import com.stephen.cloud.common.exception.BusinessException;
+import com.stephen.cloud.common.common.ThrowUtils;
 import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -38,11 +36,9 @@ public class KnowledgeChunkSearchFacade {
      */
     public List<ChunkSourceVO> searchChunks(Long knowledgeBaseId, String query, Integer requestTopK,
             int topKMax) {
-        assertKnowledgeBaseId(knowledgeBaseId);
-        validateQueryText(query);
-        if (knowledgeService.getById(knowledgeBaseId) == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
-        }
+        ThrowUtils.throwIf(knowledgeBaseId == null || knowledgeBaseId <= 0, ErrorCode.PARAMS_ERROR, "知识库 ID 不能为空");
+        ThrowUtils.throwIf(StringUtils.isBlank(query), ErrorCode.PARAMS_ERROR, "查询内容不能为空");
+        ThrowUtils.throwIf(knowledgeService.getById(knowledgeBaseId) == null, ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
         return executeChunkSearch(knowledgeBaseId, query.trim(), requestTopK, topKMax);
     }
 
@@ -51,49 +47,41 @@ public class KnowledgeChunkSearchFacade {
      */
     public List<ChunkSourceVO> searchChunksForVerifiedKnowledgeBase(Long knowledgeBaseId, String query,
             Integer requestTopK, int topKMax) {
-        assertKnowledgeBaseId(knowledgeBaseId);
-        validateQueryText(query);
+        ThrowUtils.throwIf(knowledgeBaseId == null || knowledgeBaseId <= 0, ErrorCode.PARAMS_ERROR, "知识库 ID 不能为空");
+        ThrowUtils.throwIf(StringUtils.isBlank(query), ErrorCode.PARAMS_ERROR, "查询内容不能为空");
         return executeChunkSearch(knowledgeBaseId, query.trim(), requestTopK, topKMax);
     }
 
-    private static void assertKnowledgeBaseId(Long knowledgeBaseId) {
-        if (knowledgeBaseId == null || knowledgeBaseId <= 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "知识库 ID 不能为空");
-        }
-    }
-
-    private static void validateQueryText(String query) {
-        if (StringUtils.isBlank(query)) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "查询内容不能为空");
-        }
-    }
-
-    private List<ChunkSourceVO> executeChunkSearch(long knowledgeBaseId, String queryTrimmed,
+    private List<ChunkSourceVO> executeChunkSearch(Long knowledgeBaseId, String queryTrimmed,
             Integer requestTopK, int topKMax) {
-        int topK = requestTopK != null && requestTopK > 0
-                ? requestTopK
-                : knowledgeProperties.getDefaultTopK();
-        topK = Math.min(topK, topKMax);
+        // 1. 获取 TopK 且保证不超过上限（结合 Java 21 特性简化逻辑）
+        int topK = Math.min(
+                (requestTopK != null && requestTopK > 0) ? requestTopK : knowledgeProperties.getDefaultTopK(),
+                topKMax
+        );
 
-        String filterExpression = "knowledgeBaseId == '" + knowledgeBaseId + "'";
+        // 2. 构造检索请求（元数据过滤条件与 Post 服务 ES 同步逻辑一致）
         SearchRequest searchRequest = SearchRequest.builder()
                 .query(queryTrimmed)
                 .topK(topK)
                 .similarityThreshold(knowledgeProperties.getSimilarityThreshold())
-                .filterExpression(filterExpression)
+                .filterExpression("knowledgeBaseId == '" + knowledgeBaseId + "'")
                 .build();
 
-        List<Document> docHits = vectorStoreService.similaritySearch(searchRequest);
-        List<ChunkSourceVO> results = new ArrayList<>(docHits.size());
-        for (Document d : docHits) {
-            Long chunkId = Convert.toLong(d.getMetadata().get("chunkId"));
-            double score = d.getScore() != null ? d.getScore() : 0.0;
-            results.add(ChunkSourceVO.builder()
-                    .chunkId(chunkId)
-                    .content(d.getText())
-                    .score(score)
-                    .build());
-        }
-        return results;
+        // 3. 执行语义检索并使用 Stream 流式处理结果输出
+        return vectorStoreService.similaritySearch(searchRequest).stream()
+                .map(d -> {
+                    Long chunkId = Convert.toLong(d.getMetadata().get("chunkId"));
+                    Long documentId = Convert.toLong(d.getMetadata().get("documentId"));
+                    String documentName = Convert.toStr(d.getMetadata().get("documentName"));
+
+                    return ChunkSourceVO.builder()
+                            .chunkId(chunkId)
+                            .documentId(documentId)
+                            .documentName(documentName)
+                            .content(d.getText())
+                            .score(d.getScore())
+                            .build();
+                }).toList();
     }
 }

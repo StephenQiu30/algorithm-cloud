@@ -40,6 +40,18 @@ public class ChunkSourceVO implements Serializable {
     private String content;
 
     /**
+     * 文档 ID
+     */
+    @Schema(description = "文档 ID")
+    private Long documentId;
+
+    /**
+     * 文档名称 (原文件名)
+     */
+    @Schema(description = "文档名称")
+    private String documentName;
+
+    /**
      * 相似度分数 (分值越高越匹配)
      */
     @Schema(description = "相似度分数")

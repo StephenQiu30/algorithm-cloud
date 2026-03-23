@@ -9,6 +9,8 @@ import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.model.enums.VectorSimilarityModeEnum;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.concurrent.Executor;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -23,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 混合检索：kNN + BM25，RRF 融合。
@@ -48,23 +51,41 @@ public class HybridVectorSimilarityStrategy implements VectorSimilaritySearchStr
     @Resource
     private KnowledgeProperties knowledgeProperties;
 
+    @Resource
+    private Executor vectorHybridSearchExecutor;
+
     @Override
     public List<Document> search(SearchRequest searchRequest) {
-        List<Document> knnHits = knowledgeVectorStore.similaritySearch(searchRequest);
-
         String filterQs = toFilterQueryString(searchRequest);
         int topK = searchRequest.getTopK();
         int fetch = Math.max(topK, knowledgeProperties.getHybridBm25FetchSize());
 
+        // 使用 CompletableFuture 并行执行 KNN 和 BM25 检索，降低接口响应时延
+        CompletableFuture<List<Document>> knnFuture = CompletableFuture.supplyAsync(() ->
+                knowledgeVectorStore.similaritySearch(searchRequest), vectorHybridSearchExecutor
+        );
+
+        CompletableFuture<List<Document>> bm25Future = CompletableFuture.supplyAsync(() -> {
+            try {
+                return searchBm25(searchRequest.getQuery(), filterQs, fetch);
+            } catch (IOException e) {
+                log.warn("BM25 检索失败，降级为纯向量检索: {}", e.getMessage());
+                return new ArrayList<>();
+            }
+        }, vectorHybridSearchExecutor);
+
+        List<Document> knnHits;
         List<Document> bm25Hits;
         try {
-            bm25Hits = searchBm25(searchRequest.getQuery(), filterQs, fetch);
-        } catch (IOException e) {
-            log.warn("BM25 检索失败，降级为纯向量检索: {}", e.getMessage());
-            return knnHits;
+            CompletableFuture.allOf(knnFuture, bm25Future).join();
+            knnHits = knnFuture.get();
+            bm25Hits = bm25Future.get();
+        } catch (Exception e) {
+            log.error("混合检索并行执行异常: {}", e.getMessage());
+            throw new RuntimeException("混合检索执行失败", e);
         }
 
-        if (bm25Hits.isEmpty()) {
+        if (bm25Hits == null || bm25Hits.isEmpty()) {
             return knnHits;
         }
 
@@ -137,6 +158,16 @@ public class HybridVectorSimilarityStrategy implements VectorSimilaritySearchStr
     }
 
     private static String docId(Document d) {
-        return d.getId() != null ? d.getId() : String.valueOf(System.identityHashCode(d));
+        if (d.getId() != null && !d.getId().isBlank()) {
+            return d.getId();
+        }
+        Map<String, Object> meta = d.getMetadata();
+        if (meta != null) {
+            Object chunkId = meta.get("chunkId");
+            if (chunkId != null) {
+                return String.valueOf(chunkId);
+            }
+        }
+        return "noid:" + System.identityHashCode(d);
     }
 }

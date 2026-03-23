@@ -16,12 +16,17 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 /**
  * 知识库向量存储与 ES Java API 客户端配置。
  * <p>
  * {@link VectorStore} 使用 Elasticsearch 作向量库，余弦相似度与 text-embedding 类模型常见用法一致；
  * {@link ElasticsearchClient} 与 {@link RestClient} 共用连接，供
  * {@link com.stephen.cloud.ai.service.impl.VectorStoreServiceImpl} 混合检索等执行 DSL。
+ * 向量库采用 Spring AI 文档中的 Manual Configuration（{@code spring-ai-elasticsearch-store}），与
+ * {@code spring-ai-starter-vector-store-elasticsearch} 二选一，本模块维持前者以便与现有 {@link RestClient} 复用。
  * </p>
  *
  * @author StephenQiu30
@@ -29,6 +34,11 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @EnableConfigurationProperties(KnowledgeProperties.class)
 public class KnowledgeVectorStoreConfig {
+
+    @Bean(destroyMethod = "shutdown")
+    public ExecutorService vectorHybridSearchExecutor() {
+        return Executors.newVirtualThreadPerTaskExecutor();
+    }
 
     /**
      * 与 {@link ElasticsearchVectorStore} 共用同一 {@link RestClient} 的 Java API 客户端，供混合检索 DSL、聚合等扩展使用

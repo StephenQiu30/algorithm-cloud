@@ -14,7 +14,7 @@ public interface RagService {
     /**
      * 基于指定知识库发起问答：检索（经 {@link VectorStoreService}，可含混合检索）后拼 prompt 并调用大模型。
      * <p>
-     * {@link RagChatRequest#getSessionId()} 当前仅用于异步落库关联，不参与多轮上下文拼接。
+     * {@link RagChatRequest#getSessionId()} 必填，用作 {@link org.springframework.ai.chat.memory.ChatMemory} 会话隔离与落库关联。
      * </p>
      *
      * @param request 问答请求（知识库 ID、问题、可选 topK、会话 ID）
