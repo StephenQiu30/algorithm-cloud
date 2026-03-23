@@ -1,7 +1,11 @@
 package com.stephen.cloud.ai.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
+import com.stephen.cloud.api.knowledge.model.dto.KnowledgeDocumentQueryRequest;
+import com.stephen.cloud.api.knowledge.model.vo.KnowledgeDocumentVO;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -42,4 +46,20 @@ public interface KnowledgeDocumentService extends IService<KnowledgeDocument> {
      * @return 文档实体
      */
     KnowledgeDocument getDocumentForUser(Long knowledgeBaseId, Long documentId, Long userId);
+
+    /**
+     * 获取查询条件
+     *
+     * @param queryRequest 查询请求
+     * @return 查询条件包装类
+     */
+    QueryWrapper<KnowledgeDocument> getQueryWrapper(KnowledgeDocumentQueryRequest queryRequest);
+
+    /**
+     * 分页映射 VO
+     *
+     * @param documentPage 原始分页数据
+     * @return 增强后的 VO 分页数据
+     */
+    Page<KnowledgeDocumentVO> getKnowledgeDocumentVOPage(Page<KnowledgeDocument> documentPage);
 }

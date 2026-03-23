@@ -169,6 +169,20 @@ public class FileController {
             // 允许的图片格式
             ThrowUtils.throwIf(!Arrays.asList("jpeg", "jpg", "png", "webp", "gif").contains(fileSuffix),
                     ErrorCode.PARAMS_ERROR, "帖子上传图片仅支持 jpeg、jpg、png、webp、gif 格式");
+        } else if (FileUploadBizEnum.KNOWLEDGE.equals(fileUploadBizEnum)) {
+            // 知识库文档：最大 100MB
+            long HUNDRED_MB = 100 * 1024L * 1024L;
+            ThrowUtils.throwIf(fileSize > HUNDRED_MB, ErrorCode.PARAMS_ERROR, "知识库文档大小不能超过 100M");
+            // 允许的文档格式
+            ThrowUtils.throwIf(!Arrays.asList("pdf", "docx", "doc", "txt", "md").contains(fileSuffix),
+                    ErrorCode.PARAMS_ERROR, "知识库文档仅支持 pdf、docx、doc、txt、md 格式");
+        } else if (FileUploadBizEnum.ALGORITHM_IMAGE.equals(fileUploadBizEnum)) {
+            // 算法图片：最大 10MB
+            long TEN_MB = 10 * 1024L * 1024L;
+            ThrowUtils.throwIf(fileSize > TEN_MB, ErrorCode.PARAMS_ERROR, "算法图片文件大小不能超过 10M");
+            // 允许的图片格式
+            ThrowUtils.throwIf(!Arrays.asList("jpeg", "jpg", "png", "webp").contains(fileSuffix),
+                    ErrorCode.PARAMS_ERROR, "算法图片仅支持 jpeg、jpg、png、webp 格式");
         }
     }
 }

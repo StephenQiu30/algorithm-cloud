@@ -4,17 +4,20 @@ import cn.dev33.satoken.annotation.SaCheckRole;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.ai.convert.KnowledgeConvert;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
+import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
 import com.stephen.cloud.ai.service.KnowledgeDocumentService;
 import com.stephen.cloud.ai.service.KnowledgeService;
 import com.stephen.cloud.ai.service.RagService;
 import com.stephen.cloud.api.knowledge.model.dto.*;
 import com.stephen.cloud.api.knowledge.model.vo.KnowledgeBaseVO;
+import com.stephen.cloud.api.knowledge.model.vo.KnowledgeDocumentVO;
 import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
 import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.common.BaseResponse;
 import com.stephen.cloud.common.common.DeleteRequest;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ResultUtils;
+import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.constants.UserConstant;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.log.annotation.OperationLog;
@@ -29,7 +32,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/knowledge")
+@RequestMapping("/ai/knowledge")
 @Slf4j
 @Tag(name = "KnowledgeController", description = "知识库与 RAG")
 public class KnowledgeController {
@@ -115,9 +118,23 @@ public class KnowledgeController {
         }
         long current = queryRequest.getCurrent();
         long size = queryRequest.getPageSize();
-        if (size > 20) {
-            size = 20;
+        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
+        queryRequest.setUserId(SecurityUtils.getLoginUserId());
+        Page<KnowledgeBase> knowledgeBasePage = knowledgeService.page(new Page<>(current, size),
+                knowledgeService.getQueryWrapper(queryRequest));
+        return ResultUtils.success(knowledgeService.getKnowledgeBaseVOPage(knowledgeBasePage, request));
+    }
+
+    @PostMapping("/list/page/vo")
+    @Operation(summary = "管理员分页获取知识库列表")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
+    public BaseResponse<Page<KnowledgeBaseVO>> listKnowledgeBaseVOByPage(@RequestBody KnowledgeBaseQueryRequest queryRequest, HttpServletRequest request) {
+        if (queryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
+        long current = queryRequest.getCurrent();
+        long size = queryRequest.getPageSize();
+        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
         Page<KnowledgeBase> knowledgeBasePage = knowledgeService.page(new Page<>(current, size),
                 knowledgeService.getQueryWrapper(queryRequest));
         return ResultUtils.success(knowledgeService.getKnowledgeBaseVOPage(knowledgeBasePage, request));
@@ -155,5 +172,27 @@ public class KnowledgeController {
         Long userId = SecurityUtils.getLoginUserId();
         RagChatResponseVO response = ragService.ragChat(request, userId);
         return ResultUtils.success(response);
+    }
+
+    /**
+     * 分页查询知识库文档 (管理员)
+     *
+     * @param queryRequest 分页查询请求
+     * @return 文档分页
+     */
+    @PostMapping("/document/list/page/vo")
+    @Operation(summary = "分页获取知识库文档")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
+    public BaseResponse<Page<KnowledgeDocumentVO>> listKnowledgeDocumentVOByPage(@RequestBody KnowledgeDocumentQueryRequest queryRequest) {
+        if (queryRequest == null || queryRequest.getKnowledgeBaseId() == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        long current = queryRequest.getCurrent();
+        long size = queryRequest.getPageSize();
+        // 限制查询页大小
+        ThrowUtils.throwIf(size > 50, ErrorCode.PARAMS_ERROR);
+        Page<KnowledgeDocument> documentPage = knowledgeDocumentService.page(new Page<>(current, size),
+                knowledgeDocumentService.getQueryWrapper(queryRequest));
+        return ResultUtils.success(knowledgeDocumentService.getKnowledgeDocumentVOPage(documentPage));
     }
 }

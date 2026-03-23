@@ -21,7 +21,7 @@ import java.util.UUID;
  * 日志全局过滤器
  * <p>
  * 记录每个请求的起止时间、状态码、客户端IP 等信息，
- * 并在响应完成后异步上报到日志服务（stephen-log-service）。
+ * 并在响应完成后异步上报到日志服务（algorithm-log-service）。
  * </p>
  *
  * <p>

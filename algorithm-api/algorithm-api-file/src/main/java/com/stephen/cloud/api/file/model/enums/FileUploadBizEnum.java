@@ -20,7 +20,8 @@ public enum FileUploadBizEnum {
     USER_AVATAR("用户头像", "user_avatar"),
     POST_COVER("帖子封面", "post_cover"),
     POST_IMAGE_COVER("帖子上传图片", "post_image_cover"),
-    KNOWLEDGE("知识库文档", "knowledge");
+    KNOWLEDGE("知识库文档", "knowledge"),
+    ALGORITHM_IMAGE("算法知识图片", "algorithm_image");
 
     private final String text;
 

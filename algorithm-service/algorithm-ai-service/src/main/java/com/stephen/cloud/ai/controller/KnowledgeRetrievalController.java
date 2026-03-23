@@ -26,7 +26,7 @@ import java.util.List;
  * @author StephenQiu30
  */
 @RestController
-@RequestMapping("/retrieval")
+@RequestMapping("/ai/retrieval")
 @Tag(name = "KnowledgeRetrievalController", description = "知识检索接口")
 public class KnowledgeRetrievalController {
 

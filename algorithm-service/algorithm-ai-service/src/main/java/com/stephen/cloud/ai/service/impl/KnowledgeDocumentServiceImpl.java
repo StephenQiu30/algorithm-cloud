@@ -1,7 +1,10 @@
 package com.stephen.cloud.ai.service.impl;
 
 import cn.hutool.core.io.FileUtil;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.stephen.cloud.ai.convert.KnowledgeConvert;
 import com.stephen.cloud.ai.mapper.KnowledgeDocumentMapper;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
 import com.stephen.cloud.ai.model.enums.KnowledgeDocumentTypeEnum;
@@ -12,8 +15,11 @@ import com.stephen.cloud.ai.service.KnowledgeService;
 import com.stephen.cloud.api.file.client.FileFeignClient;
 import com.stephen.cloud.api.file.model.enums.FileUploadBizEnum;
 import com.stephen.cloud.api.knowledge.model.dto.KnowledgeDocIngestMessage;
+import com.stephen.cloud.api.knowledge.model.dto.KnowledgeDocumentQueryRequest;
+import com.stephen.cloud.api.knowledge.model.vo.KnowledgeDocumentVO;
 import com.stephen.cloud.common.common.BaseResponse;
 import com.stephen.cloud.common.common.ErrorCode;
+import com.stephen.cloud.common.constants.CommonConstant;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.rabbitmq.enums.MqBizTypeEnum;
 import com.stephen.cloud.common.rabbitmq.producer.RabbitMqSender;
@@ -23,8 +29,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 知识文档服务实现类：负责文档的生命周期管理（上传、删除、权限校验）。
@@ -177,5 +185,40 @@ public class KnowledgeDocumentServiceImpl extends ServiceImpl<KnowledgeDocumentM
 
         // 3. 逻辑删除 knowledge_document
         return this.removeById(documentId);
+    }
+
+    @Override
+    public QueryWrapper<KnowledgeDocument> getQueryWrapper(KnowledgeDocumentQueryRequest queryRequest) {
+        QueryWrapper<KnowledgeDocument> queryWrapper = new QueryWrapper<>();
+        if (queryRequest == null) {
+            return queryWrapper;
+        }
+
+        Long knowledgeBaseId = queryRequest.getKnowledgeBaseId();
+        String originalName = queryRequest.getOriginalName();
+        Integer parseStatus = queryRequest.getParseStatus();
+        String sortField = queryRequest.getSortField();
+        String sortOrder = queryRequest.getSortOrder();
+
+        queryWrapper.eq(knowledgeBaseId != null && knowledgeBaseId > 0, "knowledgeBaseId", knowledgeBaseId);
+        queryWrapper.like(StringUtils.isNotBlank(originalName), "originalName", originalName);
+        queryWrapper.eq(parseStatus != null, "parseStatus", parseStatus);
+        queryWrapper.orderBy(StringUtils.isNotBlank(sortField),
+                CommonConstant.SORT_ORDER_ASC.equals(sortOrder), sortField);
+        return queryWrapper;
+    }
+
+    @Override
+    public Page<KnowledgeDocumentVO> getKnowledgeDocumentVOPage(Page<KnowledgeDocument> documentPage) {
+        List<KnowledgeDocument> documentList = documentPage.getRecords();
+        Page<KnowledgeDocumentVO> documentVOPage = new Page<>(documentPage.getCurrent(), documentPage.getSize(), documentPage.getTotal());
+        if (documentList.isEmpty()) {
+            return documentVOPage;
+        }
+        List<KnowledgeDocumentVO> documentVOList = documentList.stream()
+                .map(KnowledgeConvert::entityToDocumentVo)
+                .collect(Collectors.toList());
+        documentVOPage.setRecords(documentVOList);
+        return documentVOPage;
     }
 }

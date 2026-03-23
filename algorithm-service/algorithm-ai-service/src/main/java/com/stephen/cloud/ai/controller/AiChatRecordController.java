@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
  * @author StephenQiu30
  */
 @RestController
-@RequestMapping("/chat/record")
+@RequestMapping("/ai/record")
 @Slf4j
 @Tag(name = "AiChatRecordController", description = "AI 对话记录管理接口")
 public class AiChatRecordController {

@@ -5,7 +5,7 @@ import com.stephen.cloud.ai.knowledge.context.RagSearchContext;
 import com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade;
 import com.stephen.cloud.api.ai.model.enums.AiToolEnum;
 import com.stephen.cloud.api.knowledge.model.dto.KnowledgeSearchRequest;
-import com.stephen.cloud.api.knowledge.model.dto.KnowledgeSearchResponse;
+import com.stephen.cloud.api.knowledge.model.vo.KnowledgeSearchVO;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -35,7 +35,7 @@ public class KnowledgeSearchTool {
      */
     @Bean(AiToolEnum.ALGORITHM_KNOWLEDGE_SEARCH_VALUE)
     @Description("搜索排序算法相关的私有知识库，以获取精准的算法描述、代码实现和复杂度分析。")
-    public Function<KnowledgeSearchRequest, KnowledgeSearchResponse> algorithmKnowledgeSearch(
+    public Function<KnowledgeSearchRequest, KnowledgeSearchVO> algorithmKnowledgeSearch(
             KnowledgeChunkSearchFacade searchFacade,
             KnowledgeProperties knowledgeProperties) {
         return request -> {
@@ -48,7 +48,7 @@ public class KnowledgeSearchTool {
             );
             // 记录检索过程中的原始内容，以便在 RAG 最终响应中通过 RagSearchContext 返回引用
             RagSearchContext.addSources(sources);
-            return new KnowledgeSearchResponse(sources);
+            return new KnowledgeSearchVO(sources);
         };
     }
 }

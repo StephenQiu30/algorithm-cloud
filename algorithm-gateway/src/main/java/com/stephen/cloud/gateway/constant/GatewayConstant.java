@@ -29,7 +29,7 @@ public interface GatewayConstant {
     /**
      * 日志服务基础 URL（LoadBalancer 服务名）
      */
-    String LOG_SERVICE_BASE_URL = "http://stephen-log-service";
+    String LOG_SERVICE_BASE_URL = "http://algorithm-log-service";
 
     /**
      * API 访问日志上报接口路径
