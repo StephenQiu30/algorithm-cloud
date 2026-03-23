@@ -1,7 +1,10 @@
 package com.stephen.cloud.api.knowledge.model.dto.retrieval;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -11,16 +14,13 @@ import java.io.Serializable;
  * <p>
  * 用于对特定知识库进行语义检索，返回相似度评分和文本切片。
  * </p>
- */
-/**
- * 知识检索请求
- * <p>
- * 用于对特定知识库进行语义检索，返回相似度评分和文本切片。
- * </p>
  *
  * @author StephenQiu30
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "知识检索请求")
 public class KnowledgeRetrievalRequest implements Serializable {
 

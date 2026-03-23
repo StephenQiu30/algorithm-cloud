@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckRole;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.ai.convert.KnowledgeDocumentConvert;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
+import com.stephen.cloud.ai.service.KnowledgeBaseService;
 import com.stephen.cloud.ai.service.KnowledgeDocumentService;
 import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocumentEditRequest;
 import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocumentQueryRequest;
@@ -23,7 +24,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * 知识库文档接口
+ * 知识库文档管理接口
  *
  * @author StephenQiu30
  */
@@ -34,33 +35,36 @@ import org.springframework.web.multipart.MultipartFile;
 public class KnowledgeDocumentController {
 
     @Resource
+    private KnowledgeBaseService knowledgeBaseService;
+
+    @Resource
     private KnowledgeDocumentService knowledgeDocumentService;
 
     /**
-     * 上传知识库文档
+     * 上传知识库文档并触发自动解析
      *
-     * @param knowledgeBaseId 所属知识库 ID
-     * @param file            二进制文件
-     * @return 文档 ID
+     * @param knowledgeBaseId 关联的知识库 ID
+     * @param file            二进制文档文件
+     * @return 新建的文档 ID
      */
     @PostMapping("/upload")
-    @Operation(summary = "上传文档")
+    @Operation(summary = "上传文档", description = "上传二进制文件至特定知识库，并加入背景异步解析队列。")
     @OperationLog(module = "知识库文档模块", action = "上传知识库文档")
-    public BaseResponse<Long> uploadDocument(@RequestParam("knowledgeBaseId") Long knowledgeBaseId,
-            @Parameter(description = "二进制文件") @RequestParam("file") MultipartFile file) {
+    public BaseResponse<Long> uploadDocument(@Parameter(description = "关联的知识库 ID") @RequestParam("knowledgeBaseId") Long knowledgeBaseId,
+            @Parameter(description = "待上传的二进制文件") @RequestParam("file") MultipartFile file) {
         Long userId = SecurityUtils.getLoginUserId();
-        Long documentId = knowledgeDocumentService.uploadDocument(knowledgeBaseId, file, userId);
+        Long documentId = knowledgeBaseService.uploadDocument(knowledgeBaseId, file, userId);
         return ResultUtils.success(documentId);
     }
 
     /**
-     * 删除知识库文档
+     * 删除知识库文档及其关联记录 (分片、向量等)
      *
-     * @param deleteRequest 删除请求
+     * @param deleteRequest 包含文档 ID 的请求
      * @return 是否成功
      */
     @PostMapping("/delete")
-    @Operation(summary = "删除知识库文档")
+    @Operation(summary = "删除知识库文档", description = "同步删除文档记录及其在向量库、数据库关联的所有分片数据。")
     @SaCheckRole(UserConstant.ADMIN_ROLE)
     @OperationLog(module = "知识库文档模块", action = "删除知识库文档")
     public BaseResponse<Boolean> deleteDocument(@RequestBody DeleteRequest deleteRequest) {
@@ -68,74 +72,77 @@ public class KnowledgeDocumentController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         Long userId = SecurityUtils.getLoginUserId();
-        boolean result = knowledgeDocumentService.deleteDocument(deleteRequest.getId(), userId);
+        boolean result = knowledgeBaseService.deleteDocumentAndAssociated(deleteRequest.getId(), userId);
         return ResultUtils.success(result);
     }
 
     /**
-     * 更新知识库文档 (管理员)
+     * 更新文档基本信息 (管理员)
      *
-     * @param updateRequest 更新请求
+     * @param updateRequest 更新请求参数
      * @return 是否成功
      */
     @PostMapping("/update")
-    @Operation(summary = "更新知识库文档(管理员)")
+    @Operation(summary = "更新知识库文档(管理员)", description = "管理员强制覆盖更新文档的基本元数据。")
     @OperationLog(module = "知识库文档模块", action = "更新知识库文档(管理员)")
     @SaCheckRole(UserConstant.ADMIN_ROLE)
-    public BaseResponse<Boolean> updateKnowledgeDocument(@RequestBody KnowledgeDocumentUpdateRequest updateRequest) {
+    public BaseResponse<Boolean> updateDocument(@RequestBody KnowledgeDocumentUpdateRequest updateRequest) {
         if (updateRequest == null || updateRequest.getId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        KnowledgeDocument knowledgeDocument = KnowledgeDocumentConvert.INSTANCE.documentUpdateRequestToObj(updateRequest);
-        knowledgeDocumentService.validKnowledgeDocument(knowledgeDocument, false);
-        long id = updateRequest.getId();
-        KnowledgeDocument oldDocument = knowledgeDocumentService.getById(id);
-        ThrowUtils.throwIf(oldDocument == null, ErrorCode.NOT_FOUND_ERROR);
-        boolean result = knowledgeDocumentService.updateById(knowledgeDocument);
-        return ResultUtils.success(result);
+        KnowledgeDocument doc = KnowledgeDocumentConvert.INSTANCE.documentUpdateRequestToObj(updateRequest);
+        knowledgeDocumentService.validKnowledgeDocument(doc, false);
+        ThrowUtils.throwIf(knowledgeDocumentService.getById(updateRequest.getId()) == null, ErrorCode.NOT_FOUND_ERROR);
+        return ResultUtils.success(knowledgeDocumentService.updateById(doc));
     }
 
     /**
-     * 编辑知识库文档 (用户)
+     * 编辑文档信息 (用户本人)
      *
-     * @param editRequest 编辑请求
+     * @param editRequest 编辑请求参数
      * @return 是否成功
      */
     @PostMapping("/edit")
-    @Operation(summary = "编辑知识库文档")
+    @Operation(summary = "编辑知识库文档", description = "编辑文档详情，仅本人或管理员可操作。")
     @OperationLog(module = "知识库文档模块", action = "编辑知识库文档")
-    public BaseResponse<Boolean> editKnowledgeDocument(@RequestBody KnowledgeDocumentEditRequest editRequest) {
+    public BaseResponse<Boolean> editDocument(@RequestBody KnowledgeDocumentEditRequest editRequest) {
         if (editRequest == null || editRequest.getId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        KnowledgeDocument knowledgeDocument = KnowledgeDocumentConvert.INSTANCE.documentEditRequestToObj(editRequest);
-        knowledgeDocumentService.validKnowledgeDocument(knowledgeDocument, false);
-        long id = editRequest.getId();
-        KnowledgeDocument oldDocument = knowledgeDocumentService.getById(id);
-        ThrowUtils.throwIf(oldDocument == null, ErrorCode.NOT_FOUND_ERROR);
-        boolean result = knowledgeDocumentService.updateById(knowledgeDocument);
-        return ResultUtils.success(result);
+        KnowledgeDocument doc = KnowledgeDocumentConvert.INSTANCE.documentEditRequestToObj(editRequest);
+        knowledgeDocumentService.validKnowledgeDocument(doc, false);
+        ThrowUtils.throwIf(knowledgeDocumentService.getById(editRequest.getId()) == null, ErrorCode.NOT_FOUND_ERROR);
+        return ResultUtils.success(knowledgeDocumentService.updateById(doc));
     }
 
     /**
-     * 分页查询知识库文档 (管理员)
+     * 根据 ID 获取文档详情 (脱敏)
+     *
+     * @param id 文档 ID
+     * @return 文档视图对象
+     */
+    @GetMapping("/get/vo")
+    @Operation(summary = "获取文档详情", description = "根据 ID 获取单个知识库文档的详细视图信息。")
+    public BaseResponse<KnowledgeDocumentVO> getDocumentVOById(@Parameter(description = "文档 ID") @RequestParam("id") Long id) {
+        ThrowUtils.throwIf(id == null || id <= 0, ErrorCode.PARAMS_ERROR);
+        KnowledgeDocument doc = knowledgeDocumentService.getById(id);
+        ThrowUtils.throwIf(doc == null, ErrorCode.NOT_FOUND_ERROR);
+        return ResultUtils.success(knowledgeDocumentService.getKnowledgeDocumentVO(doc));
+    }
+
+    /**
+     * 分页查询知识库文档列表
      *
      * @param queryRequest 分页查询请求
-     * @return 文档分页
+     * @return 文档视图列表分页结果
      */
     @PostMapping("/list/page/vo")
-    @Operation(summary = "分页获取知识库文档")
+    @Operation(summary = "分页获取知识库文档", description = "管理员视角分页查询所有文档记录及解析状态。")
     @SaCheckRole(UserConstant.ADMIN_ROLE)
-    public BaseResponse<Page<KnowledgeDocumentVO>> listKnowledgeDocumentVOByPage(@RequestBody KnowledgeDocumentQueryRequest queryRequest) {
-        if (queryRequest == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        long current = queryRequest.getCurrent();
-        long size = queryRequest.getPageSize();
-        // 限制查询页大小
-        ThrowUtils.throwIf(size > 50, ErrorCode.PARAMS_ERROR);
-        Page<KnowledgeDocument> documentPage = knowledgeDocumentService.page(new Page<>(current, size),
+    public BaseResponse<Page<KnowledgeDocumentVO>> listDocumentVOByPage(@RequestBody KnowledgeDocumentQueryRequest queryRequest) {
+        if (queryRequest == null) throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        Page<KnowledgeDocument> page = knowledgeDocumentService.page(new Page<>(queryRequest.getCurrent(), queryRequest.getPageSize()),
                 knowledgeDocumentService.getQueryWrapper(queryRequest));
-        return ResultUtils.success(knowledgeDocumentService.getKnowledgeDocumentVOPage(documentPage));
+        return ResultUtils.success(knowledgeDocumentService.getKnowledgeDocumentVOPage(page));
     }
 }

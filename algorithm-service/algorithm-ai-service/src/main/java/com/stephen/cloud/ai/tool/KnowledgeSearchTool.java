@@ -2,8 +2,10 @@ package com.stephen.cloud.ai.tool;
 
 import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.knowledge.context.RagSearchContext;
-import com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade;
+import com.stephen.cloud.ai.knowledge.retrieval.VectorSearchManager;
+import com.stephen.cloud.ai.service.KnowledgeBaseService;
 import com.stephen.cloud.api.ai.model.enums.AiToolEnum;
+import com.stephen.cloud.api.knowledge.model.dto.retrieval.KnowledgeRetrievalRequest;
 import com.stephen.cloud.api.knowledge.model.dto.search.KnowledgeSearchRequest;
 import com.stephen.cloud.api.knowledge.model.vo.KnowledgeSearchVO;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
@@ -29,23 +31,23 @@ public class KnowledgeSearchTool {
      * 定义 Spring AI 检索函数 Bean。
      * 该 Bean 会被自动注入到 ChatClient 的 Tool Registry 中。
      *
-     * @param searchFacade        检索门面：负责汇聚多种检索策略
+     * @param knowledgeBaseService 知识库服务
      * @param knowledgeProperties 配置属性：获取默认检索阈值 and TopK
      * @return 函数接口实现
      */
     @Bean(AiToolEnum.ALGORITHM_KNOWLEDGE_SEARCH_VALUE)
     @Description("搜索排序算法相关的私有知识库，以获取精准的算法描述、代码实现和复杂度分析。")
     public Function<KnowledgeSearchRequest, KnowledgeSearchVO> algorithmKnowledgeSearch(
-            KnowledgeChunkSearchFacade searchFacade,
+            KnowledgeBaseService knowledgeBaseService,
             KnowledgeProperties knowledgeProperties) {
         return request -> {
             log.info("Tool algorithmKnowledgeSearch calling: query={}, kbId={}", request.getQuery(), request.getKnowledgeBaseId());
-            List<ChunkSourceVO> sources = searchFacade.searchChunks(
-                    request.getKnowledgeBaseId(),
-                    request.getQuery(),
-                    knowledgeProperties.getDefaultTopK(),
-                    knowledgeProperties.getRagTopKMax()
-            );
+            KnowledgeRetrievalRequest retrievalRequest = KnowledgeRetrievalRequest.builder()
+                .knowledgeBaseId(request.getKnowledgeBaseId())
+                .query(request.getQuery())
+                .topK(knowledgeProperties.getDefaultTopK())
+                .build();
+            List<ChunkSourceVO> sources = knowledgeBaseService.searchChunks(retrievalRequest, null);
             // 记录检索过程中的原始内容，以便在 RAG 最终响应中通过 RagSearchContext 返回引用
             RagSearchContext.addSources(sources);
             return new KnowledgeSearchVO(sources);

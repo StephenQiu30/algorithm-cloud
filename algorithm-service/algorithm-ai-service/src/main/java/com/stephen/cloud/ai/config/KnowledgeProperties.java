@@ -35,9 +35,15 @@ public class KnowledgeProperties {
     private double similarityThreshold = 0.5;
 
     /**
-     * 远程文档下载缓存根目录（建议在配置中显式指定，避免临时目录被清理）。
+     * 临时下载缓存根目录。
      */
-    private String storageDir = "./data/algorithm-kb-uploads";
+    private String cacheDir = "./data/algorithm-kb-cache";
+
+    /**
+     * 本地永久文档库目录：解析后的文档或从 COS 下载后的镜像将永久存放于此，
+     * 以便节省资源和提高二次解析速度。
+     */
+    private String localLibraryDir = "./data/algorithm-kb-library";
 
     /** 入库时写入 {@code embedding_vector} 表的嵌入模型名称。 */
     private String embeddingModelName = "text-embedding-v2";
@@ -72,5 +78,15 @@ public class KnowledgeProperties {
 
     /** 诊断检索 topK 上限（{@link com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade}）。 */
     private int retrievalTopKMax = 50;
+
+    /**
+     * BM25 检索时的最小匹配百分比（例如 "50%"）。
+     */
+    private String bm25MinimumShouldMatch = "50%";
+
+    /**
+     * 向量入库时的批量大小，防止单次请求过大。
+     */
+    private int vectorBatchSize = 100;
 
 }

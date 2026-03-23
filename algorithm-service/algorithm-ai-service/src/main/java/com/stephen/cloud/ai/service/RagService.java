@@ -2,6 +2,7 @@ package com.stephen.cloud.ai.service;
 
 import com.stephen.cloud.api.knowledge.model.dto.rag.RagChatRequest;
 import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
+import reactor.core.publisher.Flux;
 
 /**
  * RAG 对话服务（检索增强生成）。本项目智能体面向<strong>排序算法教学</strong>，具体知识点以知识库文档与
@@ -22,4 +23,13 @@ public interface RagService {
      * @return 模型回答及命中的切片来源列表（含 chunkId、score，供前端溯源）
      */
     RagChatResponseVO ragChat(RagChatRequest request, Long userId);
+
+    /**
+     * RAG 流式问答：返回 Flux 序列实现打字机效果，首包携带 sources 溯源信息。
+     *
+     * @param request 问答请求
+     * @param userId  用户 ID
+     * @return 响应 VO 流
+     */
+    Flux<RagChatResponseVO> streamRagChat(RagChatRequest request, Long userId);
 }

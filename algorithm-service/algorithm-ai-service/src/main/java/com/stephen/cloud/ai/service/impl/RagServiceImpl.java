@@ -1,182 +1,208 @@
 package com.stephen.cloud.ai.service.impl;
 
 import com.stephen.cloud.ai.knowledge.context.RagSearchContext;
-import com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade;
+import com.stephen.cloud.ai.knowledge.retrieval.KnowledgeDocumentRetriever;
+import com.stephen.cloud.ai.manager.RagAuditManager;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
-import com.stephen.cloud.ai.service.AiChatRecordService;
 import com.stephen.cloud.ai.service.KnowledgeBaseService;
 import com.stephen.cloud.ai.service.RagService;
-import com.stephen.cloud.api.ai.model.dto.AiChatRecordDTO;
-import com.stephen.cloud.api.ai.model.enums.AiModelTypeEnum;
-import com.stephen.cloud.api.ai.model.enums.AiToolEnum;
 import com.stephen.cloud.api.knowledge.model.dto.rag.RagChatRequest;
+import com.stephen.cloud.api.knowledge.model.dto.retrieval.KnowledgeRetrievalRequest;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.exception.BusinessException;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
 /**
  * RAG 服务实现类：提供面向排序算法教学的检索增强问答。
  * <p>
- * 该实现基于 Spring AI 的 Tool Calling 模型实现 Agentic RAG。
- * 核心流程：
- * 1. 接收用户问题。
- * 2. 调度 LLM (DashScope) 决策是否需要调用 `algorithmKnowledgeSearch` 工具。
- * 3. 工具执行混合检索（kNN + BM25）并注入上下文。
- * 4. LLM 基于检索到的分片生成包含引用标记的回答。
+ * 该实现基于 Spring AI 的 RetrievalAugmentationAdvisor 实现。
  * </p>
  *
  * @author StephenQiu30
  */
+@Slf4j
 @Service
 public class RagServiceImpl implements RagService {
 
-    /**
-     * 系统提示词：定义教育专家角色、RAG 规范及输出要求。
-     */
-    private static final String SYSTEM_PROMPT = """
-            # 角色
-            你是一个专业且耐心的【排序算法教学助教】。
-            你的任务是基于提供的知识库内容，为学习者解答关于排序算法（原理、实现、复杂度等）的问题。
-
-            # 核心能力
-            1. **精准检索**：当问题涉及算法具体逻辑时，必须使用 `algorithmKnowledgeSearch` 工具。
-            2. **对比分析**：擅长使用 Markdown 表格对比各种排序算法的时间/空间复杂度和稳定性。
-            3. **正确引用**：在回答的关键结论后，必须标注引用的文档名称。
-
-            # 交互规范
-            - **优先参考资料**：检索到的知识库分片是你最可靠的依据。
-            - **引用标注**：引自文档的内容请在句末标注 `[1] 文档名称`。
-            - **代码规范**：代码实现需清晰、简洁，并包含必要的注释。
-            - **透明沟通**：如果检索不到相关算法，请诚实说明并在通用知识基础上尝试回答，提示“该信息未直接出现在知识库中”。
-
-            # 当前知识库上下文
-            知识库描述：%s
-            """;
-
     @Resource
     private ChatClient chatClient;
-    
+
     @Resource
     private ChatMemory chatMemory;
 
-    /**
-     * 知识分片检索门面：支持混合检索、RRF 重排序及阈值过滤。
-     */
-    @Resource
-    private KnowledgeChunkSearchFacade knowledgeChunkSearchFacade;
-
-    /**
-     * 对话录制服务：异步持久化 Token 消耗及消息内容。
-     */
-    @Resource
-    private AiChatRecordService aiChatRecordService;
-
-    /**
-     * 知识库元数据服务：获取库描述等信息。
-     */
     @Resource
     private KnowledgeBaseService knowledgeBaseService;
 
+    @Resource
+    private KnowledgeDocumentRetriever knowledgeDocumentRetriever;
+
+    @Resource
+    private RagAuditManager ragAuditManager;
+
     /**
-     * 执行 RAG (检索增强生成) 问答流程
-     * <p>
-     * 核心步骤：
-     * 1. 权限与参数预校验。
-     * 2. 清理线程上下文中的检索缓存。
-     * 3. 构造包含知识库背景的 System Prompt 与用户问题。
-     * 4. 驱动 Spring AI ChatClient，通过 Advisor 注入会话记忆与工具调度能力。
-     * 5. 若大模型决定调用 `algorithmKnowledgeSearch`，则执行知识库检索并回填上下文。
-     * 6. 捕获最终回答、消耗 Token 统计及命中的分片来源，异步持久化对话记录。
-     * </p>
-     *
-     * @param request 包含提问内容、知识库 ID 及会话标识的请求对象
-     * @param userId  执行提问的用户 ID
-     * @return 包含回复正文及溯源切片列表的视图对象
-     * @throws BusinessException 当参数非法、知识库缺失或模型调用严重异常时抛出
+     * 系统提示词模版
      */
+    private static final String SYSTEM_PROMPT = """
+            # 角色
+            你是一个专业的算法教学助手，专注于排序算法及相关计算机科学基础。你的目标是提供准确、深入且易于理解的算法讲解。
+            
+            # 知识库背景
+            你当前关联的知识库描述：[%s]
+            
+            # 回答规范
+            1. **基于上下文**：优先根据检索到的知识库内容回答。如果当前上下文不足以完整回答，请明确提示用户，并基于通用算法知识提供补充，但需注明“补充知识”。
+            2. **代码质量**：涉及算法实现时，请提供符合 Google Java 编程规范的代码。
+            3. **多维分析**：讲解算法时，务必包含：
+               - 核心思想（通俗比喻）
+               - 时间复杂度（最好、最快、平均）
+               - 空间复杂度
+               - 稳定性分析
+               - 适用场景与优缺点
+            4. **语气与风格**：专业、严谨、耐心地解答，鼓励学生思考底层原理。
+            5. **引用来源**：如果引用了特定的文档片段，请在合适的位置提及。
+            """;
+
     @Override
     public RagChatResponseVO ragChat(RagChatRequest request, Long userId) {
-        // 1. 严格参数校验
-        if (request == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数不能为空");
+        long startTime = System.currentTimeMillis();
+        // 1. 参数校验
+        if (request == null || StringUtils.isBlank(request.getQuestion())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数非法");
         }
-        String question = request.getQuestion();
+        Long kbId = request.getKnowledgeBaseId();
         String sessionId = request.getSessionId();
-        Long knowledgeBaseId = request.getKnowledgeBaseId();
+        log.info("[RAG问答] 收到统一问答请求: userId={}, kbId={}, sessionId={}, question='{}'", 
+                userId, kbId, sessionId, request.getQuestion().trim());
         
-        ThrowUtils.throwIf(StringUtils.isBlank(question), ErrorCode.PARAMS_ERROR, "提问内容不能为空");
+        ThrowUtils.throwIf(kbId == null || kbId <= 0, ErrorCode.PARAMS_ERROR, "知识库 ID 非法");
         ThrowUtils.throwIf(StringUtils.isBlank(sessionId), ErrorCode.PARAMS_ERROR, "会话 ID 不能为空");
-        ThrowUtils.throwIf(knowledgeBaseId == null || knowledgeBaseId <= 0, ErrorCode.PARAMS_ERROR, "知识库 ID 不能为空");
 
-        // 2. 知识库合法性检查
-        KnowledgeBase kb = knowledgeBaseService.getById(knowledgeBaseId);
+        // 2. 获取知识库详情
+        KnowledgeBase kb = knowledgeBaseService.getById(kbId);
         if (kb == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "指定的知识库不存在");
+            log.error("[RAG问答] 知识库不存在: kbId={}", kbId);
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
         }
-        String kbDesc = StringUtils.defaultIfBlank(kb.getDescription(), "通用排序算法知识库");
+        String kbDesc = StringUtils.defaultIfBlank(kb.getDescription(), "通用算法知识库");
 
-        // 3. 检索上下文预处理 (确保本次请求的 sources 不受之前请求干扰)
-        RagSearchContext.clear();
+        // 3. 准备 RAG Advisor
+        RetrievalAugmentationAdvisor retrievalAdvisor = RetrievalAugmentationAdvisor.builder()
+                .documentRetriever(knowledgeDocumentRetriever)
+                .build();
 
         try {
-            // 4. 构造具备上下文提示的用户 Prompt
-            String userPrompt = String.format("""
-                    问题：%s
-                    知识库 ID: %d
-                    请优先根据检索到的知识库分片回答，若分片不足则告知用户。
-                    """, request.getQuestion().trim(), knowledgeBaseId);
-
-            // 5. 调用大模型：注入记忆 Advisor 与工具调用 Advisor
-            ChatResponse resp = chatClient.prompt()
-                    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, request.getSessionId())
+            // 4. 执行问答
+            ChatResponse response = chatClient.prompt()
+                    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId)
+                            .param(KnowledgeDocumentRetriever.KNOWLEDGE_BASE_ID_CONTEXT_KEY, kbId)
+                            .param(KnowledgeDocumentRetriever.TOP_K_CONTEXT_KEY, request.getTopK())
                             .advisors(
                                     MessageChatMemoryAdvisor.builder(chatMemory).build(),
-                                    ToolCallAdvisor.builder().build())) // 支持 Agentic 工具调度
+                                    retrievalAdvisor))
                     .system(String.format(SYSTEM_PROMPT, kbDesc))
-                    .user(userPrompt)
-                    .toolNames(AiToolEnum.ALGORITHM_KNOWLEDGE_SEARCH.getValue()) // 导出检索工具
+                    .user(request.getQuestion().trim())
                     .call()
                     .chatResponse();
 
-            // 6. 提取回答、统计 Token 消耗
-            String answer = resp.getResult().getOutput().getText();
-            Usage usage = resp.getMetadata().getUsage();
+            // 5. 组装结果
+            String answer = response.getResult().getOutput().getText();
+            List<ChunkSourceVO> sources = (List<ChunkSourceVO>) RagSearchContext.getAndClearSources();
 
-            // 7. 捕获在工具调用过程中命中的切片来源
-            List<ChunkSourceVO> sources = RagSearchContext.getAndClearSources();
+            // 6. 异步审计对话记录
+            ragAuditManager.auditCall(userId, sessionId, request.getQuestion(), response);
 
-            // 8. 异步持久化对话审计记录
-            aiChatRecordService.saveAiChatRecordAsync(AiChatRecordDTO.builder()
-                    .userId(userId)
-                    .sessionId(request.getSessionId())
-                    .message(request.getQuestion().trim())
-                    .response(answer)
-                    .modelType(AiModelTypeEnum.AGENTIC_RAG.getValue())
-                    .totalTokens(usage != null ? usage.getTotalTokens().intValue() : 0)
-                    .promptTokens(usage != null ? usage.getPromptTokens().intValue() : 0)
-                    .completionTokens(usage != null ? usage.getCompletionTokens().intValue() : 0)
-                    .build());
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("[RAG问答] 问答执行成功: userId={}, sessionId={}, 耗时={}ms, 关联来源数={}", 
+                    userId, sessionId, duration, sources.size());
 
             return RagChatResponseVO.builder()
                     .answer(answer)
-                    .sources(sources) 
+                    .sources(sources)
                     .build();
         } finally {
-            // 线程环境清理
             RagSearchContext.clear();
         }
+    }
+
+    @Override
+    public Flux<RagChatResponseVO> streamRagChat(RagChatRequest request, Long userId) {
+        // 1. 参数校验
+        if (request == null || StringUtils.isBlank(request.getQuestion())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数非法");
+        }
+        Long kbId = request.getKnowledgeBaseId();
+        String sessionId = request.getSessionId();
+        log.info("[RAG流式] 收到流式问答请求: userId={}, kbId={}, sessionId={}", userId, kbId, sessionId);
+        
+        ThrowUtils.throwIf(kbId == null || kbId <= 0, ErrorCode.PARAMS_ERROR, "知识库 ID 非法");
+        ThrowUtils.throwIf(StringUtils.isBlank(sessionId), ErrorCode.PARAMS_ERROR, "会话 ID 不能为空");
+
+        // 2. 检查知识库
+        KnowledgeBase kb = knowledgeBaseService.getById(kbId);
+        if (kb == null) {
+            log.error("[RAG流式] 知识库不存在: kbId={}", kbId);
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
+        }
+        String kbDesc = StringUtils.defaultIfBlank(kb.getDescription(), "通用算法知识库");
+
+        // 3. 预检索获取 sources (首个分片)
+        int topK = request.getTopK() != null ? request.getTopK() : 5;
+        KnowledgeRetrievalRequest retrievalRequest = KnowledgeRetrievalRequest.builder()
+                .knowledgeBaseId(kbId)
+                .query(request.getQuestion().trim())
+                .topK(topK)
+                .build();
+        
+        log.info("[RAG流式] 执行预检索获取关联来源: kbId={}, query='{}'", kbId, request.getQuestion().trim());
+        List<ChunkSourceVO> sources = knowledgeBaseService.searchChunks(retrievalRequest, userId);
+        RagChatResponseVO firstChunk = RagChatResponseVO.builder().sources(sources).build();
+
+        // 4. 准备流式输出
+        StringBuilder fullAnswer = new StringBuilder();
+        RetrievalAugmentationAdvisor retrievalAdvisor = RetrievalAugmentationAdvisor.builder()
+                .documentRetriever(knowledgeDocumentRetriever)
+                .build();
+
+        Flux<String> contentFlux = chatClient.prompt()
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId)
+                        .param(KnowledgeDocumentRetriever.KNOWLEDGE_BASE_ID_CONTEXT_KEY, kbId)
+                        .param(KnowledgeDocumentRetriever.TOP_K_CONTEXT_KEY, request.getTopK())
+                        .advisors(
+                                MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                                retrievalAdvisor))
+                .system(String.format(SYSTEM_PROMPT, kbDesc))
+                .user(request.getQuestion().trim())
+                .stream()
+                .content()
+                .doOnNext(fullAnswer::append);
+
+        // 5. 组装并处理收尾逻辑
+        return Flux.concat(
+                Flux.just(firstChunk),
+                contentFlux.map(text -> RagChatResponseVO.builder().answer(text).build())
+        ).doOnComplete(() -> {
+            log.info("[RAG流式] 问答流输出完成: userId={}, sessionId={}, 总长度={}", 
+                    userId, sessionId, fullAnswer.length());
+            // 异步记录审计
+            ragAuditManager.auditStream(userId, sessionId, request.getQuestion(), fullAnswer.toString());
+            RagSearchContext.clear();
+        }).doOnError(e -> {
+            log.error("[RAG流式] 问答流执行异常: userId={}, sessionId={}, error={}", userId, sessionId, e.getMessage(), e);
+            RagSearchContext.clear();
+        });
     }
 }

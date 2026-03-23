@@ -460,12 +460,6 @@
                 <version>${algorithm-cloud.version}</version>
             </dependency>
 
-            <dependency>
-                <groupId>com.algorithm.cloud</groupId>
-                <artifactId>algorithm-api-knowledge</artifactId>
-                <version>${algorithm-cloud.version}</version>
-            </dependency>
-
             <!-- Service 模块 -->
             <dependency>
                 <groupId>com.algorithm.cloud</groupId>

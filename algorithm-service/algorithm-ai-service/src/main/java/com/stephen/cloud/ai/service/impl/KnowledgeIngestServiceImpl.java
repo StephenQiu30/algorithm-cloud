@@ -3,42 +3,33 @@ package com.stephen.cloud.ai.service.impl;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.http.HttpUtil;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
-import com.stephen.cloud.ai.knowledge.etl.ContentTextCleaner;
-import com.stephen.cloud.ai.knowledge.parser.DocumentTextExtractor;
-import com.stephen.cloud.ai.knowledge.util.TextChunker;
-import com.stephen.cloud.ai.mapper.KnowledgeDocumentMapper;
+import com.stephen.cloud.ai.knowledge.processor.ContentTextCleaner;
+import com.stephen.cloud.ai.knowledge.processor.DocumentTextExtractor;
+import com.stephen.cloud.ai.knowledge.processor.TextChunker;
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
-import com.stephen.cloud.api.knowledge.model.enums.KnowledgeParseStatusEnum;
 import com.stephen.cloud.ai.service.DocumentChunkService;
-import com.stephen.cloud.ai.service.EmbeddingVectorService;
+import com.stephen.cloud.ai.service.KnowledgeDocumentService;
 import com.stephen.cloud.ai.service.KnowledgeIngestService;
-import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocIngestMessage;
+import com.stephen.cloud.api.knowledge.model.enums.KnowledgeParseStatusEnum;
+import com.stephen.cloud.common.cache.utils.CacheUtils;
+import com.stephen.cloud.common.common.ErrorCode;
+import com.stephen.cloud.common.exception.BusinessException;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionTextParser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
- * 知识入库服务实现类：负责文档的完整 ETL (Extract, Transform, Load) 流水线。
- * <p>
- * 该服务集成 Spring AI 的能力，将非结构化文档转换为向量化分片并存储。
- * 核心流程：
- * 1. 资源准备：从本地或远程同步文档。
- * 2. 文本提取：使用 Tika 等工具提取原始文本，并进行清洗。
- * 3. 语义分片：通过 TextChunker 进行智能切分。
- * 4. 向量化入库：双路并发处理（MySQL 分片索引 + Elasticsearch 向量存储 + 过程审计）。
- * </p>
+ * 知识文档解析入库服务实现类。
  *
  * @author StephenQiu30
  */
@@ -46,181 +37,173 @@ import java.util.Map;
 @Slf4j
 public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
 
-    /**
-     * 文档元数据 Mapper：维护文档解析状态
-     */
     @Resource
-    private KnowledgeDocumentMapper knowledgeDocumentMapper;
-
-    /**
-     * 分片持久化服务：存储文本分片到 MySQL
-     */
+    private KnowledgeDocumentService knowledgeDocumentService;
     @Resource
     private DocumentChunkService documentChunkService;
-
-    @Resource
-    private EmbeddingVectorService embeddingVectorService;
-
-    @Resource
-    private VectorStoreService vectorStoreService;
-
     @Resource
     private KnowledgeProperties knowledgeProperties;
-
+    @Resource
+    private VectorStore knowledgeVectorStore;
     @Resource
     private TextChunker textChunker;
-
     @Resource
     private ContentTextCleaner contentTextCleaner;
+    @Resource
+    private CacheUtils cacheUtils;
 
-    /**
-     * 执行文档入库完整 ETL 流程 (Extract, Transform, Load)
-     * <p>
-     * 核心步骤：
-     * 1. 原子性更新文档解析状态为 PROCESSING。
-     * 2. 物理资源获取：针对 HTTP 地址执行异步下载缓存。
-     * 3. 文本提取：调用 DocumentTextExtractor 针对不同 MIME 执行深度解析（PDF/Word/Markdown 等）。
-     * 4. 文本清洗：去除冗余字符与乱码，增强向量化质量。
-     * 5. 旧数据清理：执行幂等删除，确保相同文档 ID 不产生重复切片。
-     * 6. 语义分片：调用 TextChunker 实现带重叠部分的逻辑切分。
-     * 7. 向量化索引：双路存储 (MySQL 结构化索引 + ES 向量向量存储 + 向量元数据审计)。
-     * </p>
-     *
-     * @param message 包含文档元数据 ID、物理路径及归属信息的 MQ 消息载体
-     */
+    private final FilterExpressionTextParser filterParser = new FilterExpressionTextParser();
+
     @Override
     public void ingestDocument(KnowledgeDocIngestMessage message) {
         if (message == null || message.getDocumentId() == null) {
+            log.warn("[文档入库] 收到空或无效的入库消息");
             return;
         }
-        // 1. 获取并检查解析状态，避免重复解析
-        KnowledgeDocument doc = knowledgeDocumentMapper.selectById(message.getDocumentId());
-        if (doc == null || Integer.valueOf(KnowledgeParseStatusEnum.DONE.getValue()).equals(doc.getParseStatus())) {
-            log.info("文档无需解析或记录缺失: docId={}", message.getDocumentId());
+        KnowledgeDocument doc = knowledgeDocumentService.getById(message.getDocumentId());
+        if (doc == null) {
+            log.error("[文档入库] 未找到文档: id={}", message.getDocumentId());
+            return;
+        }
+        if (Objects.equals(doc.getParseStatus(), KnowledgeParseStatusEnum.DONE.getValue())) {
+            log.info("[文档入库] 文档已处理完成，跳过: id={}, name={}", doc.getId(), doc.getOriginalName());
             return;
         }
 
-        updateStatus(doc, KnowledgeParseStatusEnum.PROCESSING, null);
-
+        log.info("[文档入库] 开始执行文档入库流水线: id={}, name={}", doc.getId(), doc.getOriginalName());
+        updateDocumentStatus(doc, KnowledgeParseStatusEnum.PROCESSING, null);
+        
         try {
-            // 2. 将远程资源下载至本地缓存目录，方便后端解析器读取
-            Path localPath = prepareLocalFile(doc, message.getStoragePath());
-
-            log.info("开始提取文本: docId={}", doc.getId());
-            // 3. 执行多格式文本提取
-            String rawText = DocumentTextExtractor.extract(localPath, localPath.getFileName().toString().toLowerCase());
-            log.info("文本提取完成，字符数={}", rawText.length());
-            // 4. 内容降噪清洗
-            String cleanedText = contentTextCleaner.clean(rawText);
-            if (StringUtils.isBlank(cleanedText)) {
-                throw new IllegalStateException("解析后的文档内容为空，无法构建索引");
+            List<Document> chunkDocs;
+            String cacheKey = "kb:parsed:" + doc.getId();
+            chunkDocs = cacheUtils.get(cacheKey);
+            
+            if (chunkDocs == null || chunkDocs.isEmpty()) {
+                log.info("[文档入库] 未发现缓存，开始完整解析流程: doc={}", doc.getId());
+                
+                log.info("[文档入库] 阶段 1: 准备本地文件: doc={}", doc.getId());
+                Path localPath = prepareLocalFile(doc, message.getStoragePath());
+                
+                log.info("[文档入库] 阶段 2: 提取文件文本内容: doc={}", doc.getId());
+                List<Document> extracted = DocumentTextExtractor.readDocuments(localPath, localPath.getFileName().toString().toLowerCase());
+                if (extracted.isEmpty()) {
+                    throw new IllegalStateException("文本提取阶段返回内容为空");
+                }
+                
+                log.info("[文档入库] 阶段 3: 清洗文本并丰富元数据: doc={}", doc.getId());
+                Map<String, Object> commonMeta = createCommonMetadata(doc);
+                List<Document> enriched = enrichMetadata(extracted, commonMeta);
+                List<Document> cleaned = contentTextCleaner.apply(enriched);
+                
+                log.info("[文档入库] 阶段 4: 文本分段切块: doc={}", doc.getId());
+                chunkDocs = textChunker.splitToChunkDocuments(cleaned);
+                if (chunkDocs.isEmpty()) {
+                    throw new IllegalStateException("文本切分阶段返回分块为空");
+                }
+                
+                cacheUtils.put(cacheKey, chunkDocs, 3600 * 24L);
+                log.info("[文档入库] 文本解析完成，已缓存 {} 个分块: doc={}", chunkDocs.size(), doc.getId());
+            } else {
+                log.info("[文档入库] 使用已缓存的解析结果 ({} 个分块): doc={}", chunkDocs.size(), doc.getId());
             }
 
-            // 5. 数据治理：清理历史遗留切片与向量审计记录
-            removeChunksAndVectorsForDocument(doc.getId());
-
-            // 6. 执行分片策略
-            List<String> chunkTexts = textChunker.splitWithOverlap(cleanedText);
+            log.info("[文档入库] 阶段 5: 将数据加载至向量库和数据库: doc={}", doc.getId());
+            handleLoadPhase(doc, chunkDocs);
             
-            // 7. 核心落库流程：关联分片、向量入库与审计
-            processAndIndexChunks(doc, chunkTexts);
-
-            // 更新状态为完成
-            updateStatus(doc, KnowledgeParseStatusEnum.DONE, null);
-            log.info("知识文档入库成功: docId={}, 产生切片数={}", doc.getId(), chunkTexts.size());
+            updateDocumentStatus(doc, KnowledgeParseStatusEnum.DONE, null);
+            log.info("[文档入库] 文档入库流水线执行成功: id={}, name={}", doc.getId(), doc.getOriginalName());
         } catch (Exception e) {
-            log.error("知识文档入库失败 (docId: {}): {}", doc.getId(), e.getMessage(), e);
-            updateStatus(doc, KnowledgeParseStatusEnum.FAILED, e.getMessage());
+            log.error("[文档入库] 任务执行失败: id={}, name={}, error={}", 
+                    doc.getId(), doc.getOriginalName(), e.getMessage(), e);
+            updateDocumentStatus(doc, KnowledgeParseStatusEnum.FAILED, e.getMessage());
         }
     }
 
-    private Path prepareLocalFile(KnowledgeDocument doc, String storagePath) {
-        if (storagePath.startsWith("http")) {
-            String cacheDir = knowledgeProperties.getStorageDir() + "/cache";
-            FileUtil.mkdir(cacheDir);
-            String localFilePath = cacheDir + "/" + doc.getId() + "_" + doc.getOriginalName();
-            File localFile = new File(localFilePath);
-            if (!localFile.exists()) {
-                HttpUtil.downloadFile(storagePath, localFile);
+    @Transactional(rollbackFor = Exception.class)
+    protected void handleLoadPhase(KnowledgeDocument doc, List<Document> chunkDocs) {
+        log.info("[数据加载] 清理旧数据: doc={}", doc.getId());
+        knowledgeVectorStore.delete(filterParser.parse("documentId == '" + doc.getId() + "'"));
+        documentChunkService.deleteByDocumentId(doc.getId());
+        
+        log.info("[数据加载] 将 {} 个分块持久化至数据库: doc={}", chunkDocs.size(), doc.getId());
+        List<DocumentChunk> dbChunks = new ArrayList<>();
+        for (int i = 0; i < chunkDocs.size(); i++) {
+            DocumentChunk chunk = new DocumentChunk();
+            chunk.setDocumentId(doc.getId());
+            chunk.setKnowledgeBaseId(doc.getKnowledgeBaseId());
+            chunk.setChunkIndex(i);
+            chunk.setContent(chunkDocs.get(i).getText());
+            chunk.setTokenEstimate(Math.min(chunkDocs.get(i).getText().length(), 1000));
+            dbChunks.add(chunk);
+        }
+        documentChunkService.saveBatch(dbChunks);
+        
+        log.info("[数据加载] 构建并写入向量库: doc={}", doc.getId());
+        List<Document> vectorDocs = new ArrayList<>();
+        for (int i = 0; i < dbChunks.size(); i++) {
+            DocumentChunk dbChunk = dbChunks.get(i);
+            Map<String, Object> meta = new HashMap<>(chunkDocs.get(i).getMetadata());
+            meta.put("chunkId", String.valueOf(dbChunk.getId()));
+            vectorDocs.add(new Document(String.valueOf(dbChunk.getId()), dbChunk.getContent(), meta));
+        }
+
+        int batchSize = knowledgeProperties.getVectorBatchSize();
+        for (int i = 0; i < vectorDocs.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, vectorDocs.size());
+            List<Document> batch = vectorDocs.subList(i, end);
+            try {
+                knowledgeVectorStore.add(batch);
+                log.debug("[数据加载] 批量写入进度: {}/{} for doc={}", end, vectorDocs.size(), doc.getId());
+            } catch (Exception e) {
+                log.error("[数据加载] 向量批量写入失败: docId={}, index={}", doc.getId(), i, e);
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "向量库写入异常: " + e.getMessage());
             }
-            return localFile.toPath();
+        }
+        log.info("[数据加载] 向量加载完成，共 {} 条: doc={}", vectorDocs.size(), doc.getId());
+    }
+
+    private Path prepareLocalFile(KnowledgeDocument doc, String storagePath) {
+        String fileName = doc.getId() + "_" + doc.getOriginalName();
+        File libraryFile = new File(knowledgeProperties.getLocalLibraryDir(), fileName);
+        if (libraryFile.exists()) {
+            log.debug("[准备文件] 本地文件已存在: {}", libraryFile.getAbsolutePath());
+            return libraryFile.toPath();
+        }
+        if (storagePath.startsWith("http")) {
+            log.info("[准备文件] 从云端存储下载文件: {}", storagePath);
+            FileUtil.mkdir(knowledgeProperties.getLocalLibraryDir());
+            HttpUtil.downloadFile(storagePath, libraryFile);
+            return libraryFile.toPath();
         }
         return Path.of(storagePath);
     }
 
-    /**
-     * 将解析后的文本分片持久化到 MySQL 和向量存储。
-     *
-     * @param doc        文档元数据对象
-     * @param chunkTexts 切分后的文本分片列表
-     */
-    @Transactional(rollbackFor = Exception.class)
-    protected void processAndIndexChunks(KnowledgeDocument doc, List<String> chunkTexts) {
-        long kbId = doc.getKnowledgeBaseId();
-        long docId = doc.getId();
-
-        // 1. 调用分片服务：批量构建并保存文本分片 (MySQL)
-        List<DocumentChunk> chunksToSave = documentChunkService.batchCreateChunks(
-                docId, kbId, chunkTexts, knowledgeProperties.getChunkSize());
-
-        if (chunksToSave.isEmpty()) {
-            return;
-        }
-
-        // 2. 构造向量库 Document 对象及审计日志数据
-        List<Document> vectorDocs = new ArrayList<>();
-        List<String> esDocIds = new ArrayList<>();
-
-        for (DocumentChunk chunk : chunksToSave) {
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("knowledgeBaseId", String.valueOf(kbId));
-            metadata.put("documentId", String.valueOf(docId));
-            metadata.put("documentName", doc.getOriginalName());
-            metadata.put("chunkId", String.valueOf(chunk.getId()));
-            metadata.put("userId", String.valueOf(doc.getUserId()));
-
-            String chunkIdStr = String.valueOf(chunk.getId());
-            vectorDocs.add(Document.builder()
-                    .id(chunkIdStr)
-                    .text(chunk.getContent())
-                    .metadata(metadata)
-                    .build());
-            esDocIds.add(chunkIdStr);
-        }
-
-        // 3. 并行写入：向量库存储 + 过程审计日志
-        vectorStoreService.addDocuments(vectorDocs);
-        embeddingVectorService.batchSaveAuditLogs(
-                chunksToSave,
-                knowledgeProperties.getEmbeddingModelName(),
-                knowledgeProperties.getEmbeddingDimension(),
-                esDocIds
-        );
+    private Map<String, Object> createCommonMetadata(KnowledgeDocument doc) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("knowledgeBaseId", String.valueOf(doc.getKnowledgeBaseId()));
+        m.put("documentId", String.valueOf(doc.getId()));
+        m.put("documentName", doc.getOriginalName());
+        m.put("userId", String.valueOf(doc.getUserId()));
+        return m;
     }
 
-    private void updateStatus(KnowledgeDocument doc, KnowledgeParseStatusEnum status, String errorMsg) {
+    private List<Document> enrichMetadata(List<Document> docs, Map<String, Object> meta) {
+        return docs.stream().map(d -> {
+            Map<String, Object> combined = new HashMap<>(meta);
+            if (d.getMetadata() != null) combined.putAll(d.getMetadata());
+            return new Document(d.getText(), combined);
+        }).toList();
+    }
+
+    private void updateDocumentStatus(KnowledgeDocument doc, KnowledgeParseStatusEnum status, String error) {
         doc.setParseStatus(status.getValue());
-        if (errorMsg != null) {
-            doc.setErrorMsg(errorMsg.length() > 2000 ? errorMsg.substring(0, 2000) : errorMsg);
-        } else {
-            doc.setErrorMsg(null);
-        }
-        knowledgeDocumentMapper.updateById(doc);
+        if (error != null) doc.setErrorMsg(error.length() > 2000 ? error.substring(0, 2000) : error);
+        knowledgeDocumentService.updateById(doc);
     }
 
-    /**
-     * 清理文档对应的所有旧数据（分片、向量及审计日志），保证入库幂等性。
-     *
-     * @param documentId 文档内码
-     */
     @Override
-    public void removeChunksAndVectorsForDocument(long documentId) {
-        log.info("Cleaning up all data for documentId: {}", documentId);
-        // 1. 清理向量库中的分片 (Elasticsearch)
-        vectorStoreService.deleteByDocumentId(documentId);
-        // 2. 清理向量元数据审计记录 (MySQL)
-        embeddingVectorService.deleteByDocumentId(documentId);
-        // 3. 清理原始文本分片 (MySQL)
-        documentChunkService.deleteByDocumentId(documentId);
+    public void deleteVectors(Long documentId) {
+        if (documentId == null) return;
+        knowledgeVectorStore.delete(filterParser.parse("documentId == '" + documentId + "'"));
     }
 }
