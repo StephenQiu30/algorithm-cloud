@@ -1,15 +1,13 @@
 package com.stephen.cloud.ai.tool;
 
-import com.fasterxml.jackson.annotation.JsonClassDescription;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.knowledge.context.RagSearchContext;
+import com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade;
 import com.stephen.cloud.api.ai.model.enums.AiToolEnum;
+import com.stephen.cloud.api.knowledge.model.dto.KnowledgeSearchRequest;
+import com.stephen.cloud.api.knowledge.model.dto.KnowledgeSearchResponse;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
-import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Description;
@@ -24,49 +22,33 @@ import java.util.function.Function;
  * @author StephenQiu30
  */
 @Configuration
+@Slf4j
 public class KnowledgeSearchTool {
 
     /**
-     * 检索请求 DTO
-     */
-    @Data
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    @JsonClassDescription("算法知识库检索请求")
-    public static class Request {
-        @JsonProperty(required = true)
-        @JsonPropertyDescription("需要检索的问题或核心算法关键词")
-        private String query;
-
-        @JsonProperty(required = true)
-        @JsonPropertyDescription("当前对话关联的知识库 ID")
-        private Long knowledgeBaseId;
-    }
-
-    /**
-     * 检索响应 DTO
+     * 定义 Spring AI 检索函数 Bean。
+     * 该 Bean 会被自动注入到 ChatClient 的 Tool Registry 中。
      *
-     * @param sources 检索到的知识分片列表
-     */
-    public record Response(List<ChunkSourceVO> sources) {}
-
-    /**
-     * 定义 Spring AI 检索函数 Bean
+     * @param searchFacade        检索门面：负责汇聚多种检索策略
+     * @param knowledgeProperties 配置属性：获取默认检索阈值 and TopK
+     * @return 函数接口实现
      */
     @Bean(AiToolEnum.ALGORITHM_KNOWLEDGE_SEARCH_VALUE)
     @Description("搜索排序算法相关的私有知识库，以获取精准的算法描述、代码实现和复杂度分析。")
-    public Function<Request, Response> algorithmKnowledgeSearch(
+    public Function<KnowledgeSearchRequest, KnowledgeSearchResponse> algorithmKnowledgeSearch(
             KnowledgeChunkSearchFacade searchFacade,
             KnowledgeProperties knowledgeProperties) {
         return request -> {
+            log.info("Tool algorithmKnowledgeSearch calling: query={}, kbId={}", request.getQuery(), request.getKnowledgeBaseId());
             List<ChunkSourceVO> sources = searchFacade.searchChunks(
                     request.getKnowledgeBaseId(),
                     request.getQuery(),
                     knowledgeProperties.getDefaultTopK(),
                     knowledgeProperties.getRagTopKMax()
             );
-            // 记录检索过程中的原始内容，以便在 RAG 最终响应中返回引用
+            // 记录检索过程中的原始内容，以便在 RAG 最终响应中通过 RagSearchContext 返回引用
             RagSearchContext.addSources(sources);
-            return new Response(sources);
+            return new KnowledgeSearchResponse(sources);
         };
     }
 }

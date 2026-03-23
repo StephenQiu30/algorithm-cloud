@@ -2,14 +2,12 @@ package com.stephen.cloud.ai.service.impl;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.http.HttpUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.knowledge.etl.ContentTextCleaner;
 import com.stephen.cloud.ai.knowledge.parser.DocumentTextExtractor;
 import com.stephen.cloud.ai.knowledge.util.TextChunker;
 import com.stephen.cloud.ai.mapper.KnowledgeDocumentMapper;
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
-import com.stephen.cloud.ai.model.entity.EmbeddingVector;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
 import com.stephen.cloud.ai.model.enums.KnowledgeParseStatusEnum;
 import com.stephen.cloud.ai.service.DocumentChunkService;
@@ -31,9 +29,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 知识入库服务实现：集成 Spring AI 的解析与分片能力。
+ * 知识入库服务实现类：负责文档的完整 ETL (Extract, Transform, Load) 流水线。
  * <p>
- * 遵循 Lean Architecture 原则，移除冗余的 MySQL Embedding 镜像表，直接依赖向量存储。
+ * 该服务集成 Spring AI 的能力，将非结构化文档转换为向量化分片并存储。
+ * 核心流程：
+ * 1. 资源准备：从本地或远程同步文档。
+ * 2. 文本提取：使用 Tika 等工具提取原始文本，并进行清洗。
+ * 3. 语义分片：通过 TextChunker 进行智能切分。
+ * 4. 向量化入库：双路并发处理（MySQL 分片索引 + Elasticsearch 向量存储 + 过程审计）。
  * </p>
  *
  * @author StephenQiu30
@@ -42,9 +45,15 @@ import java.util.Map;
 @Slf4j
 public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
 
+    /**
+     * 文档元数据 Mapper：维护文档解析状态
+     */
     @Resource
     private KnowledgeDocumentMapper knowledgeDocumentMapper;
 
+    /**
+     * 分片持久化服务：存储文本分片到 MySQL
+     */
     @Resource
     private DocumentChunkService documentChunkService;
 
@@ -63,6 +72,11 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
     @Resource
     private ContentTextCleaner contentTextCleaner;
 
+    /**
+     * 执行文档入库主流程（由消息中心调用的入库入口）。
+     *
+     * @param message 包含文档 ID 和存储路径的消息对象
+     */
     @Override
     public void ingestDocument(KnowledgeDocIngestMessage message) {
         if (message == null || message.getDocumentId() == null) {
@@ -86,7 +100,7 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
                 throw new IllegalStateException("文档提取后的文本内容为空");
             }
 
-            // 3. 幂等性清理 旧分片
+            // 3. 幂等性清理 旧分片：确保重新解析时不会产生脏数据
             removeChunksAndVectorsForDocument(doc.getId());
 
             // 4. 执行语义分片
@@ -117,56 +131,53 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
         return Path.of(storagePath);
     }
 
+    /**
+     * 将解析后的文本分片持久化到 MySQL 和向量存储。
+     *
+     * @param doc        文档元数据对象
+     * @param chunkTexts 切分后的文本分片列表
+     */
     private void processAndIndexChunks(KnowledgeDocument doc, List<String> chunkTexts) {
-        List<DocumentChunk> chunksToSave = new ArrayList<>();
-        List<Document> vectorDocs = new ArrayList<>();
-        List<EmbeddingVector> embeddingRows = new ArrayList<>();
-
         long kbId = doc.getKnowledgeBaseId();
         long docId = doc.getId();
 
-        for (int i = 0; i < chunkTexts.size(); i++) {
-            String content = chunkTexts.get(i);
-            DocumentChunk chunk = new DocumentChunk();
-            chunk.setDocumentId(docId);
-            chunk.setKnowledgeBaseId(kbId);
-            chunk.setChunkIndex(i);
-            chunk.setContent(content);
-            chunk.setTokenEstimate(Math.min(content.length(), knowledgeProperties.getChunkSize()));
-            chunksToSave.add(chunk);
+        // 1. 调用分片服务：批量构建并保存文本分片 (MySQL)
+        List<DocumentChunk> chunksToSave = documentChunkService.batchCreateChunks(
+                docId, kbId, chunkTexts, knowledgeProperties.getChunkSize());
+
+        if (chunksToSave.isEmpty()) {
+            return;
         }
 
-        if (!chunksToSave.isEmpty()) {
-            documentChunkService.saveBatch(chunksToSave);
-            
-            for (DocumentChunk chunk : chunksToSave) {
-                Map<String, Object> metadata = new HashMap<>();
-                metadata.put("knowledgeBaseId", String.valueOf(kbId));
-                metadata.put("documentId", String.valueOf(docId));
-                metadata.put("documentName", doc.getOriginalName());
-                metadata.put("chunkId", String.valueOf(chunk.getId()));
-                metadata.put("userId", String.valueOf(doc.getUserId()));
+        // 2. 构造向量库 Document 对象及审计日志数据
+        List<Document> vectorDocs = new ArrayList<>();
+        List<String> esDocIds = new ArrayList<>();
 
-                vectorDocs.add(Document.builder()
-                        .id(String.valueOf(chunk.getId()))
-                        .text(chunk.getContent())
-                        .metadata(metadata)
-                        .build());
+        for (DocumentChunk chunk : chunksToSave) {
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("knowledgeBaseId", String.valueOf(kbId));
+            metadata.put("documentId", String.valueOf(docId));
+            metadata.put("documentName", doc.getOriginalName());
+            metadata.put("chunkId", String.valueOf(chunk.getId()));
+            metadata.put("userId", String.valueOf(doc.getUserId()));
 
-                // 记录向量元数据，支撑离线 ETL 过程审计
-                EmbeddingVector ev = new EmbeddingVector();
-                ev.setChunkId(chunk.getId());
-                ev.setEmbeddingModel(knowledgeProperties.getEmbeddingModelName());
-                ev.setDimension(knowledgeProperties.getEmbeddingDimension());
-                ev.setEsDocId(String.valueOf(chunk.getId()));
-                embeddingRows.add(ev);
-            }
-            
-            // 写入向量库
-            vectorStoreService.addDocuments(vectorDocs);
-            // 写入向量审计表
-            embeddingVectorService.saveBatch(embeddingRows);
+            String chunkIdStr = String.valueOf(chunk.getId());
+            vectorDocs.add(Document.builder()
+                    .id(chunkIdStr)
+                    .text(chunk.getContent())
+                    .metadata(metadata)
+                    .build());
+            esDocIds.add(chunkIdStr);
         }
+
+        // 3. 并行写入：向量库存储 + 过程审计日志
+        vectorStoreService.addDocuments(vectorDocs);
+        embeddingVectorService.batchSaveAuditLogs(
+                chunksToSave,
+                knowledgeProperties.getEmbeddingModelName(),
+                knowledgeProperties.getEmbeddingDimension(),
+                esDocIds
+        );
     }
 
     private void updateStatus(KnowledgeDocument doc, KnowledgeParseStatusEnum status, String errorMsg) {
@@ -179,21 +190,19 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
         knowledgeDocumentMapper.updateById(doc);
     }
 
+    /**
+     * 清理文档对应的所有旧数据（分片、向量及审计日志），保证入库幂等性。
+     *
+     * @param documentId 文档内码
+     */
     @Override
     public void removeChunksAndVectorsForDocument(long documentId) {
-        // 同步清理向量库相关分片
+        log.info("Cleaning up all data for documentId: {}", documentId);
+        // 1. 清理向量库中的分片 (Elasticsearch)
         vectorStoreService.deleteByDocumentId(documentId);
-        
-        LambdaQueryWrapper<DocumentChunk> chunkQw = new LambdaQueryWrapper<>();
-        chunkQw.eq(DocumentChunk::getDocumentId, documentId);
-        List<DocumentChunk> oldChunks = documentChunkService.list(chunkQw);
-        
-        if (!oldChunks.isEmpty()) {
-            List<Long> chunkIds = oldChunks.stream().map(DocumentChunk::getId).toList();
-            // 清理向量元数据审计表
-            embeddingVectorService.remove(new LambdaQueryWrapper<EmbeddingVector>()
-                    .in(EmbeddingVector::getChunkId, chunkIds));
-            documentChunkService.remove(chunkQw);
-        }
+        // 2. 清理向量元数据审计记录 (MySQL)
+        embeddingVectorService.deleteByDocumentId(documentId);
+        // 3. 清理原始文本分片 (MySQL)
+        documentChunkService.deleteByDocumentId(documentId);
     }
 }

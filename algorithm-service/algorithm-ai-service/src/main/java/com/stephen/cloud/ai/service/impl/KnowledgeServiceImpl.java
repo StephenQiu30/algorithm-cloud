@@ -28,6 +28,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
+ * 知识库服务实现类：负责知识库的 CRUD 及其关联视图对象的构建。
+ * <p>
+ * 遵循项目标准风格：包含参数校验、查询包装器构建及响应对象 (VO) 的高性能并行填充。
+ * </p>
+ *
  * @author StephenQiu30
  */
 @Service

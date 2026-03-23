@@ -43,6 +43,11 @@ public class VectorStoreServiceImpl implements VectorStoreService {
 
     private final FilterExpressionTextParser parser = new FilterExpressionTextParser();
 
+    /**
+     * 批量向向量库中添加文档分片。
+     *
+     * @param documents 经过元数据增强的 Spring AI Document 对象列表
+     */
     @Override
     public void addDocuments(List<Document> documents) {
         if (documents == null || documents.isEmpty()) {
@@ -52,6 +57,12 @@ public class VectorStoreServiceImpl implements VectorStoreService {
         knowledgeVectorStore.add(documents);
     }
 
+    /**
+     * 执行相似度检索：自动根据配置在 kNN 与 Hybrid (RRF) 策略间切换。
+     *
+     * @param searchRequest 检索请求配置
+     * @return 匹配的文档分片列表
+     */
     @Override
     public List<Document> similaritySearch(SearchRequest searchRequest) {
         Assert.notNull(searchRequest, "SearchRequest must not be null");
@@ -68,9 +79,15 @@ public class VectorStoreServiceImpl implements VectorStoreService {
         }
     }
 
+    /**
+     * 根据文档 ID 删除向量库中的所有关联分片。
+     *
+     * @param documentId 文档内码
+     */
     @Override
     public void deleteByDocumentId(long documentId) {
         log.info("Deleting vectors for documentId: {}", documentId);
+        // 使用元数据过滤器进行精确删除
         Filter.Expression ex = parser.parse("documentId == '" + documentId + "'");
         knowledgeVectorStore.delete(ex);
     }

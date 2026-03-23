@@ -61,13 +61,20 @@ public class HybridVectorSimilarityStrategy implements VectorSimilaritySearchStr
     @Resource
     private Executor vectorHybridSearchExecutor;
 
+    /**
+     * 执行混合检索主流程：kNN (向量) + BM25 (文本) 并行处理。
+     *
+     * @param searchRequest 包含查询文本、过滤表达式、TopK 等配置的请求对象
+     * @return 经过 RRF 融合且去重后的文档列表
+     */
     @Override
     public List<Document> search(SearchRequest searchRequest) {
         String filterQs = toFilterQueryString(searchRequest);
         int topK = searchRequest.getTopK();
+        // BM25 通常需要获取比 topK 稍多的结果，以保证在 RRF 融合时有足够的重合度
         int fetch = Math.max(topK, knowledgeProperties.getHybridBm25FetchSize());
 
-        // 1. 并行执行 KNN (向量相似度) 与 BM25 (关键词匹配)
+        // 1. 并行执行 KNN (向量相似度) 与 BM25 (关键词匹配)，降低整体时延
         CompletableFuture<List<Document>> knnFuture = CompletableFuture.supplyAsync(() ->
                 knowledgeVectorStore.similaritySearch(searchRequest), vectorHybridSearchExecutor
         );
@@ -75,6 +82,7 @@ public class HybridVectorSimilarityStrategy implements VectorSimilaritySearchStr
         CompletableFuture<List<Document>> bm25Future = CompletableFuture.supplyAsync(() -> {
             try {
                 Double threshold = searchRequest.getSimilarityThreshold();
+                // 注意：BM25 通常不强制全量匹配，通过 threshold 过滤长尾低相关回复
                 return searchBm25(searchRequest.getQuery(), filterQs, fetch, threshold != null ? threshold : 0.0);
             } catch (IOException e) {
                 log.warn("BM25 retrieval failed, falling back to pure kNN: {}", e.getMessage());
@@ -90,19 +98,23 @@ public class HybridVectorSimilarityStrategy implements VectorSimilaritySearchStr
             bm25Hits = bm25Future.get();
         } catch (Exception e) {
             log.error("Hybrid search parallel execution error: {}", e.getMessage());
-            // 容错：如果并行失败，尝试返回 KNN 结果
+            // 容错：如果并行失败，尝试返回已经完成的 KNN 结果（优先级高）
             return knnFuture.isCompletedExceptionally() ? new ArrayList<>() : knnFuture.join();
         }
 
-        // 2. 如果 BM25 无结果，直接返回 KNN
+        // 2. 如果单路检索无结果，则降级为另一路结果
         if (bm25Hits == null || bm25Hits.isEmpty()) {
             return knnHits;
         }
 
-        // 3. 执行 RRF 融合排序
+        // 3. 执行 RRF (Reciprocal Rank Fusion) 融合排序
+        // 算法公式：Score(d) = Σ (1 / (k + rank_i(d)))
         return reciprocalRankFusion(knnHits, bm25Hits, topK, knowledgeProperties.getRrfRankConstant());
     }
 
+    /**
+     * 将 Spring AI 过滤表达式转换为适用于 ES QueryString 的字符串。
+     */
     private String toFilterQueryString(SearchRequest searchRequest) {
         if (!searchRequest.hasFilterExpression() || searchRequest.getFilterExpression() == null) {
             return "*";

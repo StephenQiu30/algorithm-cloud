@@ -28,10 +28,14 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * RAG 服务实现：提供面向排序算法教学的检索增强问答。
+ * RAG 服务实现类：提供面向排序算法教学的检索增强问答。
  * <p>
- * 基于 Spring AI 的 Tool Calling 实现 Agentic RAG。
- * 优化点：通过 {@link RagSearchContext} 捕获工具检索到的中间结果并返回引用源。
+ * 该实现基于 Spring AI 的 Tool Calling 模型实现 Agentic RAG。
+ * 核心流程：
+ * 1. 接收用户问题。
+ * 2. 调度 LLM (DashScope) 决策是否需要调用 `algorithmKnowledgeSearch` 工具。
+ * 3. 工具执行混合检索（kNN + BM25）并注入上下文。
+ * 4. LLM 基于检索到的分片生成包含引用标记的回答。
  * </p>
  *
  * @author StephenQiu30
@@ -68,15 +72,31 @@ public class RagServiceImpl implements RagService {
     @Resource
     private ChatMemory chatMemory;
 
+    /**
+     * 知识分片检索门面：支持混合检索、RRF 重排序及阈值过滤。
+     */
     @Resource
     private KnowledgeChunkSearchFacade knowledgeChunkSearchFacade;
 
+    /**
+     * 对话录制服务：异步持久化 Token 消耗及消息内容。
+     */
     @Resource
     private AiChatRecordService aiChatRecordService;
 
+    /**
+     * 知识库元数据服务：获取库描述等信息。
+     */
     @Resource
     private KnowledgeService knowledgeService;
 
+    /**
+     * 执行 RAG 同步对话。
+     *
+     * @param request 对话请求对象（含问题、ID、会话 ID）
+     * @param userId  当前操作用户 ID
+     * @return 包含回复及检索源引用列表的响应对象
+     */
     @Override
     public RagChatResponseVO ragChat(RagChatRequest request, Long userId) {
         ThrowUtils.throwIf(request == null || StringUtils.isBlank(request.getQuestion()), ErrorCode.PARAMS_ERROR, "提问内容不能为空");
