@@ -1,18 +1,17 @@
 -- ============================================
--- 创建统一数据库
+-- 数据库初始化脚本
+-- 包含模块：用户、内容、AI/RAG、系统日志
 -- ============================================
 
+-- 1. 数据库建立
 CREATE DATABASE IF NOT EXISTS algorithm DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-SELECT 'algorithm database created successfully!' AS message;
--- ============================================
--- 用户表
--- ============================================
-
 USE algorithm;
 
-DROP TABLE IF EXISTS `user`;
+-- ============================================
+-- 模块：用户系统
+-- ============================================
 
+DROP TABLE IF EXISTS `user`;
 CREATE TABLE `user`
 (
     `id`              bigint       NOT NULL AUTO_INCREMENT COMMENT '用户ID',
@@ -35,19 +34,34 @@ CREATE TABLE `user`
     UNIQUE KEY `uk_user_email` (`user_email`) COMMENT '用户邮箱唯一索引',
     KEY `idx_github_id` (`github_id`) COMMENT 'GitHub ID索引',
     KEY `idx_github_id_is_delete` (`github_id`, `is_delete`) COMMENT 'GitHub ID删除状态索引'
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 1
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT = '用户表';
--- ============================================
--- 帖子表
--- ============================================
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='用户表';
 
-USE algorithm;
+DROP TABLE IF EXISTS `user_login_log`;
+CREATE TABLE `user_login_log`
+(
+    `id`          bigint      NOT NULL AUTO_INCREMENT COMMENT '登录日志ID',
+    `user_id`     bigint               DEFAULT NULL COMMENT '用户ID',
+    `account`     varchar(256)         DEFAULT NULL COMMENT '登录账号',
+    `login_type`  varchar(64)          DEFAULT NULL COMMENT '登录类型',
+    `status`      varchar(32) NOT NULL COMMENT '登录状态',
+    `fail_reason` varchar(512)         DEFAULT NULL COMMENT '失败原因',
+    `client_ip`   varchar(64)          DEFAULT NULL COMMENT '客户端IP',
+    `location`    varchar(256)         DEFAULT NULL COMMENT '归属地',
+    `user_agent`  varchar(512)         DEFAULT NULL COMMENT 'User-Agent',
+    `create_time` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_delete`   tinyint     NOT NULL DEFAULT 0 COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_account` (`account`),
+    KEY `idx_status_create_time` (`status`, `create_time` DESC)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='用户登录日志表';
+
+-- ============================================
+-- 模块：内容系统 (帖子、评论、互动)
+-- ============================================
 
 DROP TABLE IF EXISTS `post`;
-
 CREATE TABLE `post`
 (
     `id`             bigint        NOT NULL AUTO_INCREMENT COMMENT '帖子ID',
@@ -64,58 +78,28 @@ CREATE TABLE `post`
     `update_time`    datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_delete`      tinyint       NOT NULL DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
-    KEY `idx_user_id` (`user_id`) COMMENT '用户ID索引',
-    KEY `idx_create_time` (`create_time`) COMMENT '创建时间索引',
-    KEY `idx_review_status` (`review_status`) COMMENT '审核状态索引',
-    KEY `idx_is_delete_create_time` (`is_delete`, `create_time` DESC) COMMENT '未删除帖子按时间倒序索引',
-    KEY `idx_user_id_is_delete` (`user_id`, `is_delete`) COMMENT '用户未删除帖子索引',
-    KEY `idx_is_delete_thumb_num` (`is_delete`, `thumb_num` DESC) COMMENT '热门帖子按点赞数倒序索引',
-    KEY `idx_is_delete_favour_num` (`is_delete`, `favour_num` DESC) COMMENT '热门帖子按收藏数倒序索引',
-    KEY `idx_status_delete_update` (`review_status`, `is_delete`, `update_time`) COMMENT '审核状态同步索引',
-    FULLTEXT KEY `ft_title_content` (`title`, `content`) COMMENT '标题内容全文索引'
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 1
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT = '帖子表';
--- ============================================
--- 帖子评论表
--- ============================================
-
-USE algorithm;
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_review_status` (`review_status`),
+    FULLTEXT KEY `ft_title_content` (`title`, `content`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='帖子表';
 
 DROP TABLE IF EXISTS `post_comment`;
-
 CREATE TABLE `post_comment`
 (
     `id`          bigint   NOT NULL AUTO_INCREMENT COMMENT '评论ID',
     `content`     text     NOT NULL COMMENT '评论内容',
     `post_id`     bigint   NOT NULL COMMENT '帖子ID',
     `user_id`     bigint   NOT NULL COMMENT '评论用户ID',
-    `parent_id`   bigint   NOT NULL DEFAULT 0 COMMENT '父评论ID（0表示一级评论）',
+    `parent_id`   bigint   NOT NULL DEFAULT 0 COMMENT '父评论ID',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_delete`   tinyint  NOT NULL DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
-    KEY           `idx_post_id` (`post_id`) COMMENT '帖子ID索引',
-    KEY           `idx_user_id` (`user_id`) COMMENT '用户ID索引',
-    KEY           `idx_parent_id` (`parent_id`) COMMENT '父评论ID索引',
-    KEY           `idx_post_id_is_delete_create_time` (`post_id`, `is_delete`, `create_time`) COMMENT '帖子未删除评论按时间索引',
-    KEY           `idx_post_id_parent_id_is_delete` (`post_id`, `parent_id`, `is_delete`) COMMENT '评论树形结构查询优化索引',
-    KEY           `idx_post_id_create_time` (`post_id`, `create_time` DESC) COMMENT '最新评论查询优化索引'
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 1
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-  COMMENT = '帖子评论表';
--- ============================================
--- 帖子点赞表
--- ============================================
-
-USE algorithm;
+    KEY `idx_post_id` (`post_id`),
+    KEY `idx_user_id` (`user_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='帖子评论表';
 
 DROP TABLE IF EXISTS `post_thumb`;
-
 CREATE TABLE `post_thumb`
 (
     `id`          bigint   NOT NULL AUTO_INCREMENT COMMENT '点赞ID',
@@ -124,23 +108,10 @@ CREATE TABLE `post_thumb`
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_post_user` (`post_id`, `user_id`) COMMENT '用户对帖子点赞唯一索引',
-    KEY           `idx_post_id` (`post_id`) COMMENT '帖子ID索引',
-    KEY           `idx_user_id` (`user_id`) COMMENT '用户ID索引',
-    KEY           `idx_user_id_create_time` (`user_id`, `create_time` DESC) COMMENT '用户点赞历史查询优化索引'
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 1
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-  COMMENT = '帖子点赞表';
--- ============================================
--- 帖子收藏表
--- ============================================
-
-USE algorithm;
+    UNIQUE KEY `uk_post_user` (`post_id`, `user_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='帖子点赞表';
 
 DROP TABLE IF EXISTS `post_favour`;
-
 CREATE TABLE `post_favour`
 (
     `id`          bigint   NOT NULL AUTO_INCREMENT COMMENT '收藏ID',
@@ -149,29 +120,118 @@ CREATE TABLE `post_favour`
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_post_user` (`post_id`, `user_id`) COMMENT '用户对帖子收藏唯一索引',
-    KEY           `idx_post_id` (`post_id`) COMMENT '帖子ID索引',
-    KEY           `idx_user_id` (`user_id`) COMMENT '用户ID索引',
-    KEY           `idx_user_id_create_time` (`user_id`, `create_time` DESC) COMMENT '用户收藏历史查询优化索引'
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 1
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-  COMMENT = '帖子收藏表';
+    UNIQUE KEY `uk_post_user` (`post_id`, `user_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='帖子收藏表';
+
 -- ============================================
--- 通知表
+-- 模块：AI 与 知识库系统 (RAG)
 -- ============================================
 
-USE algorithm;
+DROP TABLE IF EXISTS `knowledge_base`;
+CREATE TABLE `knowledge_base`
+(
+    `id`           bigint       NOT NULL AUTO_INCREMENT COMMENT '知识库ID',
+    `user_id`      bigint       NOT NULL COMMENT '所有者用户ID',
+    `name`         varchar(256) NOT NULL COMMENT '名称',
+    `description`  varchar(1024)         DEFAULT NULL COMMENT '描述',
+    `status`       tinyint      NOT NULL DEFAULT 0 COMMENT '0正常 1停用',
+    `create_time`  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_delete`    tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='知识库';
+
+DROP TABLE IF EXISTS `knowledge_document`;
+CREATE TABLE `knowledge_document`
+(
+    `id`                 bigint        NOT NULL AUTO_INCREMENT COMMENT '文档ID',
+    `knowledge_base_id`  bigint        NOT NULL COMMENT '知识库ID',
+    `user_id`            bigint        NOT NULL COMMENT '上传用户ID',
+    `original_name`      varchar(512)  NOT NULL COMMENT '原始文件名',
+    `storage_path`       varchar(1024) NOT NULL COMMENT '存储路径',
+    `mime_type`          varchar(128)           DEFAULT NULL COMMENT 'MIME',
+    `size_bytes`         bigint        NOT NULL DEFAULT 0 COMMENT '大小',
+    `parse_status`       tinyint       NOT NULL DEFAULT 0 COMMENT '0待处理 1处理中 2完成 3失败',
+    `error_msg`          varchar(2048)          DEFAULT NULL COMMENT '错误信息',
+    `create_time`        datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`        datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_delete`          tinyint       NOT NULL DEFAULT 0 COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_kb_id` (`knowledge_base_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='知识库文档';
+
+DROP TABLE IF EXISTS `document_chunk`;
+CREATE TABLE `document_chunk`
+(
+    `id`                bigint       NOT NULL AUTO_INCREMENT COMMENT '分片ID',
+    `document_id`       bigint       NOT NULL COMMENT '文档ID',
+    `knowledge_base_id` bigint       NOT NULL COMMENT '知识库ID',
+    `chunk_index`       int          NOT NULL DEFAULT 0 COMMENT '序号',
+    `content`           mediumtext   NOT NULL COMMENT '文本',
+    `token_estimate`    int                   DEFAULT NULL COMMENT '估算token',
+    `create_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_delete`         tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_doc_index` (`document_id`, `chunk_index`),
+    KEY `idx_kb_id` (`knowledge_base_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='文档分片';
+
+DROP TABLE IF EXISTS `embedding_vector`;
+CREATE TABLE `embedding_vector`
+(
+    `id`               bigint       NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    `chunk_id`         bigint       NOT NULL COMMENT '分片ID',
+    `embedding_model`  varchar(128) NOT NULL COMMENT '模型名',
+    `dimension`        int          NOT NULL COMMENT '维度',
+    `es_doc_id`        varchar(128) NOT NULL COMMENT 'ES文档ID',
+    `create_time`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_chunk_id` (`chunk_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='向量元数据';
+
+DROP TABLE IF EXISTS `ai_chat_record`;
+CREATE TABLE `ai_chat_record`
+(
+    `id`                bigint   NOT NULL AUTO_INCREMENT COMMENT '对话ID',
+    `user_id`           bigint   NOT NULL COMMENT '用户ID',
+    `session_id`        varchar(128)      DEFAULT NULL COMMENT '会话ID',
+    `message`           text     NOT NULL COMMENT '对话消息',
+    `response`          text              DEFAULT NULL COMMENT 'AI响应内容',
+    `model_type`        varchar(128)      DEFAULT NULL COMMENT '模型类型',
+    `total_tokens`      int               DEFAULT NULL COMMENT '总消耗 token',
+    `prompt_tokens`     int               DEFAULT NULL COMMENT '提示消耗 token',
+    `completion_tokens` int               DEFAULT NULL COMMENT '生成消耗 token',
+    `post_id`           bigint             DEFAULT NULL COMMENT '关联帖子ID',
+    `create_time`       datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`       datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_delete`         tinyint  NOT NULL DEFAULT 0 COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id_create` (`user_id`, `create_time` DESC),
+    KEY `idx_session_id` (`session_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='AI 对话记录表';
+
+DROP TABLE IF EXISTS `SPRING_AI_CHAT_MEMORY`;
+CREATE TABLE `SPRING_AI_CHAT_MEMORY` (
+    `conversation_id` varchar(128) NOT NULL COMMENT '会话ID',
+    `content`         text         NOT NULL COMMENT '消息文本内容',
+    `type`            enum('USER', 'ASSISTANT', 'SYSTEM', 'TOOL') NOT NULL COMMENT '消息角色类型',
+    `timestamp`       timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '消息创建时间',
+    KEY `idx_conversation_timestamp` (`conversation_id`, `timestamp`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='Spring AI 标准对话记忆表';
+
+-- ============================================
+-- 模块：系统支撑 (通知、文件、邮件、日志)
+-- ============================================
 
 DROP TABLE IF EXISTS `notification`;
-
 CREATE TABLE `notification`
 (
     `id`           bigint       NOT NULL AUTO_INCREMENT COMMENT '通知ID',
     `title`        varchar(256) NOT NULL COMMENT '通知标题',
     `content`      text         NOT NULL COMMENT '通知内容',
-    `type`         varchar(64)  NOT NULL COMMENT '通知类型（system-系统通知，user-用户通知，comment-评论通知，like-点赞通知，follow-关注通知，broadcast-全员广播）',
+    `type`         varchar(64)  NOT NULL COMMENT '通知类型',
     `biz_id`       varchar(128) NOT NULL DEFAULT '' COMMENT '业务幂等ID',
     `user_id`      bigint       NOT NULL COMMENT '接收用户ID',
     `related_id`   bigint                DEFAULT NULL COMMENT '关联对象ID',
@@ -183,171 +243,11 @@ CREATE TABLE `notification`
     `update_time`  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_delete`    tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
-    KEY `idx_user_id` (`user_id`) COMMENT '用户ID索引',
-    UNIQUE KEY `uk_biz_user` (`biz_id`, `user_id`) COMMENT '业务幂等去重',
-    KEY `idx_type` (`type`) COMMENT '通知类型索引',
-    KEY `idx_is_read` (`is_read`) COMMENT '已读状态索引',
-    KEY `idx_create_time` (`create_time`) COMMENT '创建时间索引',
-    KEY `idx_user_id_is_read_create_time` (`user_id`, `is_read`, `create_time` DESC) COMMENT '用户未读通知按时间倒序索引'
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 1
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT = '通知表';
--- ============================================
--- 邮件记录表（支持分布式事务补偿）
--- ============================================
-
-USE algorithm;
-
-DROP TABLE IF EXISTS `email_record`;
-
-CREATE TABLE `email_record`
-(
-    `id`              bigint       NOT NULL AUTO_INCREMENT COMMENT '记录ID',
-    `msg_id`          varchar(128)          DEFAULT NULL COMMENT '消息ID',
-    `biz_id`          varchar(128)          DEFAULT NULL COMMENT '业务幂等ID',
-    `biz_type`        varchar(64)           DEFAULT NULL COMMENT '业务类型',
-    `to_email`        varchar(256) NOT NULL COMMENT '收件人邮箱',
-    `subject`         varchar(256) NOT NULL COMMENT '邮件主题',
-    `content`         text COMMENT '邮件内容',
-    `is_html`         tinyint      NOT NULL DEFAULT 0 COMMENT '是否HTML',
-    `status`          varchar(32)  NOT NULL DEFAULT 'PENDING' COMMENT '发送状态: PENDING-待发送, SUCCESS-发送成功, FAILED-发送失败, CANCELLED-业务取消',
-    `retry_count`     int          NOT NULL DEFAULT 0 COMMENT '重试次数',
-    `max_retry`       int          NOT NULL DEFAULT 3 COMMENT '最大重试次数',
-    `error_message`   varchar(1024)         DEFAULT NULL COMMENT '错误信息',
-    `provider`        varchar(64)           DEFAULT NULL COMMENT '发送渠道',
-    `send_time`       datetime              DEFAULT NULL COMMENT '发送时间',
-    `next_retry_time` datetime              DEFAULT NULL COMMENT '下次重试时间',
-    `create_time`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_delete`       tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_msg_id` (`msg_id`) COMMENT '消息ID唯一索引',
-    KEY `idx_to_email` (`to_email`) COMMENT '收件人索引',
-    KEY `idx_biz_id` (`biz_id`) COMMENT '业务幂等索引',
-    KEY `idx_status_create_time` (`status`, `create_time` DESC) COMMENT '状态时间索引',
-    KEY `idx_pending_retry` (`status`, `next_retry_time`) COMMENT '待重试邮件索引',
-    KEY `idx_biz_type` (`biz_type`) COMMENT '业务类型索引'
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 1
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT = '邮件记录表';
--- ============================================
--- 操作日志表
--- ============================================
-
-USE algorithm;
-
-DROP TABLE IF EXISTS `operation_log`;
-
-CREATE TABLE `operation_log`
-(
-    `id`              bigint   NOT NULL AUTO_INCREMENT COMMENT '日志ID',
-    `operator_id`     bigint            DEFAULT NULL COMMENT '操作人ID',
-    `operator_name`   varchar(128)      DEFAULT NULL COMMENT '操作人名称',
-    `module`          varchar(64)       DEFAULT NULL COMMENT '模块',
-    `action`          varchar(128)      DEFAULT NULL COMMENT '操作类型',
-    `method`          varchar(16)       DEFAULT NULL COMMENT 'HTTP方法',
-    `path`            varchar(512)      DEFAULT NULL COMMENT '请求路径',
-    `request_params`  text COMMENT '请求参数',
-    `response_status` int               DEFAULT NULL COMMENT '响应状态码',
-    `success`         tinyint  NOT NULL DEFAULT 1 COMMENT '是否成功',
-    `error_message`   varchar(1024)     DEFAULT NULL COMMENT '错误信息',
-    `client_ip`       varchar(64)       DEFAULT NULL COMMENT '客户端IP',
-    `location`        varchar(256)      DEFAULT NULL COMMENT '归属地',
-    `create_time`     datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time`     datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_delete`       tinyint  NOT NULL DEFAULT 0 COMMENT '是否删除',
-    PRIMARY KEY (`id`),
-    KEY `idx_operator_id` (`operator_id`) COMMENT '操作人ID索引',
-    KEY `idx_module` (`module`) COMMENT '模块索引',
-    KEY `idx_success` (`success`) COMMENT '成功状态索引',
-    KEY `idx_create_time` (`create_time`) COMMENT '创建时间索引'
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 1
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT = '操作日志表';
--- ============================================
--- 接口访问日志表
--- ============================================
-
-USE algorithm;
-
-DROP TABLE IF EXISTS `api_access_log`;
-
-CREATE TABLE `api_access_log`
-(
-    `id`            bigint       NOT NULL AUTO_INCREMENT COMMENT '日志ID',
-    `trace_id`      varchar(64)           DEFAULT NULL COMMENT '链路追踪ID',
-    `user_id`       bigint                DEFAULT NULL COMMENT '用户ID',
-    `method`        varchar(16)  NOT NULL COMMENT 'HTTP方法',
-    `path`          varchar(512) NOT NULL COMMENT '请求路径',
-    `query`         varchar(1024)         DEFAULT NULL COMMENT '查询参数',
-    `status`        int                   DEFAULT NULL COMMENT '响应状态码',
-    `latency_ms`    int                   DEFAULT NULL COMMENT '耗时毫秒',
-    `client_ip`     varchar(64)           DEFAULT NULL COMMENT '客户端IP',
-    `user_agent`    varchar(512)          DEFAULT NULL COMMENT 'User-Agent',
-    `referer`       varchar(512)          DEFAULT NULL COMMENT 'Referer',
-    `request_size`  bigint                DEFAULT NULL COMMENT '请求大小',
-    `response_size` bigint                DEFAULT NULL COMMENT '响应大小',
-    `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_delete`     tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
-    PRIMARY KEY (`id`),
-    KEY `idx_user_id` (`user_id`) COMMENT '用户ID索引',
-    KEY `idx_path` (`path`(191)) COMMENT '路径索引',
-    KEY `idx_status` (`status`) COMMENT '状态码索引',
-    KEY `idx_client_ip` (`client_ip`) COMMENT '客户端IP索引',
-    KEY `idx_create_time` (`create_time`) COMMENT '创建时间索引',
-    KEY `idx_trace_id` (`trace_id`) COMMENT '链路追踪ID索引'
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 1
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT = '接口访问日志表';
--- ============================================
--- 用户登录日志表
--- ============================================
-
-USE algorithm;
-
-DROP TABLE IF EXISTS `user_login_log`;
-
-CREATE TABLE `user_login_log`
-(
-    `id`          bigint      NOT NULL AUTO_INCREMENT COMMENT '登录日志ID',
-    `user_id`     bigint               DEFAULT NULL COMMENT '用户ID',
-    `account`     varchar(256)         DEFAULT NULL COMMENT '登录账号',
-    `login_type`  varchar(64)          DEFAULT NULL COMMENT '登录类型',
-    `status`      varchar(32) NOT NULL COMMENT '登录状态',
-    `fail_reason` varchar(512)         DEFAULT NULL COMMENT '失败原因',
-    `client_ip`   varchar(64)          DEFAULT NULL COMMENT '客户端IP',
-    `location`    varchar(256)         DEFAULT NULL COMMENT '归属地',
-    `user_agent`  varchar(512)         DEFAULT NULL COMMENT 'User-Agent',
-    `create_time` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time` datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_delete`   tinyint     NOT NULL DEFAULT 0 COMMENT '是否删除',
-    PRIMARY KEY (`id`),
-    KEY `idx_user_id` (`user_id`) COMMENT '用户ID索引',
-    KEY `idx_account` (`account`) COMMENT '账号索引',
-    KEY `idx_status_create_time` (`status`, `create_time` DESC) COMMENT '状态时间索引',
-    KEY `idx_client_ip` (`client_ip`) COMMENT '客户端IP索引'
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 1
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT = '用户登录日志表';
--- ============================================
--- 文件上传记录表
--- ============================================
-
-USE algorithm;
+    UNIQUE KEY `uk_biz_user` (`biz_id`, `user_id`),
+    KEY `idx_user_read` (`user_id`, `is_read`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='通知表';
 
 DROP TABLE IF EXISTS `file_upload_record`;
-
 CREATE TABLE `file_upload_record`
 (
     `id`            bigint        NOT NULL AUTO_INCREMENT COMMENT '记录ID',
@@ -369,47 +269,80 @@ CREATE TABLE `file_upload_record`
     `update_time`   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_delete`     tinyint       NOT NULL DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
-    KEY `idx_user_id` (`user_id`) COMMENT '用户ID索引',
-    KEY `idx_biz_type` (`biz_type`) COMMENT '业务类型索引',
-    KEY `idx_md5` (`md5`) COMMENT '文件MD5索引',
-    KEY `idx_create_time` (`create_time`) COMMENT '创建时间索引',
-    KEY `idx_storage_type` (`storage_type`) COMMENT '存储类型索引'
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 1
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT = '文件上传记录表';
--- ============================================
--- AI 对话记录表
--- ============================================
+    KEY `idx_md5` (`md5`),
+    KEY `idx_user_id` (`user_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='文件上传记录表';
 
-USE algorithm;
-
-DROP TABLE IF EXISTS `ai_chat_record`;
-
-CREATE TABLE `ai_chat_record`
+DROP TABLE IF EXISTS `email_record`;
+CREATE TABLE `email_record`
 (
-    `id`          bigint   NOT NULL AUTO_INCREMENT COMMENT '对话ID',
-    `user_id`     bigint   NOT NULL COMMENT '用户ID',
-    `session_id`  varchar(128)      DEFAULT NULL COMMENT '会话ID',
-    `message`     text     NOT NULL COMMENT '对话消息',
-    `response`    text              DEFAULT NULL COMMENT 'AI响应内容',
-    `model_type`        varchar(128)      DEFAULT NULL COMMENT '模型类型',
-    `total_tokens`      int               DEFAULT NULL COMMENT '总消耗 token',
-    `prompt_tokens`     int               DEFAULT NULL COMMENT '提示消耗 token',
-    `completion_tokens` int               DEFAULT NULL COMMENT '生成消耗 token',
-    `post_id`           bigint             DEFAULT NULL COMMENT '关联帖子ID',
-    `create_time`       datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_delete`   tinyint  NOT NULL DEFAULT 0 COMMENT '是否删除',
+    `id`              bigint       NOT NULL AUTO_INCREMENT COMMENT '记录ID',
+    `msg_id`          varchar(128)          DEFAULT NULL COMMENT '消息ID',
+    `biz_id`          varchar(128)          DEFAULT NULL COMMENT '业务幂等ID',
+    `biz_type`        varchar(64)           DEFAULT NULL COMMENT '业务类型',
+    `to_email`        varchar(256) NOT NULL COMMENT '收件人邮箱',
+    `subject`         varchar(256) NOT NULL COMMENT '邮件主题',
+    `content`         text COMMENT '邮件内容',
+    `is_html`         tinyint      NOT NULL DEFAULT 0 COMMENT '是否HTML',
+    `status`          varchar(32)  NOT NULL DEFAULT 'PENDING' COMMENT '发送状态',
+    `retry_count`     int          NOT NULL DEFAULT 0 COMMENT '重试次数',
+    `max_retry`       int          NOT NULL DEFAULT 3 COMMENT '最大重试次数',
+    `error_message`   varchar(1024)         DEFAULT NULL COMMENT '错误信息',
+    `provider`        varchar(64)           DEFAULT NULL COMMENT '发送渠道',
+    `send_time`       datetime              DEFAULT NULL COMMENT '发送时间',
+    `next_retry_time` datetime              DEFAULT NULL COMMENT '下次重试时间',
+    `create_time`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_delete`       tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
-    KEY           `idx_user_id` (`user_id`) COMMENT '用户ID索引',
-    KEY           `idx_session_id` (`session_id`) COMMENT '会话ID索引',
-    KEY           `idx_create_time` (`create_time`) COMMENT '创建时间索引',
-    KEY           `idx_user_id_create_time` (`user_id`, `create_time` DESC) COMMENT '用户对话历史按时间倒序索引',
-    KEY           `idx_session_create` (`session_id`, `create_time` DESC) COMMENT '会话聊天历史索引'
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 1
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-  COMMENT = 'AI 对话记录表';
+    UNIQUE KEY `uk_msg_id` (`msg_id`),
+    KEY `idx_status_retry` (`status`, `next_retry_time`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='邮件记录表';
+
+DROP TABLE IF EXISTS `operation_log`;
+CREATE TABLE `operation_log`
+(
+    `id`              bigint   NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    `operator_id`     bigint            DEFAULT NULL COMMENT '操作人ID',
+    `operator_name`   varchar(128)      DEFAULT NULL COMMENT '操作人名称',
+    `module`          varchar(64)       DEFAULT NULL COMMENT '模块',
+    `action`          varchar(128)      DEFAULT NULL COMMENT '操作类型',
+    `method`          varchar(16)       DEFAULT NULL COMMENT 'HTTP方法',
+    `path`            varchar(512)      DEFAULT NULL COMMENT '请求路径',
+    `request_params`  text COMMENT '请求参数',
+    `response_status` int               DEFAULT NULL COMMENT '响应状态码',
+    `success`         tinyint  NOT NULL DEFAULT 1 COMMENT '是否成功',
+    `error_message`   varchar(1024)     DEFAULT NULL COMMENT '错误信息',
+    `client_ip`       varchar(64)       DEFAULT NULL COMMENT '客户端IP',
+    `location`        varchar(256)      DEFAULT NULL COMMENT '归属地',
+    `create_time`     datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`     datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_delete`       tinyint  NOT NULL DEFAULT 0 COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_create_time` (`create_time`),
+    KEY `idx_operator_id` (`operator_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='操作日志表';
+
+DROP TABLE IF EXISTS `api_access_log`;
+CREATE TABLE `api_access_log`
+(
+    `id`            bigint       NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    `trace_id`      varchar(64)           DEFAULT NULL COMMENT '链路追踪ID',
+    `user_id`       bigint                DEFAULT NULL COMMENT '用户ID',
+    `method`        varchar(16)  NOT NULL COMMENT 'HTTP方法',
+    `path`          varchar(512) NOT NULL COMMENT '请求路径',
+    `query`         varchar(1024)         DEFAULT NULL COMMENT '查询参数',
+    `status`        int                   DEFAULT NULL COMMENT '响应状态码',
+    `latency_ms`    int                   DEFAULT NULL COMMENT '耗时毫秒',
+    `client_ip`     varchar(64)           DEFAULT NULL COMMENT '客户端IP',
+    `user_agent`    varchar(512)          DEFAULT NULL COMMENT 'User-Agent',
+    `referer`       varchar(512)          DEFAULT NULL COMMENT 'Referer',
+    `request_size`  bigint                DEFAULT NULL COMMENT '请求大小',
+    `response_size` bigint                DEFAULT NULL COMMENT '响应大小',
+    `create_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_delete`     tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_trace_id` (`trace_id`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT ='接口访问日志表';
