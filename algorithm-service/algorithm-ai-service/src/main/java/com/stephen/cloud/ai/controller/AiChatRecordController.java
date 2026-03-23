@@ -2,9 +2,16 @@ package com.stephen.cloud.ai.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.stephen.cloud.ai.convert.AiChatRecordConvert;
 import com.stephen.cloud.ai.model.entity.AiChatRecord;
 import com.stephen.cloud.ai.service.AiChatRecordService;
+import com.stephen.cloud.ai.service.RagService;
+import com.stephen.cloud.api.knowledge.model.dto.rag.RagChatRequest;
+import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
+import com.stephen.cloud.api.ai.model.dto.AiChatRecordAddRequest;
+import com.stephen.cloud.api.ai.model.dto.AiChatRecordEditRequest;
 import com.stephen.cloud.api.ai.model.dto.AiChatRecordQueryRequest;
+import com.stephen.cloud.api.ai.model.dto.AiChatRecordUpdateRequest;
 import com.stephen.cloud.api.ai.model.vo.AiChatRecordVO;
 import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.common.BaseResponse;
@@ -14,6 +21,7 @@ import com.stephen.cloud.common.common.ResultUtils;
 import com.stephen.cloud.common.constants.UserConstant;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.log.annotation.OperationLog;
+import com.stephen.cloud.common.common.ThrowUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -40,6 +48,82 @@ public class AiChatRecordController {
 
     @Resource
     private AiChatRecordService aiChatRecordService;
+
+    @Resource
+    private RagService ragService;
+
+    /**
+     * 创建对话记录
+     *
+     * @param addRequest 创建请求
+     * @param request    请求对象
+     * @return 记录 ID
+     */
+    @PostMapping("/add")
+    @Operation(summary = "创建对话记录")
+    @OperationLog(module = "AI 对话模块", action = "创建对话记录")
+    public BaseResponse<Long> addAiChatRecord(@RequestBody AiChatRecordAddRequest addRequest, HttpServletRequest request) {
+        if (addRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        AiChatRecord aiChatRecord = AiChatRecordConvert.INSTANCE.addRequestToObj(addRequest);
+        aiChatRecord.setUserId(SecurityUtils.getLoginUserId());
+        aiChatRecordService.validAiChatRecord(aiChatRecord, true);
+        boolean result = aiChatRecordService.save(aiChatRecord);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(aiChatRecord.getId());
+    }
+
+    /**
+     * 更新对话记录 (管理员)
+     *
+     * @param updateRequest 更新请求
+     * @param request       请求对象
+     * @return 是否成功
+     */
+    @PostMapping("/update")
+    @Operation(summary = "更新对话记录(管理员)")
+    @OperationLog(module = "AI 对话模块", action = "更新对话记录(管理员)")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> updateAiChatRecord(@RequestBody AiChatRecordUpdateRequest updateRequest, HttpServletRequest request) {
+        if (updateRequest == null || updateRequest.getId() == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        AiChatRecord aiChatRecord = AiChatRecordConvert.INSTANCE.updateRequestToObj(updateRequest);
+        aiChatRecordService.validAiChatRecord(aiChatRecord, false);
+        long id = updateRequest.getId();
+        AiChatRecord oldRecord = aiChatRecordService.getById(id);
+        ThrowUtils.throwIf(oldRecord == null, ErrorCode.NOT_FOUND_ERROR);
+        boolean result = aiChatRecordService.updateById(aiChatRecord);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 编辑对话记录 (用户)
+     *
+     * @param editRequest 编辑请求
+     * @param request     请求对象
+     * @return 是否成功
+     */
+    @PostMapping("/edit")
+    @Operation(summary = "编辑对话记录")
+    @OperationLog(module = "AI 对话模块", action = "编辑对话记录")
+    public BaseResponse<Boolean> editAiChatRecord(@RequestBody AiChatRecordEditRequest editRequest, HttpServletRequest request) {
+        if (editRequest == null || editRequest.getId() == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        AiChatRecord aiChatRecord = AiChatRecordConvert.INSTANCE.editRequestToObj(editRequest);
+        aiChatRecordService.validAiChatRecord(aiChatRecord, false);
+        long id = editRequest.getId();
+        AiChatRecord oldRecord = aiChatRecordService.getById(id);
+        ThrowUtils.throwIf(oldRecord == null, ErrorCode.NOT_FOUND_ERROR);
+        // 仅本人或管理员可编辑
+        if (!oldRecord.getUserId().equals(SecurityUtils.getLoginUserId()) && !SecurityUtils.isAdmin()) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+        boolean result = aiChatRecordService.updateById(aiChatRecord);
+        return ResultUtils.success(result);
+    }
 
     /**
      * 删除对话记录 (仅限本人或管理员)
@@ -115,4 +199,23 @@ public class AiChatRecordController {
                 aiChatRecordService.getQueryWrapper(queryRequest));
         return ResultUtils.success(aiChatRecordService.getAiChatRecordVOPage(aiChatRecordPage, request));
     }
+
+    /**
+     * 发起 RAG 问答
+     *
+     * @param request 问答请求
+     * @return 问答结果
+     */
+    @PostMapping("/chat")
+    @Operation(summary = "发起 RAG 问答")
+    @OperationLog(module = "AI 对话模块", action = "发起 RAG 问答")
+    public BaseResponse<RagChatResponseVO> ragChat(@RequestBody RagChatRequest request) {
+        if (request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        Long userId = SecurityUtils.getLoginUserId();
+        RagChatResponseVO response = ragService.ragChat(request, userId);
+        return ResultUtils.success(response);
+    }
+
 }

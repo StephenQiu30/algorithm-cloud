@@ -24,21 +24,21 @@ public class AiChatRecordVO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * id
+     * 主键 ID
      */
-    @Schema(description = "主键")
+    @Schema(description = "主键 ID")
     private Long id;
 
     /**
-     * 用户 id
+     * 用户 ID
      */
-    @Schema(description = "用户 id")
+    @Schema(description = "用户 ID")
     private Long userId;
 
     /**
-     * 会话 id
+     * 会话 ID
      */
-    @Schema(description = "会话 id")
+    @Schema(description = "会话 ID")
     private String sessionId;
 
     /**
@@ -72,8 +72,8 @@ public class AiChatRecordVO implements Serializable {
     private Date updateTime;
 
     /**
-     * 用户详细脱敏信息
+     * 用户详细信息
      */
-    @Schema(description = "用户信息")
+    @Schema(description = "用户详细信息")
     private UserVO userVO;
 }

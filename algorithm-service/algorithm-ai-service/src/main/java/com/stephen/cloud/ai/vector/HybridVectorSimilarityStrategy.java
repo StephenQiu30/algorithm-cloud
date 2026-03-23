@@ -6,7 +6,7 @@ import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.stephen.cloud.ai.annotation.VectorSimilarityType;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
-import com.stephen.cloud.ai.model.enums.VectorSimilarityModeEnum;
+import com.stephen.cloud.api.knowledge.model.enums.VectorSimilarityModeEnum;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;

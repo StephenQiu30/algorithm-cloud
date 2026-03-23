@@ -1,6 +1,6 @@
 package com.stephen.cloud.ai.annotation;
 
-import com.stephen.cloud.ai.model.enums.VectorSimilarityModeEnum;
+import com.stephen.cloud.api.knowledge.model.enums.VectorSimilarityModeEnum;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

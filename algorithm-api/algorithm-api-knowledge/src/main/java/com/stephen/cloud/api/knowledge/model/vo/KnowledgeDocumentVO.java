@@ -29,15 +29,15 @@ public class KnowledgeDocumentVO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * id
+     * 主键 ID
      */
-    @Schema(description = "id")
+    @Schema(description = "主键 ID")
     private Long id;
 
     /**
-     * 知识库 id
+     * 知识库 ID
      */
-    @Schema(description = "知识库 id")
+    @Schema(description = "知识库 ID")
     private Long knowledgeBaseId;
 
     /**
@@ -49,7 +49,7 @@ public class KnowledgeDocumentVO implements Serializable {
     /**
      * 解析状态 (0-待解析, 1-解析中, 2-解析成功, 3-解析失败等)
      */
-    @Schema(description = "解析状态")
+    @Schema(description = "解析状态 (0-待解析, 1-解析中, 2-解析成功, 3-解析失败等)")
     private Integer parseStatus;
 
     /**

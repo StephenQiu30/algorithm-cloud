@@ -1,8 +1,10 @@
 package com.stephen.cloud.ai.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.ai.model.entity.EmbeddingVector;
+import com.stephen.cloud.api.knowledge.model.dto.vector.EmbeddingVectorQueryRequest;
 
 import java.util.List;
 
@@ -28,5 +30,21 @@ public interface EmbeddingVectorService extends IService<EmbeddingVector> {
      *
      * @param docId 文档 ID
      */
-    void deleteByDocumentId(Long docId);
+    boolean deleteByDocumentId(Long docId);
+
+    /**
+     * 校验向量元数据
+     *
+     * @param entity 向量实体
+     * @param add    是否为新增
+     */
+    void validEmbeddingVector(EmbeddingVector entity, boolean add);
+
+    /**
+     * 获取查询包装器
+     *
+     * @param queryRequest 查询请求
+     * @return LambdaQueryWrapper
+     */
+    LambdaQueryWrapper<EmbeddingVector> getQueryWrapper(EmbeddingVectorQueryRequest queryRequest);
 }

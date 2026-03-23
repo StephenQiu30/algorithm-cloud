@@ -1,4 +1,4 @@
-package com.stephen.cloud.api.knowledge.model.dto;
+package com.stephen.cloud.api.knowledge.model.dto.search;
 
 import com.fasterxml.jackson.annotation.JsonClassDescription;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -34,3 +34,4 @@ public class KnowledgeSearchRequest implements Serializable {
     @JsonPropertyDescription("当前对话关联的知识库 ID")
     private Long knowledgeBaseId;
 }
+

@@ -49,12 +49,12 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
     private RabbitMqSender mqSender;
 
     /**
-     * 包装并发送持久化消息到 MQ
+     * 异步持久化 AI 对话记录
      * <p>
-     * 保持和其他微服务中实现风格的一致
+     * 通过消息队列 (RabbitMQ) 实现记录的削峰填谷，确保持久化操作不阻塞主对话流程。
      * </p>
      *
-     * @param aiChatRecordDTO 记录传输对象
+     * @param aiChatRecordDTO 包含对话详情的数据传输对象
      */
     @Override
     public void saveAiChatRecordAsync(AiChatRecordDTO aiChatRecordDTO) {
@@ -62,12 +62,15 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
             return;
         }
         try {
+            // 自动注入当前登录用户 ID (如有)
             Long userId = SecurityUtils.getLoginUserIdPermitNull();
             aiChatRecordDTO.setUserId(userId);
+            // 生成追踪用的业务 ID
             String bizId = "ai_chat:" + System.currentTimeMillis();
             mqSender.send(MqBizTypeEnum.AI_CHAT_RECORD, bizId, aiChatRecordDTO);
+            log.info("已成功发送对话记录异步持久化消息: bizId={}", bizId);
         } catch (Exception e) {
-            log.error("异步同步 AI 对话记录失败", e);
+            log.error("尝试发送异步对话记录失败: {}", e.getMessage(), e);
         }
     }
 
@@ -89,10 +92,13 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
     }
 
     /**
-     * 构造组合查询条件
+     * 构造 MyBatis Plus 的 Lambda 查询条件封装
+     * <p>
+     * 支持多字段组合查询，包含对 'message' 和 'response' 的 OR 模糊匹配搜索。
+     * </p>
      *
-     * @param aiChatRecordQueryRequest 查询请求
-     * @return LambdaQueryWrapper
+     * @param aiChatRecordQueryRequest 查询请求包装类
+     * @return 组装完成的 LambdaQueryWrapper 对象
      */
     @Override
     public LambdaQueryWrapper<AiChatRecord> getQueryWrapper(AiChatRecordQueryRequest aiChatRecordQueryRequest) {
@@ -108,13 +114,13 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
         String sortField = aiChatRecordQueryRequest.getSortField();
         String sortOrder = aiChatRecordQueryRequest.getSortOrder();
 
-        // 精确匹配
+        // 1. 执行精准字段过滤
         queryWrapper.eq(id != null && id > 0, AiChatRecord::getId, id)
                 .eq(userId != null && userId > 0, AiChatRecord::getUserId, userId)
                 .eq(StringUtils.isNotBlank(sessionId), AiChatRecord::getSessionId, sessionId)
                 .eq(StringUtils.isNotBlank(modelType), AiChatRecord::getModelType, modelType);
 
-        // 模糊搜索：同时匹配消息和响应内容
+        // 2. 复合搜索关键词匹配 (消息原文 OR AI 回复内容)
         if (StringUtils.isNotBlank(searchText)) {
             queryWrapper.and(qw -> qw
                     .like(AiChatRecord::getMessage, searchText)
@@ -122,7 +128,7 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
                     .like(AiChatRecord::getResponse, searchText));
         }
 
-        // 排序逻辑
+        // 3. 处理分页排序规则
         if (StringUtils.isNotBlank(sortField)) {
             boolean isAsc = CommonConstant.SORT_ORDER_ASC.equalsIgnoreCase(sortOrder);
             switch (sortField) {
@@ -130,6 +136,9 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
                 default -> {
                 }
             }
+        } else {
+            // 默认按创建时间倒序排
+            queryWrapper.orderByDesc(AiChatRecord::getCreateTime);
         }
         return queryWrapper;
     }
@@ -146,22 +155,25 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
         if (aiChatRecord == null) {
             return null;
         }
-        AiChatRecordVO vo = AiChatRecordConvert.objToVo(aiChatRecord);
+        AiChatRecordVO aiChatRecordVO = AiChatRecordConvert.INSTANCE.objToVo(aiChatRecord);
         // 单个记录查询用户信息
         Long userId = aiChatRecord.getUserId();
         if (userId != null && userId > 0) {
             UserVO userVO = userFeignClient.getUserVOById(userId).getData();
-            vo.setUserVO(userVO);
+            aiChatRecordVO.setUserVO(userVO);
         }
-        return vo;
+        return aiChatRecordVO;
     }
 
     /**
-     * 分页获取对话记录封装
+     * 批量获取对话记录封装 VO (分页)
+     * <p>
+     * 使用批量获取 UserVO 的策略来规避单记录循环请求带来的性能损耗。
+     * </p>
      *
-     * @param aiChatRecordPage 分页实体
+     * @param aiChatRecordPage 原始分页结果
      * @param request          HTTP 请求
-     * @return Page<AiChatRecordVO>
+     * @return 包含用户信息的数据视图分页对象
      */
     @Override
     public Page<AiChatRecordVO> getAiChatRecordVOPage(Page<AiChatRecord> aiChatRecordPage, HttpServletRequest request) {
@@ -172,7 +184,7 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
             return voPage;
         }
 
-        // 1. 批量获取用户信息，极大优化性能
+        // 1. 批量提取并去重用户 ID，极大优化 RPC 性能
         Set<Long> userIdSet = records.stream().map(AiChatRecord::getUserId).collect(Collectors.toSet());
         Map<Long, UserVO> userVOMap = new HashMap<>();
         if (CollUtil.isNotEmpty(userIdSet)) {
@@ -182,10 +194,10 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
             }
         }
 
-        // 2. 填充数据
+        // 2. 将实体转化为 VO 并填充关联用户信息
         Map<Long, UserVO> finalUserVOMap = userVOMap;
         List<AiChatRecordVO> voList = records.stream().map(record -> {
-            AiChatRecordVO vo = AiChatRecordConvert.objToVo(record);
+            AiChatRecordVO vo = AiChatRecordConvert.INSTANCE.objToVo(record);
             vo.setUserVO(finalUserVOMap.get(record.getUserId()));
             return vo;
         }).collect(Collectors.toList());

@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
-import com.stephen.cloud.api.knowledge.model.dto.KnowledgeBaseQueryRequest;
+import com.stephen.cloud.api.knowledge.model.dto.knowledgebase.KnowledgeBaseQueryRequest;
 import com.stephen.cloud.api.knowledge.model.vo.KnowledgeBaseVO;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -16,7 +16,7 @@ import jakarta.servlet.http.HttpServletRequest;
  *
  * @author StephenQiu30
  */
-public interface KnowledgeService extends IService<KnowledgeBase> {
+public interface KnowledgeBaseService extends IService<KnowledgeBase> {
 
     /**
      * 校验知识库信息

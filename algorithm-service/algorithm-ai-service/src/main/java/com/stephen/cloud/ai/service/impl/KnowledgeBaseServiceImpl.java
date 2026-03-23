@@ -4,11 +4,11 @@ import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.stephen.cloud.ai.convert.KnowledgeConvert;
+import com.stephen.cloud.ai.convert.KnowledgeBaseConvert;
 import com.stephen.cloud.ai.mapper.KnowledgeBaseMapper;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
-import com.stephen.cloud.ai.service.KnowledgeService;
-import com.stephen.cloud.api.knowledge.model.dto.KnowledgeBaseQueryRequest;
+import com.stephen.cloud.ai.service.KnowledgeBaseService;
+import com.stephen.cloud.api.knowledge.model.dto.knowledgebase.KnowledgeBaseQueryRequest;
 import com.stephen.cloud.api.knowledge.model.vo.KnowledgeBaseVO;
 import com.stephen.cloud.api.user.client.UserFeignClient;
 import com.stephen.cloud.api.user.model.vo.UserVO;
@@ -37,16 +37,20 @@ import java.util.stream.Collectors;
  */
 @Service
 @Slf4j
-public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeBaseMapper, KnowledgeBase> implements KnowledgeService {
+public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, KnowledgeBase> implements KnowledgeBaseService {
 
     @Resource
     private UserFeignClient userFeignClient;
 
     /**
      * 校验知识库合法性
+     * <p>
+     * 包含核心字段的非空检查以及业务长度限制。
+     * </p>
      *
-     * @param knowledgeBase 知识库实体
-     * @param add           是否为新增操作 (新增时名称必填)
+     * @param knowledgeBase 知识库实体对象
+     * @param add           是否为新增操作 (新增时 'name' 字段为必填)
+     * @throws BusinessException 当校验不通过时抛出业务异常
      */
     @Override
     public void validKnowledgeBase(KnowledgeBase knowledgeBase, boolean add) {
@@ -58,17 +62,20 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeBaseMapper, Knowl
         if (add) {
             ThrowUtils.throwIf(StringUtils.isBlank(name), ErrorCode.PARAMS_ERROR, "知识库名称不能为空");
         }
-        // 字数限制
+        // 字数限制：名称不允许超过 50 个字符
         if (StringUtils.isNotBlank(name) && name.length() > 50) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "名称过长");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "名称过长，最大支持 50 个字符");
         }
     }
 
     /**
-     * 构造查询包装器
+     * 构造 MyBatis Plus 的 Lambda 查询包装器
+     * <p>
+     * 支持根据 ID 精确匹配、名称模糊查询及创建人过滤。
+     * </p>
      *
      * @param knowledgeBaseQueryRequest 知识库查询请求对象
-     * @return LambdaQueryWrapper
+     * @return 组装好的 LambdaQueryWrapper
      */
     @Override
     public LambdaQueryWrapper<KnowledgeBase> getQueryWrapper(KnowledgeBaseQueryRequest knowledgeBaseQueryRequest) {
@@ -87,6 +94,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeBaseMapper, Knowl
         qw.like(StringUtils.isNotBlank(name), KnowledgeBase::getName, name);
         qw.eq(ObjectUtils.isNotEmpty(userId), KnowledgeBase::getUserId, userId);
 
+        // 动态排序处理
         if (SqlUtils.validSortField(sortField)) {
             boolean isAsc = CommonConstant.SORT_ORDER_ASC.equalsIgnoreCase(sortOrder);
             switch (sortField) {
@@ -96,6 +104,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeBaseMapper, Knowl
                 }
             }
         } else {
+            // 默认按最后更新时间倒序
             qw.orderByDesc(KnowledgeBase::getUpdateTime);
         }
         return qw;
@@ -113,7 +122,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeBaseMapper, Knowl
         if (knowledgeBase == null) {
             return null;
         }
-        KnowledgeBaseVO vo = KnowledgeConvert.objToVo(knowledgeBase);
+        KnowledgeBaseVO vo = KnowledgeBaseConvert.INSTANCE.objToVo(knowledgeBase);
         // 关联用户信息
         Long userId = knowledgeBase.getUserId();
         if (userId != null && userId > 0) {
@@ -124,11 +133,14 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeBaseMapper, Knowl
     }
 
     /**
-     * 分页获取知识库封装
+     * 批量获取知识库封装对象 (分页)
+     * <p>
+     * 核心优化：采用批量 Feign 调用的方式一次性获取所有记录相关的用户信息，避免 N+1 查询问题。
+     * </p>
      *
-     * @param knowledgeBasePage 实体分页对象
-     * @param request           HTTP 请求
-     * @return Page<KnowledgeBaseVO>
+     * @param knowledgeBasePage 分页原始数据记录
+     * @param request           HTTP Servlet Request
+     * @return 填充完整用户信息后的封装 Page
      */
     @Override
     public Page<KnowledgeBaseVO> getKnowledgeBaseVOPage(Page<KnowledgeBase> knowledgeBasePage, HttpServletRequest request) {
@@ -138,11 +150,11 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeBaseMapper, Knowl
             return voPage;
         }
 
-        // 1. 批量提取用户 ID
+        // 1. 批量提取非重的用户 ID
         Set<Long> userIdSet = records.stream().map(KnowledgeBase::getUserId).collect(Collectors.toSet());
         Map<Long, UserVO> userVOMap = new HashMap<>();
         
-        // 2. 批量调用用户服务获取信息，减少 Feign 调用次数
+        // 2. 批量调用用户服务获取信息，减少 Feign 往返开销
         if (CollUtil.isNotEmpty(userIdSet)) {
             List<UserVO> userVOList = userFeignClient.getUserVOByIds(new ArrayList<>(userIdSet)).getData();
             if (CollUtil.isNotEmpty(userVOList)) {
@@ -150,10 +162,10 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeBaseMapper, Knowl
             }
         }
 
-        // 3. 填充 VO 列表
+        // 3. 将实体转换为 VO 并注入用户信息
         Map<Long, UserVO> finalUserVOMap = userVOMap;
         List<KnowledgeBaseVO> voList = records.stream().map(kb -> {
-            KnowledgeBaseVO vo = KnowledgeConvert.objToVo(kb);
+            KnowledgeBaseVO vo = KnowledgeBaseConvert.INSTANCE.objToVo(kb);
             vo.setUserVO(finalUserVOMap.get(kb.getUserId()));
             return vo;
         }).collect(Collectors.toList());

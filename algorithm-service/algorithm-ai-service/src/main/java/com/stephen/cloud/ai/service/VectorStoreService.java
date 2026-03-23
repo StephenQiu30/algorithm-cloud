@@ -9,7 +9,7 @@ import java.util.List;
  * 知识库向量存储封装（统一 Spring AI {@link org.springframework.ai.vectorstore.VectorStore} 操作）。
  * <p>
  * {@link #similaritySearch} 在配置开启混合检索时经 {@link com.stephen.cloud.ai.vector.VectorSimilarityStrategyRegistry}
- * 选择 {@link com.stephen.cloud.ai.model.enums.VectorSimilarityModeEnum#HYBRID} 策略（kNN + BM25 + RRF），
+ * 选择 {@link com.stephen.cloud.api.knowledge.model.enums.VectorSimilarityModeEnum#HYBRID} 策略（kNN + BM25 + RRF），
  * 与 {@link RagService}、{@link KnowledgeRetrievalService} 共用同一路径，保证入库 metadata 与检索过滤一致。
  * </p>
  *

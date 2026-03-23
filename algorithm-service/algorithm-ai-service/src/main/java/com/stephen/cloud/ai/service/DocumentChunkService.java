@@ -1,7 +1,9 @@
 package com.stephen.cloud.ai.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
+import com.stephen.cloud.api.knowledge.model.dto.chunk.DocumentChunkQueryRequest;
 
 import java.util.List;
 
@@ -30,4 +32,20 @@ public interface DocumentChunkService extends IService<DocumentChunk> {
      * @return 是否清理成功
      */
     boolean deleteByDocumentId(Long docId);
+
+    /**
+     * 校验分片
+     *
+     * @param entity 分片实体
+     * @param add    是否为新增
+     */
+    void validDocumentChunk(DocumentChunk entity, boolean add);
+
+    /**
+     * 获取查询包装器
+     *
+     * @param queryRequest 查询请求
+     * @return LambdaQueryWrapper
+     */
+    LambdaQueryWrapper<DocumentChunk> getQueryWrapper(DocumentChunkQueryRequest queryRequest);
 }

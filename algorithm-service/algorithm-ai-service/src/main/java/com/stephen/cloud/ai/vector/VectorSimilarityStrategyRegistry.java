@@ -1,7 +1,7 @@
 package com.stephen.cloud.ai.vector;
 
 import com.stephen.cloud.ai.annotation.VectorSimilarityType;
-import com.stephen.cloud.ai.model.enums.VectorSimilarityModeEnum;
+import com.stephen.cloud.api.knowledge.model.enums.VectorSimilarityModeEnum;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.exception.BusinessException;
 import jakarta.annotation.PostConstruct;

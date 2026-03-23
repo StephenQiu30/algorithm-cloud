@@ -1,4 +1,4 @@
-package com.stephen.cloud.api.knowledge.model.dto;
+package com.stephen.cloud.api.knowledge.model.dto.retrieval;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -11,6 +11,14 @@ import java.io.Serializable;
  * <p>
  * 用于对特定知识库进行语义检索，返回相似度评分和文本切片。
  * </p>
+ */
+/**
+ * 知识检索请求
+ * <p>
+ * 用于对特定知识库进行语义检索，返回相似度评分和文本切片。
+ * </p>
+ *
+ * @author StephenQiu30
  */
 @Data
 @Schema(description = "知识检索请求")
@@ -32,8 +40,9 @@ public class KnowledgeRetrievalRequest implements Serializable {
     private String query;
 
     /**
-     * 检索条数
+     * 检索数量
      */
     @Schema(description = "检索数量", example = "5")
     private Integer topK;
 }
+

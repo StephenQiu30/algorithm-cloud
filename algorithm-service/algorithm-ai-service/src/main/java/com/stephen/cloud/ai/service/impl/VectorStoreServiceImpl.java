@@ -1,7 +1,7 @@
 package com.stephen.cloud.ai.service.impl;
 
 import com.stephen.cloud.ai.config.KnowledgeProperties;
-import com.stephen.cloud.ai.model.enums.VectorSimilarityModeEnum;
+import com.stephen.cloud.api.knowledge.model.enums.VectorSimilarityModeEnum;
 import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.ai.vector.VectorSimilarityStrategyRegistry;
 import jakarta.annotation.Resource;
@@ -44,29 +44,40 @@ public class VectorStoreServiceImpl implements VectorStoreService {
     private final FilterExpressionTextParser parser = new FilterExpressionTextParser();
 
     /**
-     * 批量向向量库中添加文档分片。
+     * 批量向向量库中添加文档分片
+     * <p>
+     * 文档入库后会自动通过 Embedding Model 转换为稠密向量。
+     * 建议 Metadata 中必须携带 {@code knowledgeBaseId} 以支持后续的多租户硬过滤。
+     * </p>
      *
-     * @param documents 经过元数据增强的 Spring AI Document 对象列表
+     * @param documents 包含正文与关键 Metadata 的 Spring AI Document 对象列表
      */
     @Override
     public void addDocuments(List<Document> documents) {
         if (documents == null || documents.isEmpty()) {
             return;
         }
-        log.info("Adding {} documents to knowledge vector store", documents.size());
+        log.info("正在向向量库同步 {} 条文档记录", documents.size());
         knowledgeVectorStore.add(documents);
     }
 
     /**
-     * 执行相似度检索：自动根据配置在 kNN 与 Hybrid (RRF) 策略间切换。
+     * 执行向量空间相似度检索
+     * <p>
+     * 策略选择逻辑：
+     * 1. 检查 `knowledge.hybrid-search-enabled` 配置。
+     * 2. 若配置开启，则从中获取 HYBRID 策略（kNN + BM25 并通过 RRF 融合）。
+     * 3. 否则回退至传统的跨索引 kNN 语义检索。
+     * </p>
      *
-     * @param searchRequest 检索请求配置
-     * @return 匹配的文档分片列表
+     * @param searchRequest 封装了 Query、Filter Expression 及 TopK 的检索配置
+     * @return 命中的 Document 列表（包含相似度分数 metadata）
      */
     @Override
     public List<Document> similaritySearch(SearchRequest searchRequest) {
-        Assert.notNull(searchRequest, "SearchRequest must not be null");
+        Assert.notNull(searchRequest, "检索请求对象不能为空");
         
+        // 根据系统全局配置或动态条件决定检索模式
         VectorSimilarityModeEnum mode = knowledgeProperties.isHybridSearchEnabled()
                 ? VectorSimilarityModeEnum.HYBRID
                 : VectorSimilarityModeEnum.KNN;
@@ -74,7 +85,7 @@ public class VectorStoreServiceImpl implements VectorStoreService {
         try {
             return vectorSimilarityStrategyRegistry.getStrategy(mode).search(searchRequest);
         } catch (Exception e) {
-            log.error("Similarity search failed (mode: {}): {}", mode, e.getMessage());
+            log.error("向量检索执行异常 (模式: {}): {}", mode, e.getMessage(), e);
             return Collections.emptyList();
         }
     }

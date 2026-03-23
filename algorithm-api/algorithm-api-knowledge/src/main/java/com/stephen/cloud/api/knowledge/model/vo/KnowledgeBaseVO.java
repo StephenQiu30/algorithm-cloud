@@ -30,15 +30,15 @@ public class KnowledgeBaseVO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * id
+     * 主键 ID
      */
-    @Schema(description = "id")
+    @Schema(description = "主键 ID")
     private Long id;
 
     /**
-     * 用户 id
+     * 用户 ID
      */
-    @Schema(description = "用户 id")
+    @Schema(description = "用户 ID")
     private Long userId;
 
     /**
@@ -64,10 +64,10 @@ public class KnowledgeBaseVO implements Serializable {
      */
     @Schema(description = "创建时间")
     private Date createTime;
-
+    
     /**
-     * 用户信息
+     * 用户详细信息
      */
-    @Schema(description = "用户信息")
+    @Schema(description = "用户详细信息")
     private UserVO userVO;
 }

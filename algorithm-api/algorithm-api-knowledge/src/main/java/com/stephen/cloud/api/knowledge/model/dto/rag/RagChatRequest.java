@@ -1,4 +1,4 @@
-package com.stephen.cloud.api.knowledge.model.dto;
+package com.stephen.cloud.api.knowledge.model.dto.rag;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -40,8 +40,9 @@ public class RagChatRequest implements Serializable {
     private String sessionId;
 
     /**
-     * 检索 topK (返回相关文档切片的数量)
+     * 检索数量 (返回相关文档切片的数量)
      */
-    @Schema(description = "检索 topK", example = "5")
+    @Schema(description = "检索数量", example = "5")
     private Integer topK;
 }
+

@@ -1,7 +1,7 @@
 package com.stephen.cloud.ai.vector;
 
 import com.stephen.cloud.ai.annotation.VectorSimilarityType;
-import com.stephen.cloud.ai.model.enums.VectorSimilarityModeEnum;
+import com.stephen.cloud.api.knowledge.model.enums.VectorSimilarityModeEnum;
 import jakarta.annotation.Resource;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;

@@ -2,7 +2,7 @@ package com.stephen.cloud.ai.manager;
 
 import cn.hutool.core.convert.Convert;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
-import com.stephen.cloud.ai.service.KnowledgeService;
+import com.stephen.cloud.ai.service.KnowledgeBaseService;
 import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import com.stephen.cloud.common.common.ErrorCode;
@@ -26,7 +26,7 @@ public class KnowledgeChunkSearchFacade {
     private VectorStoreService vectorStoreService;
 
     @Resource
-    private KnowledgeService knowledgeService;
+    private KnowledgeBaseService knowledgeBaseService;
 
     @Resource
     private KnowledgeProperties knowledgeProperties;
@@ -38,7 +38,7 @@ public class KnowledgeChunkSearchFacade {
             int topKMax) {
         ThrowUtils.throwIf(knowledgeBaseId == null || knowledgeBaseId <= 0, ErrorCode.PARAMS_ERROR, "知识库 ID 不能为空");
         ThrowUtils.throwIf(StringUtils.isBlank(query), ErrorCode.PARAMS_ERROR, "查询内容不能为空");
-        ThrowUtils.throwIf(knowledgeService.getById(knowledgeBaseId) == null, ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
+        ThrowUtils.throwIf(knowledgeBaseService.getById(knowledgeBaseId) == null, ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
         return executeChunkSearch(knowledgeBaseId, query.trim(), requestTopK, topKMax);
     }
 

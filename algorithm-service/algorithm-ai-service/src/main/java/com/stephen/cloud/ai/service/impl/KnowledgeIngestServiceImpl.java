@@ -9,17 +9,18 @@ import com.stephen.cloud.ai.knowledge.util.TextChunker;
 import com.stephen.cloud.ai.mapper.KnowledgeDocumentMapper;
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
-import com.stephen.cloud.ai.model.enums.KnowledgeParseStatusEnum;
+import com.stephen.cloud.api.knowledge.model.enums.KnowledgeParseStatusEnum;
 import com.stephen.cloud.ai.service.DocumentChunkService;
 import com.stephen.cloud.ai.service.EmbeddingVectorService;
 import com.stephen.cloud.ai.service.KnowledgeIngestService;
 import com.stephen.cloud.ai.service.VectorStoreService;
-import com.stephen.cloud.api.knowledge.model.dto.KnowledgeDocIngestMessage;
+import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocIngestMessage;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -73,46 +74,62 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
     private ContentTextCleaner contentTextCleaner;
 
     /**
-     * 执行文档入库主流程（由消息中心调用的入库入口）。
+     * 执行文档入库完整 ETL 流程 (Extract, Transform, Load)
+     * <p>
+     * 核心步骤：
+     * 1. 原子性更新文档解析状态为 PROCESSING。
+     * 2. 物理资源获取：针对 HTTP 地址执行异步下载缓存。
+     * 3. 文本提取：调用 DocumentTextExtractor 针对不同 MIME 执行深度解析（PDF/Word/Markdown 等）。
+     * 4. 文本清洗：去除冗余字符与乱码，增强向量化质量。
+     * 5. 旧数据清理：执行幂等删除，确保相同文档 ID 不产生重复切片。
+     * 6. 语义分片：调用 TextChunker 实现带重叠部分的逻辑切分。
+     * 7. 向量化索引：双路存储 (MySQL 结构化索引 + ES 向量向量存储 + 向量元数据审计)。
+     * </p>
      *
-     * @param message 包含文档 ID 和存储路径的消息对象
+     * @param message 包含文档元数据 ID、物理路径及归属信息的 MQ 消息载体
      */
     @Override
     public void ingestDocument(KnowledgeDocIngestMessage message) {
         if (message == null || message.getDocumentId() == null) {
             return;
         }
+        // 1. 获取并检查解析状态，避免重复解析
         KnowledgeDocument doc = knowledgeDocumentMapper.selectById(message.getDocumentId());
-        if (doc == null || (doc.getParseStatus() != null && doc.getParseStatus() == KnowledgeParseStatusEnum.DONE.getValue())) {
+        if (doc == null || Integer.valueOf(KnowledgeParseStatusEnum.DONE.getValue()).equals(doc.getParseStatus())) {
+            log.info("文档无需解析或记录缺失: docId={}", message.getDocumentId());
             return;
         }
 
         updateStatus(doc, KnowledgeParseStatusEnum.PROCESSING, null);
 
         try {
-            // 1. 资源准备（本地/远程同步）
+            // 2. 将远程资源下载至本地缓存目录，方便后端解析器读取
             Path localPath = prepareLocalFile(doc, message.getStoragePath());
 
-            // 2. 文本提取与预处理
+            log.info("开始提取文本: docId={}", doc.getId());
+            // 3. 执行多格式文本提取
             String rawText = DocumentTextExtractor.extract(localPath, localPath.getFileName().toString().toLowerCase());
+            log.info("文本提取完成，字符数={}", rawText.length());
+            // 4. 内容降噪清洗
             String cleanedText = contentTextCleaner.clean(rawText);
             if (StringUtils.isBlank(cleanedText)) {
-                throw new IllegalStateException("文档提取后的文本内容为空");
+                throw new IllegalStateException("解析后的文档内容为空，无法构建索引");
             }
 
-            // 3. 幂等性清理 旧分片：确保重新解析时不会产生脏数据
+            // 5. 数据治理：清理历史遗留切片与向量审计记录
             removeChunksAndVectorsForDocument(doc.getId());
 
-            // 4. 执行语义分片
+            // 6. 执行分片策略
             List<String> chunkTexts = textChunker.splitWithOverlap(cleanedText);
             
-            // 5. 数据持久化 (MySQL 分片索引 + 向量库)
+            // 7. 核心落库流程：关联分片、向量入库与审计
             processAndIndexChunks(doc, chunkTexts);
 
+            // 更新状态为完成
             updateStatus(doc, KnowledgeParseStatusEnum.DONE, null);
-            log.info("Document ingested successfully: docId={}", doc.getId());
+            log.info("知识文档入库成功: docId={}, 产生切片数={}", doc.getId(), chunkTexts.size());
         } catch (Exception e) {
-            log.error("Ingestion failed for docId={}", doc.getId(), e);
+            log.error("知识文档入库失败 (docId: {}): {}", doc.getId(), e.getMessage(), e);
             updateStatus(doc, KnowledgeParseStatusEnum.FAILED, e.getMessage());
         }
     }
@@ -137,7 +154,8 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
      * @param doc        文档元数据对象
      * @param chunkTexts 切分后的文本分片列表
      */
-    private void processAndIndexChunks(KnowledgeDocument doc, List<String> chunkTexts) {
+    @Transactional(rollbackFor = Exception.class)
+    protected void processAndIndexChunks(KnowledgeDocument doc, List<String> chunkTexts) {
         long kbId = doc.getKnowledgeBaseId();
         long docId = doc.getId();
 

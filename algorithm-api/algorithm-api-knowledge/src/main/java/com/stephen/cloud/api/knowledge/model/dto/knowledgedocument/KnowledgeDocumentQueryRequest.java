@@ -1,4 +1,4 @@
-package com.stephen.cloud.api.knowledge.model.dto;
+package com.stephen.cloud.api.knowledge.model.dto.knowledgedocument;
 
 import com.stephen.cloud.common.common.PageRequest;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -39,3 +39,4 @@ public class KnowledgeDocumentQueryRequest extends PageRequest implements Serial
     @Serial
     private static final long serialVersionUID = 1L;
 }
+

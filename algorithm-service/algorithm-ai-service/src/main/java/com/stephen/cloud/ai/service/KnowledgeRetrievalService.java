@@ -1,6 +1,6 @@
 package com.stephen.cloud.ai.service;
 
-import com.stephen.cloud.api.knowledge.model.dto.KnowledgeRetrievalRequest;
+import com.stephen.cloud.api.knowledge.model.dto.retrieval.KnowledgeRetrievalRequest;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 
 import java.util.List;

@@ -1,10 +1,10 @@
 package com.stephen.cloud.ai.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
-import com.stephen.cloud.api.knowledge.model.dto.KnowledgeDocumentQueryRequest;
+import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocumentQueryRequest;
 import com.stephen.cloud.api.knowledge.model.vo.KnowledgeDocumentVO;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,6 +27,14 @@ public interface KnowledgeDocumentService extends IService<KnowledgeDocument> {
      * @return 数据库文档 ID
      */
     Long uploadDocument(Long knowledgeBaseId, MultipartFile file, Long userId);
+
+    /**
+     * 校验知识文档
+     *
+     * @param entity 文档实体
+     * @param add    是否为新增
+     */
+    void validKnowledgeDocument(KnowledgeDocument entity, boolean add);
 
     /**
      * 删除文档并同步清除向量库中的切片
@@ -53,7 +61,7 @@ public interface KnowledgeDocumentService extends IService<KnowledgeDocument> {
      * @param queryRequest 查询请求
      * @return 查询条件包装类
      */
-    QueryWrapper<KnowledgeDocument> getQueryWrapper(KnowledgeDocumentQueryRequest queryRequest);
+    LambdaQueryWrapper<KnowledgeDocument> getQueryWrapper(KnowledgeDocumentQueryRequest queryRequest);
 
     /**
      * 分页映射 VO

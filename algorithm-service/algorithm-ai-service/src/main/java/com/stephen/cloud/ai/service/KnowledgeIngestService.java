@@ -1,6 +1,6 @@
 package com.stephen.cloud.ai.service;
 
-import com.stephen.cloud.api.knowledge.model.dto.KnowledgeDocIngestMessage;
+import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocIngestMessage;
 
 /**
  * 知识文档入库服务（解析、清洗、分片、向量化、写库）。

@@ -1,16 +1,15 @@
 package com.stephen.cloud.ai.service.impl;
 
-import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.knowledge.context.RagSearchContext;
 import com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
 import com.stephen.cloud.ai.service.AiChatRecordService;
-import com.stephen.cloud.ai.service.KnowledgeService;
+import com.stephen.cloud.ai.service.KnowledgeBaseService;
 import com.stephen.cloud.ai.service.RagService;
 import com.stephen.cloud.api.ai.model.dto.AiChatRecordDTO;
 import com.stephen.cloud.api.ai.model.enums.AiModelTypeEnum;
 import com.stephen.cloud.api.ai.model.enums.AiToolEnum;
-import com.stephen.cloud.api.knowledge.model.dto.RagChatRequest;
+import com.stephen.cloud.api.knowledge.model.dto.rag.RagChatRequest;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
 import com.stephen.cloud.common.common.ErrorCode;
@@ -88,56 +87,70 @@ public class RagServiceImpl implements RagService {
      * 知识库元数据服务：获取库描述等信息。
      */
     @Resource
-    private KnowledgeService knowledgeService;
+    private KnowledgeBaseService knowledgeBaseService;
 
     /**
-     * 执行 RAG 同步对话。
+     * 执行 RAG (检索增强生成) 问答流程
+     * <p>
+     * 核心步骤：
+     * 1. 权限与参数预校验。
+     * 2. 清理线程上下文中的检索缓存。
+     * 3. 构造包含知识库背景的 System Prompt 与用户问题。
+     * 4. 驱动 Spring AI ChatClient，通过 Advisor 注入会话记忆与工具调度能力。
+     * 5. 若大模型决定调用 `algorithmKnowledgeSearch`，则执行知识库检索并回填上下文。
+     * 6. 捕获最终回答、消耗 Token 统计及命中的分片来源，异步持久化对话记录。
+     * </p>
      *
-     * @param request 对话请求对象（含问题、ID、会话 ID）
-     * @param userId  当前操作用户 ID
-     * @return 包含回复及检索源引用列表的响应对象
+     * @param request 包含提问内容、知识库 ID 及会话标识的请求对象
+     * @param userId  执行提问的用户 ID
+     * @return 包含回复正文及溯源切片列表的视图对象
+     * @throws BusinessException 当参数非法、知识库缺失或模型调用严重异常时抛出
      */
     @Override
     public RagChatResponseVO ragChat(RagChatRequest request, Long userId) {
-        ThrowUtils.throwIf(request == null || StringUtils.isBlank(request.getQuestion()), ErrorCode.PARAMS_ERROR, "提问内容不能为空");
+        // 1. 严格参数校验
+        ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR, "请求参数不能为空");
+        ThrowUtils.throwIf(StringUtils.isBlank(request.getQuestion()), ErrorCode.PARAMS_ERROR, "提问内容不能为空");
         ThrowUtils.throwIf(StringUtils.isBlank(request.getSessionId()), ErrorCode.PARAMS_ERROR, "会话 ID 不能为空");
         Long knowledgeBaseId = request.getKnowledgeBaseId();
         ThrowUtils.throwIf(knowledgeBaseId == null || knowledgeBaseId <= 0, ErrorCode.PARAMS_ERROR, "知识库 ID 不能为空");
 
-        KnowledgeBase kb = knowledgeService.getById(knowledgeBaseId);
-        ThrowUtils.throwIf(kb == null, ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
+        // 2. 知识库合法性检查
+        KnowledgeBase kb = knowledgeBaseService.getById(knowledgeBaseId);
+        ThrowUtils.throwIf(kb == null, ErrorCode.NOT_FOUND_ERROR, "指定的知识库不存在");
         String kbDesc = StringUtils.defaultIfBlank(kb.getDescription(), "通用排序算法知识库");
 
-        // 1. 初始化检索上下文，确保存储最新的检索分片
+        // 3. 检索上下文预处理 (确保本次请求的 sources 不受之前请求干扰)
         RagSearchContext.clear();
 
         try {
-            // 2. 构造用户提示词
+            // 4. 构造具备上下文提示的用户 Prompt
             String userPrompt = String.format("""
                     问题：%s
                     知识库 ID: %d
-                    请优先检索并据此回答。
+                    请优先根据检索到的知识库分片回答，若分片不足则告知用户。
                     """, request.getQuestion().trim(), knowledgeBaseId);
 
-            // 3. 执行 AI 调用（含工具调度）
+            // 5. 调用大模型：注入记忆 Advisor 与工具调用 Advisor
             ChatResponse resp = chatClient.prompt()
                     .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, request.getSessionId())
                             .advisors(
                                     MessageChatMemoryAdvisor.builder(chatMemory).build(),
-                                    ToolCallAdvisor.builder().build()))
+                                    ToolCallAdvisor.builder().build())) // 支持 Agentic 工具调度
                     .system(String.format(SYSTEM_PROMPT, kbDesc))
                     .user(userPrompt)
-                    .toolNames(AiToolEnum.ALGORITHM_KNOWLEDGE_SEARCH.getValue())
+                    .toolNames(AiToolEnum.ALGORITHM_KNOWLEDGE_SEARCH.getValue()) // 导出检索工具
                     .call()
                     .chatResponse();
 
+            // 6. 提取回答、统计 Token 消耗
             String answer = resp.getResult().getOutput().getText();
             Usage usage = resp.getMetadata().getUsage();
 
-            // 4. 从上下文中获取本次请求捕获的所有检索源
+            // 7. 捕获在工具调用过程中命中的切片来源
             List<ChunkSourceVO> sources = RagSearchContext.getAndClearSources();
 
-            // 5. 记录对话记录
+            // 8. 异步持久化对话审计记录
             aiChatRecordService.saveAiChatRecordAsync(AiChatRecordDTO.builder()
                     .userId(userId)
                     .sessionId(request.getSessionId())
@@ -154,6 +167,7 @@ public class RagServiceImpl implements RagService {
                     .sources(sources) 
                     .build();
         } finally {
+            // 线程环境清理
             RagSearchContext.clear();
         }
     }

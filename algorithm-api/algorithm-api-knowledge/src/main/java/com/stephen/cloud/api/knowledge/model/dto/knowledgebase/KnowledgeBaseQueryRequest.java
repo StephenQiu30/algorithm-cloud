@@ -1,4 +1,4 @@
-package com.stephen.cloud.api.knowledge.model.dto;
+package com.stephen.cloud.api.knowledge.model.dto.knowledgebase;
 
 import com.stephen.cloud.common.common.PageRequest;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,9 +25,9 @@ public class KnowledgeBaseQueryRequest extends PageRequest implements Serializab
     private static final long serialVersionUID = 1L;
 
     /**
-     * id
+     * 主键 ID
      */
-    @Schema(description = "id")
+    @Schema(description = "主键 ID")
     private Long id;
 
     /**
@@ -37,8 +37,9 @@ public class KnowledgeBaseQueryRequest extends PageRequest implements Serializab
     private String name;
 
     /**
-     * 创建用户 id
+     * 创建用户 ID
      */
-    @Schema(description = "用户 id")
+    @Schema(description = "用户 ID")
     private Long userId;
 }
+

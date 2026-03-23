@@ -1,9 +1,9 @@
 package com.stephen.cloud.api.knowledge.client;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.stephen.cloud.api.knowledge.model.dto.KnowledgeBaseAddRequest;
-import com.stephen.cloud.api.knowledge.model.dto.KnowledgeBaseQueryRequest;
-import com.stephen.cloud.api.knowledge.model.dto.RagChatRequest;
+import com.stephen.cloud.api.knowledge.model.dto.knowledgebase.KnowledgeBaseAddRequest;
+import com.stephen.cloud.api.knowledge.model.dto.knowledgebase.KnowledgeBaseQueryRequest;
+import com.stephen.cloud.api.knowledge.model.dto.rag.RagChatRequest;
 import com.stephen.cloud.api.knowledge.model.vo.KnowledgeBaseVO;
 import com.stephen.cloud.api.knowledge.model.vo.KnowledgeDocumentVO;
 import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
