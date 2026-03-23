@@ -22,11 +22,8 @@ import java.util.concurrent.Executors;
 /**
  * 知识库向量存储与 ES Java API 客户端配置。
  * <p>
- * {@link VectorStore} 使用 Elasticsearch 作向量库，余弦相似度与 text-embedding 类模型常见用法一致；
- * {@link ElasticsearchClient} 与 {@link RestClient} 共用连接，供
- * {@link com.stephen.cloud.ai.service.impl.VectorStoreServiceImpl} 混合检索等执行 DSL。
- * 向量库采用 Spring AI 文档中的 Manual Configuration（{@code spring-ai-elasticsearch-store}），与
- * {@code spring-ai-starter-vector-store-elasticsearch} 二选一，本模块维持前者以便与现有 {@link RestClient} 复用。
+ * {@link VectorStore} 使用 Elasticsearch 作向量库，通过 {@link ElasticsearchVectorStoreOptions} 
+ * 显式映射字段，确保与 RAG 检索保持语义一致。
  * </p>
  *
  * @author StephenQiu30
@@ -52,12 +49,12 @@ public class KnowledgeVectorStoreConfig {
     }
 
     /**
-     * 注册面向知识库的 {@link VectorStore}，索引名与维度来自 {@link KnowledgeProperties}
+     * 注册面向知识库的 {@link VectorStore}，采用官方建议的配置项显式化。
      *
      * @param restClient          ES 低阶客户端
-     * @param embeddingModel      嵌入模型（与 DashScope 等配置联动）
+     * @param embeddingModel      嵌入模型
      * @param knowledgeProperties 知识库参数
-     * @return 可用于 add / similaritySearch / delete 的向量存储
+     * @return 向量存储实例
      */
     @Bean
     public VectorStore knowledgeVectorStore(RestClient restClient, EmbeddingModel embeddingModel,
@@ -65,7 +62,9 @@ public class KnowledgeVectorStoreConfig {
         ElasticsearchVectorStoreOptions options = new ElasticsearchVectorStoreOptions();
         options.setIndexName(knowledgeProperties.getVectorIndex());
         options.setDimensions(knowledgeProperties.getEmbeddingDimension());
+        // 显式指定余弦相似度
         options.setSimilarity(SimilarityFunction.cosine);
+        
         return ElasticsearchVectorStore.builder(restClient, embeddingModel)
                 .options(options)
                 .initializeSchema(true)

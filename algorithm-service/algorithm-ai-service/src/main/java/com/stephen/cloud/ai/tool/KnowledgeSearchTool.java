@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
+import com.stephen.cloud.ai.knowledge.context.RagSearchContext;
 import com.stephen.cloud.api.ai.model.enums.AiToolEnum;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import lombok.Data;
@@ -63,6 +64,8 @@ public class KnowledgeSearchTool {
                     knowledgeProperties.getDefaultTopK(),
                     knowledgeProperties.getRagTopKMax()
             );
+            // 记录检索过程中的原始内容，以便在 RAG 最终响应中返回引用
+            RagSearchContext.addSources(sources);
             return new Response(sources);
         };
     }

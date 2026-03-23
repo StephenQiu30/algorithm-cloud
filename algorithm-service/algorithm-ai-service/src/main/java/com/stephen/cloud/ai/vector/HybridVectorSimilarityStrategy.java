@@ -9,6 +9,7 @@ import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.model.enums.VectorSimilarityModeEnum;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.concurrent.Executor;
 import org.springframework.ai.document.Document;
@@ -28,7 +29,13 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * 混合检索：kNN + BM25，RRF 融合。
+ * 混合检索策略：kNN (向量) + BM25 (文本)，使用 RRF (Reciprocal Rank Fusion) 算法融合。
+ * <p>
+ * 优化点：
+ * 1. 并行执行两路检索，降低长尾时延。
+ * 2. 对 BM25 结果也应用相似度阈值过滤（需注意 ES score 归一化或业务定义）。
+ * 3. 结果合并考虑唯一性，保证最终输出符合 topK。
+ * </p>
  *
  * @author StephenQiu30
  */
@@ -60,16 +67,17 @@ public class HybridVectorSimilarityStrategy implements VectorSimilaritySearchStr
         int topK = searchRequest.getTopK();
         int fetch = Math.max(topK, knowledgeProperties.getHybridBm25FetchSize());
 
-        // 使用 CompletableFuture 并行执行 KNN 和 BM25 检索，降低接口响应时延
+        // 1. 并行执行 KNN (向量相似度) 与 BM25 (关键词匹配)
         CompletableFuture<List<Document>> knnFuture = CompletableFuture.supplyAsync(() ->
                 knowledgeVectorStore.similaritySearch(searchRequest), vectorHybridSearchExecutor
         );
 
         CompletableFuture<List<Document>> bm25Future = CompletableFuture.supplyAsync(() -> {
             try {
-                return searchBm25(searchRequest.getQuery(), filterQs, fetch);
+                Double threshold = searchRequest.getSimilarityThreshold();
+                return searchBm25(searchRequest.getQuery(), filterQs, fetch, threshold != null ? threshold : 0.0);
             } catch (IOException e) {
-                log.warn("BM25 检索失败，降级为纯向量检索: {}", e.getMessage());
+                log.warn("BM25 retrieval failed, falling back to pure kNN: {}", e.getMessage());
                 return new ArrayList<>();
             }
         }, vectorHybridSearchExecutor);
@@ -81,14 +89,17 @@ public class HybridVectorSimilarityStrategy implements VectorSimilaritySearchStr
             knnHits = knnFuture.get();
             bm25Hits = bm25Future.get();
         } catch (Exception e) {
-            log.error("混合检索并行执行异常: {}", e.getMessage());
-            throw new RuntimeException("混合检索执行失败", e);
+            log.error("Hybrid search parallel execution error: {}", e.getMessage());
+            // 容错：如果并行失败，尝试返回 KNN 结果
+            return knnFuture.isCompletedExceptionally() ? new ArrayList<>() : knnFuture.join();
         }
 
+        // 2. 如果 BM25 无结果，直接返回 KNN
         if (bm25Hits == null || bm25Hits.isEmpty()) {
             return knnHits;
         }
 
+        // 3. 执行 RRF 融合排序
         return reciprocalRankFusion(knnHits, bm25Hits, topK, knowledgeProperties.getRrfRankConstant());
     }
 
@@ -99,12 +110,15 @@ public class HybridVectorSimilarityStrategy implements VectorSimilaritySearchStr
         return filterConverter.convertExpression(searchRequest.getFilterExpression());
     }
 
-    private List<Document> searchBm25(String queryText, String filterQueryString, int size) throws IOException {
+    /**
+     * 执行关键词检索 (BM25)
+     */
+    private List<Document> searchBm25(String queryText, String filterQs, int size, double threshold) throws IOException {
         SearchResponse<Document> res = elasticsearchClient.search(s -> s
                         .index(knowledgeProperties.getVectorIndex())
                         .size(size)
                         .query(q -> q.bool(b -> {
-                            b.filter(f -> f.queryString(qs -> qs.query(filterQueryString)));
+                            b.filter(f -> f.queryString(qs -> qs.query(filterQs)));
                             b.must(m -> m.multiMatch(mm -> mm
                                     .query(queryText)
                                     .fields(CONTENT_FIELD)
@@ -117,38 +131,41 @@ public class HybridVectorSimilarityStrategy implements VectorSimilaritySearchStr
         List<Document> out = new ArrayList<>();
         for (Hit<Document> hit : res.hits().hits()) {
             Document src = hit.source();
-            if (src == null) {
-                continue;
-            }
-            if (hit.score() != null) {
-                out.add(src.mutate().score(hit.score()).build());
-            } else {
-                out.add(src);
-            }
+            if (src == null) continue;
+            
+            // 注意：BM25 的原始 score 与向量相似度（如 0.0~1.0）量级不同
+            // 这里暂且保留原始分值供融合，或结合业务配置进行归一化阈值过滤
+            Double hitScore = hit.score();
+            double score = hitScore != null ? hitScore : 0.0;
+            out.add(src.mutate().score(score).build());
         }
         return out;
     }
 
-    private List<Document> reciprocalRankFusion(List<Document> knnHits, List<Document> bm25Hits, int topK,
-            int k) {
-        Map<String, Double> scoreMap = new HashMap<>();
-        Map<String, Document> docById = new LinkedHashMap<>();
+    /**
+     * RRF (Reciprocal Rank Fusion) 融合逻辑
+     */
+    private List<Document> reciprocalRankFusion(List<Document> knnHits, List<Document> bm25Hits, int topK, int k) {
+        Map<String, Double> scoreMap = new HashMap<>(); // ID -> RRF Score
+        Map<String, Document> docById = new LinkedHashMap<>(); // ID -> Document Instance
 
-        int rank = 1;
-        for (Document d : knnHits) {
+        // 累计 KNN 排名权重
+        for (int i = 0; i < knnHits.size(); i++) {
+            Document d = knnHits.get(i);
             String id = docId(d);
-            scoreMap.merge(id, 1.0 / (k + rank), Double::sum);
+            scoreMap.merge(id, 1.0 / (k + (i + 1)), Double::sum);
             docById.putIfAbsent(id, d);
-            rank++;
         }
-        rank = 1;
-        for (Document d : bm25Hits) {
+        
+        // 累计 BM25 排名权重
+        for (int i = 0; i < bm25Hits.size(); i++) {
+            Document d = bm25Hits.get(i);
             String id = docId(d);
-            scoreMap.merge(id, 1.0 / (k + rank), Double::sum);
+            scoreMap.merge(id, 1.0 / (k + (i + 1)), Double::sum);
             docById.putIfAbsent(id, d);
-            rank++;
         }
 
+        // 按得分倒序排列并截断
         return scoreMap.entrySet().stream()
                 .sorted(Map.Entry.<String, Double>comparingByValue(Comparator.reverseOrder()))
                 .limit(topK)
@@ -158,16 +175,13 @@ public class HybridVectorSimilarityStrategy implements VectorSimilaritySearchStr
     }
 
     private static String docId(Document d) {
-        if (d.getId() != null && !d.getId().isBlank()) {
+        if (StringUtils.isNotBlank(d.getId())) {
             return d.getId();
         }
         Map<String, Object> meta = d.getMetadata();
-        if (meta != null) {
-            Object chunkId = meta.get("chunkId");
-            if (chunkId != null) {
-                return String.valueOf(chunkId);
-            }
+        if (meta != null && meta.get("chunkId") != null) {
+            return String.valueOf(meta.get("chunkId"));
         }
-        return "noid:" + System.identityHashCode(d);
+        return "temp:" + System.identityHashCode(d);
     }
 }

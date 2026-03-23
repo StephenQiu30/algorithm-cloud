@@ -7,7 +7,7 @@ import com.stephen.cloud.ai.service.EmbeddingVectorService;
 import org.springframework.stereotype.Service;
 
 /**
- * 向量元数据服务实现：分片与 ES 文档 id、嵌入模型维度的持久化记录。
+ * 向量元数据服务实现
  *
  * @author StephenQiu30
  */

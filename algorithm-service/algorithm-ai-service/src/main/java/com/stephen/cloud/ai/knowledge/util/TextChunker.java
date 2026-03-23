@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 /**
  * 文本分片工具：用于教学类文档（含排序算法说明）入库前的语义切分。
  * <p>
+ * 符合 Spring AI {@link org.springframework.ai.document.DocumentTransformer} 的逻辑，
  * 先 {@link ContentTextCleaner} 清洗，再按空行拆段并在
  * {@link KnowledgeProperties#getChunkParagraphMergeCharBudget()} 预算内合并短段，最后
  * {@link TokenTextSplitter} 按 {@link KnowledgeProperties#getChunkSize()} /
@@ -32,12 +33,13 @@ public class TextChunker {
     public TextChunker(KnowledgeProperties knowledgeProperties, ContentTextCleaner contentTextCleaner) {
         this.knowledgeProperties = knowledgeProperties;
         this.contentTextCleaner = contentTextCleaner;
+        // 显式配置 TokenTextSplitter，确保参数生效
         this.splitter = new TokenTextSplitter(
                 knowledgeProperties.getChunkSize(),
                 knowledgeProperties.getChunkOverlap(),
-                5,
-                10000,
-                true);
+                5, // 固定长度（保持默认）
+                10000, // 最大分段数
+                true); // 保持格式
     }
 
     /**
@@ -51,24 +53,30 @@ public class TextChunker {
         if (StringUtils.isBlank(cleaned)) {
             return List.of();
         }
+        // 1. 段落合并，避免过度切分
         List<String> segments = mergeParagraphBlocks(cleaned, knowledgeProperties.getChunkParagraphMergeCharBudget());
-        List<String> out = new ArrayList<>();
-        for (String segment : segments) {
-            List<Document> chunks = splitter.split(new Document(segment));
-            out.addAll(chunks.stream()
-                    .map(Document::getText)
-                    .map(String::trim)
-                    .filter(StringUtils::isNotBlank)
-                    .collect(Collectors.toList()));
-        }
-        return out;
+        
+        // 2. 将段落转为 Document 后使用 TokenTextSplitter 进行最终分片
+        List<Document> documents = segments.stream()
+                .map(Document::new)
+                .collect(Collectors.toList());
+        
+        List<Document> chunks = splitter.apply(documents);
+        
+        return chunks.stream()
+                .map(Document::getText)
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toList());
     }
 
     /**
-     * 按空行分段，并在预算内合并过短段落，减少跨语义硬切分
+     * 按空行分段，并在预算内合并过短段落，减少跨语义硬切分。
+     * 对于算法题或代码块，合并段落能保持上下文完整性。
      */
     private List<String> mergeParagraphBlocks(String cleaned, int budget) {
-        String[] parts = cleaned.split("\\n\\s*\\n");
+        // 适配多种换行符
+        String[] parts = cleaned.split("\\r?\\n\\s*\\n");
         List<String> merged = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
         for (String p : parts) {
@@ -76,6 +84,7 @@ public class TextChunker {
             if (t.isEmpty()) {
                 continue;
             }
+            // 超过预算则存入并开启新段落
             if (cur.length() > 0 && cur.length() + t.length() + 2 > budget) {
                 merged.add(cur.toString());
                 cur = new StringBuilder();
