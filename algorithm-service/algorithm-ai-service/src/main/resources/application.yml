@@ -16,6 +16,7 @@ spring:
       - nacos:common-cache.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-mysql.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-elasticsearch.yml?group=DEFAULT_GROUP&refresh=true
+      - nacos:common-rabbitmq.yml?group=DEFAULT_GROUP&refresh=true
   cloud:
     nacos:
       discovery:

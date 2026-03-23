@@ -8,6 +8,7 @@ import com.stephen.cloud.ai.knowledge.processor.DocumentTextExtractor;
 import com.stephen.cloud.ai.knowledge.processor.TextChunker;
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
+import com.stephen.cloud.ai.mq.KnowledgeIngestMqProducer;
 import com.stephen.cloud.ai.service.DocumentChunkService;
 import com.stephen.cloud.ai.service.KnowledgeDocumentService;
 import com.stephen.cloud.ai.service.KnowledgeIngestService;
@@ -51,6 +52,8 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
     private ContentTextCleaner contentTextCleaner;
     @Resource
     private CacheUtils cacheUtils;
+    @Resource
+    private KnowledgeIngestMqProducer knowledgeIngestMqProducer;
 
     private final FilterExpressionTextParser filterParser = new FilterExpressionTextParser();
 
@@ -119,12 +122,52 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
         }
     }
 
+    @Override
+    public void retryIngest(Long documentId) {
+        if (documentId == null || documentId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "文档 ID 非法");
+        }
+        KnowledgeDocument doc = knowledgeDocumentService.getById(documentId);
+        if (doc == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "文档不存在");
+        }
+        doc.setParseStatus(KnowledgeParseStatusEnum.PENDING.getValue());
+        doc.setErrorMsg(null);
+        knowledgeDocumentService.updateById(doc);
+        cacheUtils.delete("kb:parsed:" + documentId);
+        knowledgeIngestMqProducer.sendIngestCreated(KnowledgeDocIngestMessage.builder()
+                .documentId(doc.getId())
+                .knowledgeBaseId(doc.getKnowledgeBaseId())
+                .userId(doc.getUserId())
+                .storagePath(doc.getStoragePath())
+                .build());
+        log.info("[文档入库] 已重新投递入库任务: docId={}, kbId={}", doc.getId(), doc.getKnowledgeBaseId());
+    }
+
     @Transactional(rollbackFor = Exception.class)
     protected void handleLoadPhase(KnowledgeDocument doc, List<Document> chunkDocs) {
         log.info("[数据加载] 清理旧数据: doc={}", doc.getId());
         knowledgeVectorStore.delete(filterParser.parse("documentId == '" + doc.getId() + "'"));
         documentChunkService.deleteByDocumentId(doc.getId());
         
+        IntSummaryStatistics stats = chunkDocs.stream()
+                .map(Document::getText)
+                .filter(Objects::nonNull)
+                .mapToInt(String::length)
+                .summaryStatistics();
+        long shortChunkCount = chunkDocs.stream()
+                .map(Document::getText)
+                .filter(Objects::nonNull)
+                .filter(t -> t.length() < Math.max(50, knowledgeProperties.getChunkSize() / 5))
+                .count();
+        log.info("[数据加载] 分片质量基线: doc={}, chunkCount={}, minLen={}, avgLen={}, maxLen={}, shortChunkCount={}",
+                doc.getId(),
+                chunkDocs.size(),
+                stats.getCount() > 0 ? stats.getMin() : 0,
+                stats.getCount() > 0 ? Math.round(stats.getAverage()) : 0,
+                stats.getCount() > 0 ? stats.getMax() : 0,
+                shortChunkCount);
+
         log.info("[数据加载] 将 {} 个分块持久化至数据库: doc={}", chunkDocs.size(), doc.getId());
         List<DocumentChunk> dbChunks = new ArrayList<>();
         for (int i = 0; i < chunkDocs.size(); i++) {
@@ -133,7 +176,7 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
             chunk.setKnowledgeBaseId(doc.getKnowledgeBaseId());
             chunk.setChunkIndex(i);
             chunk.setContent(chunkDocs.get(i).getText());
-            chunk.setTokenEstimate(Math.min(chunkDocs.get(i).getText().length(), 1000));
+            chunk.setTokenEstimate(Math.min(chunkDocs.get(i).getText().length(), knowledgeProperties.getChunkSize()));
             dbChunks.add(chunk);
         }
         documentChunkService.saveBatch(dbChunks);

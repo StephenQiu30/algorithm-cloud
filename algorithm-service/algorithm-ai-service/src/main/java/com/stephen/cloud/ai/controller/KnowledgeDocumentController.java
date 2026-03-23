@@ -6,6 +6,7 @@ import com.stephen.cloud.ai.convert.KnowledgeDocumentConvert;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
 import com.stephen.cloud.ai.service.KnowledgeBaseService;
 import com.stephen.cloud.ai.service.KnowledgeDocumentService;
+import com.stephen.cloud.ai.service.KnowledgeIngestService;
 import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocumentEditRequest;
 import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocumentQueryRequest;
 import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocumentUpdateRequest;
@@ -42,6 +43,8 @@ public class KnowledgeDocumentController {
 
     @Resource
     private KnowledgeDocumentService knowledgeDocumentService;
+    @Resource
+    private KnowledgeIngestService knowledgeIngestService;
 
     /**
      * 上传知识库文档并触发自动解析
@@ -68,6 +71,24 @@ public class KnowledgeDocumentController {
         Long userId = SecurityUtils.getLoginUserId();
         Long documentId = knowledgeBaseService.uploadDocument(knowledgeBaseId, file, userId);
         return ResultUtils.success(documentId);
+    }
+
+    @PostMapping("/retry")
+    @Operation(summary = "重试文档解析", description = "将失败或待处理文档重新投递到异步入库队列。")
+    @OperationLog(module = "知识库文档模块", action = "重试文档解析")
+    public BaseResponse<Boolean> retryIngest(@Parameter(description = "文档 ID", required = true) @RequestParam("documentId") Long documentId) {
+        ThrowUtils.throwIf(documentId == null || documentId <= 0, ErrorCode.PARAMS_ERROR, "文档 ID 非法");
+        knowledgeIngestService.retryIngest(documentId);
+        return ResultUtils.success(true);
+    }
+
+    @GetMapping("/status")
+    @Operation(summary = "查询文档解析状态", description = "用于上传后轮询查看解析状态与失败原因。")
+    public BaseResponse<KnowledgeDocumentVO> getIngestStatus(@Parameter(description = "文档 ID", required = true) @RequestParam("documentId") Long documentId) {
+        ThrowUtils.throwIf(documentId == null || documentId <= 0, ErrorCode.PARAMS_ERROR, "文档 ID 非法");
+        KnowledgeDocument doc = knowledgeDocumentService.getById(documentId);
+        ThrowUtils.throwIf(doc == null, ErrorCode.NOT_FOUND_ERROR, "文档不存在");
+        return ResultUtils.success(knowledgeDocumentService.getKnowledgeDocumentVO(doc));
     }
 
     /**

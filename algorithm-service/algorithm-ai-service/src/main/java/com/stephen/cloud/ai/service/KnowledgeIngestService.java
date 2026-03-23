@@ -17,6 +17,13 @@ public interface KnowledgeIngestService {
     void ingestDocument(KnowledgeDocIngestMessage message);
 
     /**
+     * 按文档 ID 重新投递入库任务（重试）。
+     *
+     * @param documentId 文档 ID
+     */
+    void retryIngest(Long documentId);
+
+    /**
      * 从向量库中下线指定文档的所有向量。
      *
      * @param documentId 文档 ID

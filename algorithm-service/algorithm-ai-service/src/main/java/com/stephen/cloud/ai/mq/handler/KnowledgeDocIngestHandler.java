@@ -25,7 +25,10 @@ public class KnowledgeDocIngestHandler implements RabbitMqHandler<KnowledgeDocIn
 
     @Override
     public void onMessage(KnowledgeDocIngestMessage dto, RabbitMessage rabbitMessage) throws Exception {
-        log.info("[KnowledgeDocIngestHandler] documentId={}", dto.getDocumentId());
+        log.info("[KnowledgeDocIngestHandler] msgId={}, bizType={}, documentId={}",
+                rabbitMessage != null ? rabbitMessage.getMsgId() : null,
+                rabbitMessage != null ? rabbitMessage.getBizType() : null,
+                dto != null ? dto.getDocumentId() : null);
         knowledgeIngestService.ingestDocument(dto);
     }
 

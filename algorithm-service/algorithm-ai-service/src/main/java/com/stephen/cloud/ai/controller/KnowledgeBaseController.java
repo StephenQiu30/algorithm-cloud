@@ -12,6 +12,7 @@ import com.stephen.cloud.api.knowledge.model.dto.knowledgebase.KnowledgeBaseQuer
 import com.stephen.cloud.api.knowledge.model.dto.knowledgebase.KnowledgeBaseUpdateRequest;
 import com.stephen.cloud.api.knowledge.model.vo.KnowledgeBaseVO;
 import java.util.List;
+import java.util.Map;
 import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.common.BaseResponse;
 import com.stephen.cloud.common.common.DeleteRequest;
@@ -190,6 +191,15 @@ public class KnowledgeBaseController {
     public BaseResponse<List<ChunkSourceVO>> search(@RequestBody KnowledgeRetrievalRequest knowledgeRetrievalRequest) {
         Long loginUserId = SecurityUtils.getLoginUserId();
         List<ChunkSourceVO> result = knowledgeBaseService.searchChunks(knowledgeRetrievalRequest, loginUserId);
+        return ResultUtils.success(result);
+    }
+
+    @PostMapping("/search/diagnose")
+    @Operation(summary = "诊断双路召回", description = "返回 kNN、BM25 和 RRF 融合三路结果，便于调参校准。")
+    @OperationLog(module = "知识库模块", action = "诊断双路召回")
+    public BaseResponse<Map<String, List<ChunkSourceVO>>> diagnoseSearch(@RequestBody KnowledgeRetrievalRequest knowledgeRetrievalRequest) {
+        Long loginUserId = SecurityUtils.getLoginUserId();
+        Map<String, List<ChunkSourceVO>> result = knowledgeBaseService.diagnoseHybridSearch(knowledgeRetrievalRequest, loginUserId);
         return ResultUtils.success(result);
     }
 }

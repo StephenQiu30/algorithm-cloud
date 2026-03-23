@@ -14,6 +14,7 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 统一知识库业务管理接口：负责知识库核心生命周期。
@@ -95,6 +96,15 @@ public interface KnowledgeBaseService extends IService<KnowledgeBase> {
      * @return List<ChunkSourceVO>
      */
     List<ChunkSourceVO> searchChunks(KnowledgeRetrievalRequest request, Long userId);
+
+    /**
+     * 双路召回诊断：分别返回 kNN、BM25、RRF 融合结果。
+     *
+     * @param request 检索请求对象
+     * @param userId  用户 ID
+     * @return key: knn/bm25/hybrid
+     */
+    Map<String, List<ChunkSourceVO>> diagnoseHybridSearch(KnowledgeRetrievalRequest request, Long userId);
 
     /**
      * 底层向量相似度检索入口

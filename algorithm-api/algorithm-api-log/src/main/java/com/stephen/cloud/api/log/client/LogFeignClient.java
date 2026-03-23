@@ -62,8 +62,6 @@ public interface LogFeignClient {
     @PostMapping("/email/add")
     BaseResponse<Boolean> addEmailRecord(@RequestBody EmailRecordAddRequest request);
 
-
-
     /**
      * 创建文件上传记录
      *

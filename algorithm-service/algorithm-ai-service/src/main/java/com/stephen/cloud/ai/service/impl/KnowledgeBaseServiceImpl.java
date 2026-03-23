@@ -11,12 +11,14 @@ import com.stephen.cloud.ai.knowledge.retrieval.VectorSearchManager;
 import com.stephen.cloud.ai.mapper.KnowledgeBaseMapper;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
 import com.stephen.cloud.ai.model.entity.KnowledgeDocument;
+import com.stephen.cloud.ai.mq.KnowledgeIngestMqProducer;
 import com.stephen.cloud.ai.service.DocumentChunkService;
 import com.stephen.cloud.ai.service.KnowledgeBaseService;
 import com.stephen.cloud.ai.service.KnowledgeDocumentService;
 import com.stephen.cloud.ai.service.KnowledgeIngestService;
 import com.stephen.cloud.api.file.client.FileFeignClient;
 import com.stephen.cloud.api.file.model.enums.FileUploadBizEnum;
+import com.stephen.cloud.api.file.model.vo.FileUploadVO;
 import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocIngestMessage;
 import com.stephen.cloud.api.knowledge.model.dto.knowledgebase.KnowledgeBaseQueryRequest;
 import com.stephen.cloud.api.knowledge.model.dto.retrieval.KnowledgeRetrievalRequest;
@@ -33,8 +35,6 @@ import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.constants.CommonConstant;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.mysql.utils.SqlUtils;
-import com.stephen.cloud.common.rabbitmq.enums.MqBizTypeEnum;
-import com.stephen.cloud.common.rabbitmq.producer.RabbitMqSender;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +44,8 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
@@ -69,7 +71,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     @Resource
     private KnowledgeProperties knowledgeProperties;
     @Resource
-    private RabbitMqSender rabbitMqSender;
+    private KnowledgeIngestMqProducer knowledgeIngestMqProducer;
     @Resource
     private VectorSearchManager vectorSearchManager;
     @Resource
@@ -166,8 +168,8 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
         }
 
         log.info("[知识库] 调用文件服务存储文档: kbId={}", knowledgeBaseId);
-        BaseResponse<String> uploadResponse = fileFeignClient.uploadFile(file, FileUploadBizEnum.KNOWLEDGE.getValue());
-        String cosUrl = Optional.ofNullable(uploadResponse).map(BaseResponse::getData)
+        BaseResponse<FileUploadVO> uploadResponse = fileFeignClient.uploadFile(file, FileUploadBizEnum.KNOWLEDGE.getValue());
+        String cosUrl = Optional.ofNullable(uploadResponse).map(BaseResponse::getData).map(FileUploadVO::getUrl)
                 .orElseThrow(() -> {
                     log.error("[知识库] 文件服务上传失败: kbId={}", knowledgeBaseId);
                     return new BusinessException(ErrorCode.OPERATION_ERROR, "文件存储上传失败");
@@ -187,9 +189,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "写入文档记录失败");
         }
 
-        log.info("[知识库] 发送入库消息至 MQ: docId={}, kbId={}", doc.getId(), knowledgeBaseId);
-        rabbitMqSender.send(MqBizTypeEnum.KNOWLEDGE_DOC_INGEST, KnowledgeDocIngestMessage.builder()
-                .documentId(doc.getId()).knowledgeBaseId(knowledgeBaseId).userId(userId).storagePath(cosUrl).build());
+        dispatchIngestMessageAfterCommit(doc, knowledgeBaseId, userId, cosUrl);
         
         return doc.getId();
     }
@@ -232,10 +232,63 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     }
 
     @Override
+    public Map<String, List<ChunkSourceVO>> diagnoseHybridSearch(KnowledgeRetrievalRequest request, Long userId) {
+        if (request == null || StringUtils.isBlank(request.getQuery())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "检索内容不能为空");
+        }
+        ThrowUtils.throwIf(request.getKnowledgeBaseId() == null || request.getKnowledgeBaseId() <= 0,
+                ErrorCode.PARAMS_ERROR, "知识库 ID 非法");
+        int topK = request.getTopK() != null ? request.getTopK() : knowledgeProperties.getDefaultTopK();
+        int maxK = knowledgeProperties.getRetrievalTopKMax();
+        int finalTopK = Math.min(topK, maxK);
+        SearchRequest searchRequest = SearchRequest.builder()
+                .query(request.getQuery())
+                .topK(finalTopK)
+                .similarityThreshold(knowledgeProperties.getSimilarityThreshold())
+                .filterExpression("knowledgeBaseId == '" + request.getKnowledgeBaseId() + "'")
+                .build();
+        Map<String, List<Document>> diagnostics = vectorSearchManager.diagnoseHybrid(searchRequest);
+        Map<String, List<ChunkSourceVO>> result = new LinkedHashMap<>();
+        result.put("knn", vectorSearchManager.mapToVO(diagnostics.getOrDefault("knn", List.of())));
+        result.put("bm25", vectorSearchManager.mapToVO(diagnostics.getOrDefault("bm25", List.of())));
+        result.put("hybrid", vectorSearchManager.mapToVO(diagnostics.getOrDefault("hybrid", List.of())));
+        log.info("[知识库] 双路召回诊断完成: kbId={}, query='{}', knn={}, bm25={}, hybrid={}",
+                request.getKnowledgeBaseId(),
+                request.getQuery(),
+                result.get("knn").size(),
+                result.get("bm25").size(),
+                result.get("hybrid").size());
+        return result;
+    }
+
+    @Override
     public List<Document> similaritySearch(SearchRequest searchRequest) {
         return vectorSearchManager.search(searchRequest,
                 knowledgeProperties.isHybridSearchEnabled() ?
                         VectorSimilarityModeEnum.HYBRID :
                         VectorSimilarityModeEnum.KNN);
+    }
+
+    private void dispatchIngestMessageAfterCommit(KnowledgeDocument doc, Long knowledgeBaseId, Long userId, String storagePath) {
+        KnowledgeDocIngestMessage message = KnowledgeDocIngestMessage.builder()
+                .documentId(doc.getId())
+                .knowledgeBaseId(knowledgeBaseId)
+                .userId(userId)
+                .storagePath(storagePath)
+                .build();
+        Runnable sendTask = () -> {
+            log.info("[知识库] 自动触发文档解析入库: docId={}, kbId={}", doc.getId(), knowledgeBaseId);
+            knowledgeIngestMqProducer.sendIngestCreated(message);
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendTask.run();
+                }
+            });
+        } else {
+            sendTask.run();
+        }
     }
 }

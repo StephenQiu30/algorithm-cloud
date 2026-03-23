@@ -52,6 +52,9 @@ public class KnowledgeDocumentVO implements Serializable {
     @Schema(description = "解析状态 (0-待解析, 1-解析中, 2-解析成功, 3-解析失败等)")
     private Integer parseStatus;
 
+    @Schema(description = "解析状态文案")
+    private String parseStatusText;
+
     /**
      * 错误信息 (解析失败时的原因)
      */

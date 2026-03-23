@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 
 /**
  * 向量检索统一管理器：整合了 KNN 与 Hybrid (RRF 融合) 检索逻辑。
@@ -61,6 +62,27 @@ public class VectorSearchManager {
         return searchKnn(searchRequest);
     }
 
+    public Map<String, List<Document>> diagnoseHybrid(SearchRequest searchRequest) {
+        String filterQs = toFilterQueryString(searchRequest);
+        int topK = searchRequest.getTopK();
+        int fetch = Math.max(topK, knowledgeProperties.getHybridBm25FetchSize());
+        List<Document> knnHits = searchKnn(searchRequest);
+        List<Document> bm25Hits;
+        try {
+            Double threshold = searchRequest.getSimilarityThreshold();
+            bm25Hits = searchBm25(searchRequest.getQuery(), filterQs, fetch, threshold != null ? threshold : 0.0);
+        } catch (IOException e) {
+            log.warn("BM25 retrieval failed during diagnose: {}", e.getMessage());
+            bm25Hits = List.of();
+        }
+        List<Document> hybridHits = reciprocalRankFusion(knnHits, bm25Hits, topK, knowledgeProperties.getRrfRankConstant());
+        Map<String, List<Document>> result = new LinkedHashMap<>();
+        result.put("knn", knnHits);
+        result.put("bm25", bm25Hits);
+        result.put("hybrid", hybridHits);
+        return result;
+    }
+
     /**
      * 执行纯向量 kNN 检索
      */
@@ -97,10 +119,22 @@ public class VectorSearchManager {
             List<Document> bm25Hits = bm25Future.get();
 
             if (bm25Hits == null || bm25Hits.isEmpty()) {
+                log.info("[检索链路] hybrid fallback to knn only: query='{}', topK={}, knnHits={}",
+                        searchRequest.getQuery(), topK, knnHits != null ? knnHits.size() : 0);
                 return knnHits;
             }
 
-            return reciprocalRankFusion(knnHits, bm25Hits, topK, knowledgeProperties.getRrfRankConstant());
+            List<Document> fused = reciprocalRankFusion(knnHits, bm25Hits, topK, knowledgeProperties.getRrfRankConstant());
+            log.info("[检索链路] hybrid fused: query='{}', topK={}, knnHits={}, bm25Hits={}, fusedHits={}, knnTopIds={}, bm25TopIds={}, fusedTopIds={}",
+                    searchRequest.getQuery(),
+                    topK,
+                    knnHits.size(),
+                    bm25Hits.size(),
+                    fused.size(),
+                    topIds(knnHits, 5),
+                    topIds(bm25Hits, 5),
+                    topIds(fused, 5));
+            return fused;
         } catch (Exception e) {
             log.error("Hybrid search execution error: {}", e.getMessage(), e);
             return knnFuture.isCompletedExceptionally() ? new ArrayList<>() : knnFuture.join();
@@ -204,5 +238,15 @@ public class VectorSearchManager {
             return String.valueOf(meta.get("chunkId"));
         }
         return "temp:" + System.identityHashCode(d);
+    }
+
+    private List<String> topIds(List<Document> docs, int limit) {
+        if (docs == null || docs.isEmpty()) {
+            return List.of();
+        }
+        return docs.stream()
+                .limit(limit)
+                .map(this::docId)
+                .collect(Collectors.toList());
     }
 }

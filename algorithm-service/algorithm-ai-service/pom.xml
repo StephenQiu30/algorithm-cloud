@@ -130,6 +130,12 @@
             <groupId>com.algorithm.cloud</groupId>
             <artifactId>algorithm-common-rabbitmq</artifactId>
         </dependency>
+
+        <!-- Common Core -->
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-core</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
