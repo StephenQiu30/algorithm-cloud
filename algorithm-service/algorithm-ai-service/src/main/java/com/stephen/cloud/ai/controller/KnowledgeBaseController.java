@@ -52,7 +52,6 @@ public class KnowledgeBaseController {
      * 创建知识库
      *
      * @param addRequest 创建请求
-     * @param request    请求对象
      * @return 记录 ID
      */
     @PostMapping("/add")
@@ -75,7 +74,6 @@ public class KnowledgeBaseController {
      * 删除知识库
      *
      * @param deleteRequest 删除请求
-     * @param request       请求对象
      * @return 是否成功
      */
     @PostMapping("/delete")
@@ -97,7 +95,6 @@ public class KnowledgeBaseController {
      * 更新知识库 (管理员)
      *
      * @param updateRequest 更新请求
-     * @param request       请求对象
      * @return 是否成功
      */
     @PostMapping("/update")

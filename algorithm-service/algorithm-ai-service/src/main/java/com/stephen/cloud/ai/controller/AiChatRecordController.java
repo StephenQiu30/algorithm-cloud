@@ -57,7 +57,6 @@ public class AiChatRecordController {
      * 创建对话记录
      *
      * @param addRequest 创建请求
-     * @param request    请求对象
      * @return 记录 ID
      */
     @PostMapping("/add")
@@ -79,7 +78,6 @@ public class AiChatRecordController {
      * 更新对话记录 (管理员)
      *
      * @param updateRequest 更新请求
-     * @param request       请求对象
      * @return 是否成功
      */
     @PostMapping("/update")
@@ -103,7 +101,6 @@ public class AiChatRecordController {
      * 编辑对话记录 (用户本人)
      *
      * @param editRequest 编辑请求
-     * @param request     请求对象
      * @return 是否成功
      */
     @PostMapping("/edit")
@@ -129,10 +126,9 @@ public class AiChatRecordController {
     }
 
     /**
-     * 删除对话记录 (仅限本人或管理员)
+     * 删除对话记录 (仅限本人 or 管理员)
      *
      * @param deleteRequest 包含记录 ID 的请求
-     * @param request       请求对象
      * @return 是否成功
      */
     @PostMapping("/delete")

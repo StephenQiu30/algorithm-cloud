@@ -6,11 +6,8 @@ import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
-import com.stephen.cloud.ai.service.KnowledgeBaseService;
 import com.stephen.cloud.api.knowledge.model.enums.VectorSimilarityModeEnum;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
-import com.stephen.cloud.common.common.ErrorCode;
-import com.stephen.cloud.common.common.ThrowUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -46,9 +43,6 @@ public class VectorSearchManager {
     private VectorStore knowledgeVectorStore;
 
     @Resource
-    private KnowledgeBaseService knowledgeBaseService;
-
-    @Resource
     private ElasticsearchClient elasticsearchClient;
 
     @Resource
@@ -56,42 +50,6 @@ public class VectorSearchManager {
 
     @Resource
     private Executor vectorHybridSearchExecutor;
-
-    /**
-     * 针对指定知识库执行语义检索与分片封装 (Facade logic)
-     */
-    public List<ChunkSourceVO> searchChunks(Long kbId, String query, Integer requestTopK, int topKMax) {
-        ThrowUtils.throwIf(kbId == null || kbId <= 0, ErrorCode.PARAMS_ERROR, "知识库 ID 无效");
-        ThrowUtils.throwIf(StringUtils.isBlank(query), ErrorCode.PARAMS_ERROR, "查询内容不能为空");
-        ThrowUtils.throwIf(knowledgeBaseService.getById(kbId) == null, ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
-
-        List<Document> docs = searchDocuments(kbId, query, requestTopK, topKMax);
-        return mapToVO(docs);
-    }
-
-    /**
-     * 构建针对特定知识库的检索请求并执行 (Facade logic)
-     */
-    public List<Document> searchDocuments(Long kbId, String query, Integer requestTopK, int topKMax) {
-        int topK = Math.min(
-                (requestTopK != null && requestTopK > 0) ? requestTopK : knowledgeProperties.getDefaultTopK(),
-                topKMax
-        );
-
-        SearchRequest searchRequest = SearchRequest.builder()
-                .query(query.trim())
-                .topK(topK)
-                .similarityThreshold(knowledgeProperties.getSimilarityThreshold())
-                .filterExpression("knowledgeBaseId == '" + kbId + "'")
-                .build();
-
-        // 根据配置自动选择 kNN 或 Hybrid
-        VectorSimilarityModeEnum mode = knowledgeProperties.isHybridSearchEnabled()
-                ? VectorSimilarityModeEnum.HYBRID
-                : VectorSimilarityModeEnum.KNN;
-
-        return search(searchRequest, mode);
-    }
 
     /**
      * 核心检索逻辑
