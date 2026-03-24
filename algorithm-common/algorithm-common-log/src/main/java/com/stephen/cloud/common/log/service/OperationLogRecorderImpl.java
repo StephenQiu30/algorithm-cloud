@@ -3,16 +3,18 @@ package com.stephen.cloud.common.log.service;
 import cn.hutool.core.util.StrUtil;
 import com.stephen.cloud.api.log.client.LogFeignClient;
 import com.stephen.cloud.api.log.model.dto.operation.OperationLogAddRequest;
+import com.stephen.cloud.common.common.BaseResponse;
+import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.log.model.OperationLogContext;
 import com.stephen.cloud.common.utils.IpUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnMissingBean(OperationLogRecorder.class)
+@ConditionalOnBean(LogFeignClient.class)
 @Slf4j
 public class OperationLogRecorderImpl implements OperationLogRecorder {
 
@@ -56,7 +58,14 @@ public class OperationLogRecorderImpl implements OperationLogRecorder {
                 request.setLocation(location);
             }
 
-            logFeignClient.addOperationLog(request);
+            BaseResponse<Boolean> response = logFeignClient.addOperationLog(request);
+            if (response == null || response.getCode() != ErrorCode.SUCCESS.getCode()
+                    || !Boolean.TRUE.equals(response.getData())) {
+                log.error("操作日志落库失败, module={}, action={}, path={}, code={}, message={}",
+                        context.getModule(), context.getAction(), context.getPath(),
+                        response == null ? "null" : response.getCode(),
+                        response == null ? "empty response" : response.getMessage());
+            }
         } catch (Exception e) {
             log.error("记录操作日志失败", e);
         }

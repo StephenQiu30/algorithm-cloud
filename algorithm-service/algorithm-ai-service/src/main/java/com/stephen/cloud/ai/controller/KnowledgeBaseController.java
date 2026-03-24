@@ -92,7 +92,7 @@ public class KnowledgeBaseController {
     public BaseResponse<KnowledgeBaseVO> getKnowledgeBaseVOById(@RequestParam("id") long id, HttpServletRequest request) {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
         KnowledgeBase knowledgeBase = knowledgeBaseService.getById(id);
-        ThrowUtils.throwIf(knowledgeBase == null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(knowledgeBase == null, ErrorCode.NOT_FOUND_ERROR, "知识库不存在，id=" + id);
         return ResultUtils.success(knowledgeBaseService.getKnowledgeBaseVO(knowledgeBase, request));
     }
 

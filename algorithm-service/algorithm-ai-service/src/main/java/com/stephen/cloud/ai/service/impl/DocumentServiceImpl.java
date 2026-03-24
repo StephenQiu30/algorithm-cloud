@@ -14,8 +14,12 @@ import com.stephen.cloud.ai.service.DocumentService;
 import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.api.ai.model.dto.document.DocumentQueryRequest;
 import com.stephen.cloud.api.ai.model.vo.DocumentVO;
+import com.stephen.cloud.api.file.client.FileFeignClient;
+import com.stephen.cloud.api.file.model.enums.FileUploadBizEnum;
+import com.stephen.cloud.api.file.model.vo.FileUploadVO;
 import com.stephen.cloud.api.user.client.UserFeignClient;
 import com.stephen.cloud.api.user.model.vo.UserVO;
+import com.stephen.cloud.common.common.BaseResponse;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.constants.CommonConstant;
@@ -28,10 +32,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -52,6 +52,9 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     @Resource
     private VectorStoreService vectorStoreService;
 
+    @Resource
+    private FileFeignClient fileFeignClient;
+
     @Override
     public Long uploadDocument(MultipartFile file, Long knowledgeBaseId, Long userId) {
         ThrowUtils.throwIf(file == null || file.isEmpty(), ErrorCode.PARAMS_ERROR, "文件不能为空");
@@ -61,29 +64,26 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         String extension = StringUtils.lowerCase(FilenameUtils.getExtension(originalFilename));
         ThrowUtils.throwIf(StringUtils.isBlank(extension) || !SUPPORTED_EXTENSIONS.contains(extension),
                 ErrorCode.PARAMS_ERROR, "不支持的文件格式");
-        try {
-            Path saveDir = Path.of(documentProcessingProperties.getUploadPath(), String.valueOf(knowledgeBaseId));
-            Files.createDirectories(saveDir);
-            String saveName = System.currentTimeMillis() + "_" + UUID.randomUUID() + "." + extension;
-            Path savePath = saveDir.resolve(saveName);
-            file.transferTo(savePath.toFile());
-            Document document = new Document();
-            document.setKnowledgeBaseId(knowledgeBaseId);
-            document.setName(StringUtils.defaultIfBlank(originalFilename, saveName));
-            document.setFilePath(savePath.toAbsolutePath().toString());
-            document.setFileSize(file.getSize());
-            document.setFileExtension(extension);
-            document.setStatus("PENDING");
-            document.setChunkCount(0);
-            document.setUserId(userId);
-            document.setUploadTime(new Date());
-            boolean result = this.save(document);
-            ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-            sendDocumentProcessMessage(document.getId());
-            return document.getId();
-        } catch (IOException e) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "文件保存失败");
-        }
+        BaseResponse<FileUploadVO> uploadResponse = fileFeignClient.uploadFile(file, FileUploadBizEnum.KNOWLEDGE.getValue());
+        ThrowUtils.throwIf(uploadResponse == null || uploadResponse.getCode() != 0
+                || uploadResponse.getData() == null || StringUtils.isBlank(uploadResponse.getData().getUrl()),
+                ErrorCode.OPERATION_ERROR, "文件保存失败");
+
+        String fileUrl = uploadResponse.getData().getUrl();
+        Document document = new Document();
+        document.setKnowledgeBaseId(knowledgeBaseId);
+        document.setName(StringUtils.defaultIfBlank(originalFilename, uploadResponse.getData().getFileName()));
+        document.setFilePath(fileUrl);
+        document.setFileSize(file.getSize());
+        document.setFileExtension(extension);
+        document.setStatus("PENDING");
+        document.setChunkCount(0);
+        document.setUserId(userId);
+        document.setUploadTime(new Date());
+        boolean result = this.save(document);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        sendDocumentProcessMessage(document.getId());
+        return document.getId();
     }
 
     @Override

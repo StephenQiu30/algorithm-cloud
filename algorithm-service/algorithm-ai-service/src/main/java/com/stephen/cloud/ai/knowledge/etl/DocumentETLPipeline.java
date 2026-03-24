@@ -29,7 +29,12 @@ public class DocumentETLPipeline {
     private ResourceLoader resourceLoader;
 
     public int process(String filePath, String fileExtension, Map<String, Object> metadata) {
-        org.springframework.core.io.Resource resource = resourceLoader.getResource("file:" + filePath);
+        String location = filePath;
+        if (!(filePath.startsWith("http://") || filePath.startsWith("https://")
+                || filePath.startsWith("file:") || filePath.startsWith("classpath:"))) {
+            location = "file:" + filePath;
+        }
+        org.springframework.core.io.Resource resource = resourceLoader.getResource(location);
         DocumentReader reader = documentReaderFactory.getReader(fileExtension, resource);
         List<Document> documents = reader.get();
         for (Document document : documents) {
