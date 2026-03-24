@@ -29,5 +29,29 @@ public class KnowledgeBaseAddRequest implements Serializable {
      */
     @Schema(description = "知识库描述")
     private String description;
+
+    /**
+     * 向量相似度模式 (cosine/euclidean/dot_product)
+     */
+    @Schema(description = "向量相似度模式")
+    private String similarityMode;
+
+    /**
+     * 分片策略 (token/recursive/semantic)
+     */
+    @Schema(description = "分片策略")
+    private String chunkStrategy;
+
+    /**
+     * 分片大小
+     */
+    @Schema(description = "分片大小")
+    private Integer chunkSize;
+
+    /**
+     * 分片重叠
+     */
+    @Schema(description = "分片重叠")
+    private Integer chunkOverlap;
 }
 

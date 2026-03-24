@@ -38,6 +38,21 @@ public class KnowledgeBase implements Serializable {
     private String description;
 
     /**
+     * 文档总数
+     */
+    private Integer documentCount;
+
+    /**
+     * 分片总数
+     */
+    private Integer chunkCount;
+
+    /**
+     * 最后入库时间
+     */
+    private Date lastIngestTime;
+
+    /**
      * 库状态（0-正常, 1-禁用）
      */
     private Integer status;

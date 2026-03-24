@@ -194,8 +194,15 @@ public class KnowledgeBaseController {
         return ResultUtils.success(result);
     }
 
+    /**
+     * 诊断双路召回（调试用）
+     *
+     * @param knowledgeRetrievalRequest 检索参数
+     * @return kNN、BM25、Hybrid 三路结果
+     */
     @PostMapping("/search/diagnose")
-    @Operation(summary = "诊断双路召回", description = "返回 kNN、BM25 和 RRF 融合三路结果，便于调参校准。")
+    @Operation(summary = "诊断双路召回", description = "返回 kNN、BM25 和 RRF 融合三路结果，用于调参优化。")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @OperationLog(module = "知识库模块", action = "诊断双路召回")
     public BaseResponse<Map<String, List<ChunkSourceVO>>> diagnoseSearch(@RequestBody KnowledgeRetrievalRequest knowledgeRetrievalRequest) {
         Long loginUserId = SecurityUtils.getLoginUserId();

@@ -44,17 +44,24 @@ app:
   knowledge:
     vector-index: algorithm-knowledge-vectors
     embedding-dimension: 1536
-    chunk-size: 800
-    chunk-overlap: 100
+    chunk-size: 400
+    chunk-overlap: 50
     default-top-k: 5
-
-ai:
-  dashscope:
-    apiKey: ${prod.aliyun.dashscope.api-key}
-    modelName: ${prod.aliyun.dashscope.model-name}
-  ollama:
-    baseUrl: ${prod.ollama.base-url}
-    modelName: ${prod.ollama.model-name}
+    vector-similarity-threshold: 0.5
+    bm25-score-threshold: 0.0
+    cache-dir: ./data/algorithm-kb-cache
+    local-library-dir: ./data/algorithm-kb-library
+    hybrid-search-enabled: true
+    hybrid-bm25-fetch-size: 30
+    rrf-rank-constant: 60
+    chunk-paragraph-merge-char-budget: 2500
+    rag-top-k-max: 20
+    retrieval-top-k-max: 50
+    bm25-minimum-should-match: 50%
+    vector-batch-size: 100
+    keyword-metadata-enrich-enabled: false
+    keyword-metadata-count: 5
+    keyword-metadata-mode: rule
 
 # MyBatis-Plus 业务配置
 mybatis-plus:

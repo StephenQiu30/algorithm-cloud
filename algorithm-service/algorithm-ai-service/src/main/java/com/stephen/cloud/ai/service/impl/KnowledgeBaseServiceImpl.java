@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.convert.KnowledgeBaseConvert;
+import com.stephen.cloud.ai.knowledge.retrieval.KnowledgeSearchRequestBuilder;
 import com.stephen.cloud.ai.knowledge.retrieval.VectorSearchManager;
 import com.stephen.cloud.ai.mapper.KnowledgeBaseMapper;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
@@ -76,6 +77,8 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     private VectorSearchManager vectorSearchManager;
     @Resource
     private KnowledgeIngestService knowledgeIngestService;
+    @Resource
+    private KnowledgeSearchRequestBuilder knowledgeSearchRequestBuilder;
 
     private static final long MAX_FILE_BYTES = 20 * 1024 * 1024;
     private static final Set<String> ALLOWED_EXT = Set.copyOf(KnowledgeDocumentTypeEnum.getValues());
@@ -198,8 +201,16 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     @Transactional(rollbackFor = Exception.class)
     public boolean deleteDocumentAndAssociated(Long documentId, Long userId) {
         log.info("[知识库] 请求删除文档及关联数据: docId={}, userId={}", documentId, userId);
-        knowledgeIngestService.deleteVectors(documentId);
-        log.debug("[知识库] 向量库关联向量已清理: docId={}", documentId);
+        
+        // 先删除向量库数据（带异常处理）
+        try {
+            knowledgeIngestService.deleteVectors(documentId);
+            log.debug("[知识库] 向量库关联向量已清理: docId={}", documentId);
+        } catch (Exception e) {
+            log.error("[知识库] 向量库删除失败，继续删除数据库记录: docId={}, error={}", documentId, e.getMessage(), e);
+            // 不中断流程，继续删除数据库记录
+        }
+        
         documentChunkService.deleteByDocumentId(documentId);
         log.debug("[知识库] 数据库关联分块已清理: docId={}", documentId);
         boolean removed = knowledgeDocumentService.removeById(documentId);
@@ -212,18 +223,19 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
         if (request == null || StringUtils.isBlank(request.getQuery())) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "检索内容不能为空");
         }
+        ThrowUtils.throwIf(request.getKnowledgeBaseId() == null || request.getKnowledgeBaseId() <= 0,
+                ErrorCode.PARAMS_ERROR, "知识库 ID 非法");
+        KnowledgeBase kb = this.getById(request.getKnowledgeBaseId());
+        ThrowUtils.throwIf(kb == null, ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
+        ThrowUtils.throwIf(userId != null && !Objects.equals(kb.getUserId(), userId), ErrorCode.NO_AUTH_ERROR, "无权限访问该知识库");
         int topK = request.getTopK() != null ? request.getTopK() : knowledgeProperties.getDefaultTopK();
-        int maxK = knowledgeProperties.getRetrievalTopKMax();
-        int finalTopK = Math.min(topK, maxK);
+        ThrowUtils.throwIf(topK <= 0, ErrorCode.PARAMS_ERROR, "topK 必须大于 0");
+        int finalTopK = knowledgeSearchRequestBuilder.resolveTopK(request.getTopK());
         
         log.info("[知识库] 执行分块检索: query='{}', kbId={}, topK={}, userId={}", 
                 request.getQuery(), request.getKnowledgeBaseId(), finalTopK, userId);
         
-        SearchRequest searchRequest = SearchRequest.builder()
-                .query(request.getQuery())
-                .topK(finalTopK)
-                .filterExpression("knowledgeBaseId == '" + request.getKnowledgeBaseId() + "'")
-                .build();
+        SearchRequest searchRequest = knowledgeSearchRequestBuilder.build(request.getQuery(), request.getKnowledgeBaseId(), finalTopK);
         
         List<Document> docs = similaritySearch(searchRequest);
         log.info("[知识库] 检索返回文档数: {} (kbId={})", docs.size(), request.getKnowledgeBaseId());
@@ -238,15 +250,13 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
         }
         ThrowUtils.throwIf(request.getKnowledgeBaseId() == null || request.getKnowledgeBaseId() <= 0,
                 ErrorCode.PARAMS_ERROR, "知识库 ID 非法");
+        KnowledgeBase kb = this.getById(request.getKnowledgeBaseId());
+        ThrowUtils.throwIf(kb == null, ErrorCode.NOT_FOUND_ERROR, "知识库不存在");
+        ThrowUtils.throwIf(userId != null && !Objects.equals(kb.getUserId(), userId), ErrorCode.NO_AUTH_ERROR, "无权限访问该知识库");
         int topK = request.getTopK() != null ? request.getTopK() : knowledgeProperties.getDefaultTopK();
-        int maxK = knowledgeProperties.getRetrievalTopKMax();
-        int finalTopK = Math.min(topK, maxK);
-        SearchRequest searchRequest = SearchRequest.builder()
-                .query(request.getQuery())
-                .topK(finalTopK)
-                .similarityThreshold(knowledgeProperties.getSimilarityThreshold())
-                .filterExpression("knowledgeBaseId == '" + request.getKnowledgeBaseId() + "'")
-                .build();
+        ThrowUtils.throwIf(topK <= 0, ErrorCode.PARAMS_ERROR, "topK 必须大于 0");
+        int finalTopK = knowledgeSearchRequestBuilder.resolveTopK(request.getTopK());
+        SearchRequest searchRequest = knowledgeSearchRequestBuilder.build(request.getQuery(), request.getKnowledgeBaseId(), finalTopK);
         Map<String, List<Document>> diagnostics = vectorSearchManager.diagnoseHybrid(searchRequest);
         Map<String, List<ChunkSourceVO>> result = new LinkedHashMap<>();
         result.put("knn", vectorSearchManager.mapToVO(diagnostics.getOrDefault("knn", List.of())));

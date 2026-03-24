@@ -5,7 +5,12 @@ import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import com.stephen.cloud.api.knowledge.model.enums.RagMetricTagEnum;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
+import com.stephen.cloud.ai.enums.RagMetricEnum;
 import com.stephen.cloud.api.knowledge.model.enums.VectorSimilarityModeEnum;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import jakarta.annotation.Resource;
@@ -52,14 +57,24 @@ public class VectorSearchManager {
     @Resource
     private Executor vectorHybridSearchExecutor;
 
+    @Resource
+    private MeterRegistry meterRegistry;
+
     /**
      * 核心检索逻辑
      */
     public List<Document> search(SearchRequest searchRequest, VectorSimilarityModeEnum mode) {
-        if (mode == VectorSimilarityModeEnum.HYBRID) {
-            return searchHybrid(searchRequest);
-        }
-        return searchKnn(searchRequest);
+        long start = System.currentTimeMillis();
+        List<Document> out = mode == VectorSimilarityModeEnum.HYBRID ? searchHybrid(searchRequest) : searchKnn(searchRequest);
+        Timer.builder(RagMetricEnum.RAG_RETRIEVAL_LATENCY_MS.getValue())
+                .tag(RagMetricTagEnum.MODE_TAG_KEY.getValue(), mode.name())
+                .register(meterRegistry)
+                .record(System.currentTimeMillis() - start, java.util.concurrent.TimeUnit.MILLISECONDS);
+        Counter.builder(RagMetricEnum.RAG_RETRIEVAL_HIT_COUNT.getValue())
+                .tag(RagMetricTagEnum.MODE_TAG_KEY.getValue(), mode.name())
+                .register(meterRegistry)
+                .increment(out != null ? out.size() : 0);
+        return out;
     }
 
     public Map<String, List<Document>> diagnoseHybrid(SearchRequest searchRequest) {
@@ -69,8 +84,7 @@ public class VectorSearchManager {
         List<Document> knnHits = searchKnn(searchRequest);
         List<Document> bm25Hits;
         try {
-            Double threshold = searchRequest.getSimilarityThreshold();
-            bm25Hits = searchBm25(searchRequest.getQuery(), filterQs, fetch, threshold != null ? threshold : 0.0);
+            bm25Hits = searchBm25(searchRequest.getQuery(), filterQs, fetch, knowledgeProperties.getBm25ScoreThreshold());
         } catch (IOException e) {
             log.warn("BM25 retrieval failed during diagnose: {}", e.getMessage());
             bm25Hits = List.of();
@@ -105,10 +119,12 @@ public class VectorSearchManager {
 
         CompletableFuture<List<Document>> bm25Future = CompletableFuture.supplyAsync(() -> {
             try {
-                Double threshold = searchRequest.getSimilarityThreshold();
-                return searchBm25(searchRequest.getQuery(), filterQs, fetch, threshold != null ? threshold : 0.0);
+                return searchBm25(searchRequest.getQuery(), filterQs, fetch, knowledgeProperties.getBm25ScoreThreshold());
             } catch (IOException e) {
-                log.warn("BM25 retrieval failed, falling back to pure kNN: {}", e.getMessage());
+                log.error("[检索链路] BM25检索IO异常: query='{}', error={}", searchRequest.getQuery(), e.getMessage(), e);
+                return new ArrayList<>();
+            } catch (Exception e) {
+                log.error("[检索链路] BM25检索未知异常: query='{}', error={}", searchRequest.getQuery(), e.getMessage(), e);
                 return new ArrayList<>();
             }
         }, vectorHybridSearchExecutor);
@@ -119,7 +135,11 @@ public class VectorSearchManager {
             List<Document> bm25Hits = bm25Future.get();
 
             if (bm25Hits == null || bm25Hits.isEmpty()) {
-                log.info("[检索链路] hybrid fallback to knn only: query='{}', topK={}, knnHits={}",
+                Counter.builder(RagMetricEnum.RAG_RETRIEVAL_FALLBACK_COUNT.getValue())
+                        .tag(RagMetricTagEnum.MODE_TAG_KEY.getValue(), VectorSimilarityModeEnum.HYBRID.name())
+                        .register(meterRegistry)
+                        .increment();
+                log.warn("[检索链路] BM25返回为空，降级为纯kNN检索: query='{}', topK={}, knnHits={}", 
                         searchRequest.getQuery(), topK, knnHits != null ? knnHits.size() : 0);
                 return knnHits;
             }
@@ -136,13 +156,26 @@ public class VectorSearchManager {
                     topIds(fused, 5));
             return fused;
         } catch (Exception e) {
-            log.error("Hybrid search execution error: {}", e.getMessage(), e);
-            return knnFuture.isCompletedExceptionally() ? new ArrayList<>() : knnFuture.join();
+            log.error("[检索链路] 混合检索执行异常: query='{}', error={}", searchRequest.getQuery(), e.getMessage(), e);
+            // 降级到kNN
+            try {
+                List<Document> fallbackResult = knnFuture.isCompletedExceptionally() ? new ArrayList<>() : knnFuture.join();
+                Counter.builder(RagMetricEnum.RAG_RETRIEVAL_FALLBACK_COUNT.getValue())
+                        .tag(RagMetricTagEnum.MODE_TAG_KEY.getValue(), VectorSimilarityModeEnum.HYBRID.name())
+                        .register(meterRegistry)
+                        .increment();
+                log.warn("[检索链路] 混合检索异常，降级为kNN: query='{}', knnHits={}", 
+                        searchRequest.getQuery(), fallbackResult.size());
+                return fallbackResult;
+            } catch (Exception fallbackEx) {
+                log.error("[检索链路] kNN降级也失败: query='{}', error={}", searchRequest.getQuery(), fallbackEx.getMessage(), fallbackEx);
+                return new ArrayList<>();
+            }
         }
     }
 
     /**
-     * BM25 文本检索
+     * BM25 文本检索（优化版：增强字段权重，支持标签检索）
      */
     private List<Document> searchBm25(String queryText, String filterQs, int size, double threshold) throws IOException {
         SearchResponse<Document> res = elasticsearchClient.search(s -> s
@@ -150,10 +183,18 @@ public class VectorSearchManager {
                         .size(size)
                         .query(q -> q.bool(b -> {
                             b.filter(f -> f.queryString(qs -> qs.query(filterQs)));
+                            // 优化：增强字段权重，新增 tags 和 tag_list 字段
                             b.must(m -> m.multiMatch(mm -> mm
                                     .query(queryText)
-                                    .fields(CONTENT_FIELD)
+                                    .fields(
+                                            CONTENT_FIELD,              // 权重 1
+                                            "documentName^2",           // 权重 2
+                                            "excerpt_keywords^5",       // 权重 5（LLM 提取的关键词）
+                                            "tags^4",                   // 权重 4（规则提取的标签）
+                                            "tag_list^4"                // 权重 4（标签数组）
+                                    )
                                     .type(TextQueryType.BestFields)
+                                    .lenient(true)
                                     .minimumShouldMatch(knowledgeProperties.getBm25MinimumShouldMatch())));
                             return b;
                         })),

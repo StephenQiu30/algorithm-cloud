@@ -87,3 +87,6 @@ nacos-config/common-secret-prod.properties
 .env
 .env.*
 !.env.example
+
+# Data
+data/

@@ -34,7 +34,12 @@ public class AiChatRecord implements Serializable {
     private String sessionId;
 
     /**
-     * 对话消息
+     * 关联知识库ID
+     */
+    private Long knowledgeBaseId;
+
+    /**
+     * 用户消息
      */
     private String message;
 
@@ -67,6 +72,11 @@ public class AiChatRecord implements Serializable {
      * 帖子 id
      */
     private Long postId;
+
+    /**
+     * 检索元数据(分片ID、评分等)
+     */
+    private String retrievalMetadata;
 
     /**
      * 创建时间

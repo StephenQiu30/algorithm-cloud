@@ -45,4 +45,16 @@ public class KnowledgeDocumentUpdateRequest implements Serializable {
      */
     @Schema(description = "错误信息")
     private String errorMsg;
+
+    /**
+     * 文档标签 (逗号分隔)
+     */
+    @Schema(description = "文档标签")
+    private String tags;
+
+    /**
+     * 是否包含代码
+     */
+    @Schema(description = "是否包含代码")
+    private Boolean hasCode;
 }

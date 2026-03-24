@@ -60,6 +60,42 @@ public class KnowledgeBaseVO implements Serializable {
     private Integer status;
 
     /**
+     * 文档总数
+     */
+    @Schema(description = "文档总数")
+    private Integer documentCount;
+
+    /**
+     * 分片总数
+     */
+    @Schema(description = "分片总数")
+    private Integer chunkCount;
+
+    /**
+     * 向量相似度模式
+     */
+    @Schema(description = "向量相似度模式")
+    private String similarityMode;
+
+    /**
+     * 分片策略
+     */
+    @Schema(description = "分片策略")
+    private String chunkStrategy;
+
+    /**
+     * 分片大小
+     */
+    @Schema(description = "分片大小")
+    private Integer chunkSize;
+
+    /**
+     * 分片重叠
+     */
+    @Schema(description = "分片重叠")
+    private Integer chunkOverlap;
+
+    /**
      * 创建时间
      */
     @Schema(description = "创建时间")

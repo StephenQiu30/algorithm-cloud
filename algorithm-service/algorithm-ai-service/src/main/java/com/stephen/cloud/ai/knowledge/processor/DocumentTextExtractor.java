@@ -72,13 +72,14 @@ public class DocumentTextExtractor {
             return new TikaDocumentReader(resource).read();
 
         } catch (Exception e) {
-            log.error("解析文档失败: {}, 错误信息: {}", lowerName, e.getMessage());
+            log.error("解析文档失败: {}, 错误类型: {}, 错误信息: {}", lowerName, e.getClass().getSimpleName(), e.getMessage());
             // 如果特定解析器失败，尝试使用 Tika 作为最终兜底
             try {
+                log.info("尝试使用 Tika 兜底解析: {}", lowerName);
                 return new TikaDocumentReader(resource).read();
             } catch (Exception fatal) {
-                log.error("所有解析器均失败: {}", fatal.getMessage());
-                return List.of();
+                log.error("所有解析器均失败: {}, 错误: {}", lowerName, fatal.getMessage(), fatal);
+                throw new IOException("文档解析失败: " + fatal.getMessage(), fatal);
             }
         }
     }

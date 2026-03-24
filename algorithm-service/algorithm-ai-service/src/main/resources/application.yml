@@ -51,17 +51,30 @@ app:
   knowledge:
     vector-index: algorithm-knowledge-vectors
     embedding-dimension: 1536
-    chunk-size: 800
-    chunk-overlap: 100
+    chunk-size: 400
+    chunk-overlap: 50
     default-top-k: 5
-    similarity-threshold: 0.5
-    storage-dir: ./data/algorithm-kb-uploads
+    # 优化：降低相似度阈值，提升召回率（从 0.5 降到 0.3）
+    vector-similarity-threshold: 0.3
+    # 优化：降低 BM25 阈值，允许更多候选（从 0.0 保持不变）
+    bm25-score-threshold: 0.0
+    cache-dir: ./data/algorithm-kb-cache
+    local-library-dir: ./data/algorithm-kb-library
     hybrid-search-enabled: true
-    hybrid-bm25-fetch-size: 30
+    # 优化：增加 BM25 召回数量（从 30 提升到 50）
+    hybrid-bm25-fetch-size: 50
     rrf-rank-constant: 60
     chunk-paragraph-merge-char-budget: 2500
     rag-top-k-max: 20
     retrieval-top-k-max: 50
+    # 优化：降低最小匹配度，提升召回（从 50% 降到 30%）
+    bm25-minimum-should-match: 30%
+    vector-batch-size: 100
+    # 优化：启用 KeywordMetadataEnricher（关键改进）
+    keyword-metadata-enrich-enabled: true
+    # 优化：增加关键词数量（从 5 提升到 8）
+    keyword-metadata-count: 8
+    keyword-metadata-mode: llm
 
 # MyBatis-Plus 业务配置
 mybatis-plus:

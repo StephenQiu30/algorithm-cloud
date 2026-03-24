@@ -8,12 +8,10 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.Date;
 
 /**
- * 知识切片源视图
- * <p>
- * 表示从文档库中检索出的具体文本片段及其置信度。
- * </p>
+ * 文档分片视图
  *
  * @author StephenQiu30
  */
@@ -21,23 +19,17 @@ import java.io.Serializable;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(description = "知识切片源视图")
-public class ChunkSourceVO implements Serializable {
+@Schema(description = "文档分片视图")
+public class DocumentChunkVO implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
     /**
-     * 切片 ID (在向量库或关系库中的标识)
+     * 主键 ID
      */
-    @Schema(description = "切片 ID")
-    private Long chunkId;
-
-    /**
-     * 切片文本内容
-     */
-    @Schema(description = "切片内容")
-    private String content;
+    @Schema(description = "主键 ID")
+    private Long id;
 
     /**
      * 文档 ID
@@ -46,19 +38,25 @@ public class ChunkSourceVO implements Serializable {
     private Long documentId;
 
     /**
-     * 文档名称 (原文件名)
+     * 知识库 ID
      */
-    @Schema(description = "文档名称")
-    private String documentName;
+    @Schema(description = "知识库 ID")
+    private Long knowledgeBaseId;
 
     /**
-     * 相似度分数 (分值越高越匹配)
+     * 分片序号
      */
-    @Schema(description = "相似度分数")
-    private Double score;
+    @Schema(description = "分片序号")
+    private Integer chunkIndex;
 
     /**
-     * 标签列表 (算法名、数据结构等)
+     * 分片内容
+     */
+    @Schema(description = "分片内容")
+    private String content;
+
+    /**
+     * 标签列表 (逗号分隔)
      */
     @Schema(description = "标签列表")
     private String tags;
@@ -68,4 +66,16 @@ public class ChunkSourceVO implements Serializable {
      */
     @Schema(description = "是否包含代码")
     private Boolean hasCode;
+
+    /**
+     * 字符数
+     */
+    @Schema(description = "字符数")
+    private Integer charCount;
+
+    /**
+     * 创建时间
+     */
+    @Schema(description = "创建时间")
+    private Date createTime;
 }

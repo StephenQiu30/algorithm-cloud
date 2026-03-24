@@ -80,4 +80,10 @@ public class AiChatRecordDTO implements Serializable {
      */
     @Schema(description = "生成消耗 token")
     private Integer completionTokens;
+
+    /**
+     * 检索元数据（来源分片、分数等）
+     */
+    @Schema(description = "检索元数据")
+    private String retrievalMetadata;
 }

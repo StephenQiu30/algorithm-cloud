@@ -45,4 +45,16 @@ public class KnowledgeDocumentAddRequest implements Serializable {
      */
     @Schema(description = "文件大小 (字节)")
     private Long sizeBytes;
+
+    /**
+     * 文档标签 (逗号分隔，如：算法,动态规划,LeetCode)
+     */
+    @Schema(description = "文档标签")
+    private String tags;
+
+    /**
+     * 是否包含代码
+     */
+    @Schema(description = "是否包含代码")
+    private Boolean hasCode;
 }

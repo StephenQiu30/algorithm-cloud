@@ -1,30 +1,35 @@
 package com.stephen.cloud.ai.service.impl;
 
+import com.stephen.cloud.api.knowledge.model.enums.RagMetricTagEnum;
 import com.stephen.cloud.ai.knowledge.context.RagSearchContext;
 import com.stephen.cloud.ai.knowledge.retrieval.KnowledgeDocumentRetriever;
 import com.stephen.cloud.ai.manager.RagAuditManager;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
 import com.stephen.cloud.ai.service.KnowledgeBaseService;
 import com.stephen.cloud.ai.service.RagService;
+import com.stephen.cloud.ai.enums.RagMetricEnum;
 import com.stephen.cloud.api.knowledge.model.dto.rag.RagChatRequest;
-import com.stephen.cloud.api.knowledge.model.dto.retrieval.KnowledgeRetrievalRequest;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.exception.BusinessException;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * RAG 服务实现类：提供面向排序算法教学的检索增强问答。
@@ -52,6 +57,9 @@ public class RagServiceImpl implements RagService {
 
     @Resource
     private RagAuditManager ragAuditManager;
+
+    @Resource
+    private MeterRegistry meterRegistry;
 
     /**
      * 系统提示词模版
@@ -123,9 +131,13 @@ public class RagServiceImpl implements RagService {
             List<ChunkSourceVO> sources = (List<ChunkSourceVO>) RagSearchContext.getAndClearSources();
 
             // 6. 异步审计对话记录
-            ragAuditManager.auditCall(userId, sessionId, request.getQuestion(), response);
+            ragAuditManager.auditCall(userId, sessionId, request.getQuestion(), response, sources);
 
             long duration = System.currentTimeMillis() - startTime;
+            Timer.builder(RagMetricEnum.RAG_LATENCY_MS.getValue())
+                    .tag(RagMetricTagEnum.MODE_TAG_KEY.getValue(), RagMetricTagEnum.CALL_MODE_SYNC.getValue())
+                    .register(meterRegistry)
+                    .record(duration, java.util.concurrent.TimeUnit.MILLISECONDS);
             log.info("[RAG问答] 问答执行成功: userId={}, sessionId={}, 耗时={}ms, 关联来源数={}", 
                     userId, sessionId, duration, sources.size());
 
@@ -140,6 +152,7 @@ public class RagServiceImpl implements RagService {
 
     @Override
     public Flux<RagChatResponseVO> streamRagChat(RagChatRequest request, Long userId) {
+        long startTime = System.currentTimeMillis();
         // 1. 参数校验
         if (request == null || StringUtils.isBlank(request.getQuestion())) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数非法");
@@ -159,17 +172,7 @@ public class RagServiceImpl implements RagService {
         }
         String kbDesc = StringUtils.defaultIfBlank(kb.getDescription(), "通用算法知识库");
 
-        // 3. 预检索获取 sources (首个分片)
-        int topK = request.getTopK() != null ? request.getTopK() : 5;
-        KnowledgeRetrievalRequest retrievalRequest = KnowledgeRetrievalRequest.builder()
-                .knowledgeBaseId(kbId)
-                .query(request.getQuestion().trim())
-                .topK(topK)
-                .build();
-        
-        log.info("[RAG流式] 执行预检索获取关联来源: kbId={}, query='{}'", kbId, request.getQuestion().trim());
-        List<ChunkSourceVO> sources = knowledgeBaseService.searchChunks(retrievalRequest, userId);
-        RagChatResponseVO firstChunk = RagChatResponseVO.builder().sources(sources).build();
+        RagChatResponseVO firstChunk = RagChatResponseVO.builder().sources(List.of()).build();
 
         // 4. 准备流式输出
         StringBuilder fullAnswer = new StringBuilder();
@@ -177,7 +180,8 @@ public class RagServiceImpl implements RagService {
                 .documentRetriever(knowledgeDocumentRetriever)
                 .build();
 
-        Flux<String> contentFlux = chatClient.prompt()
+        AtomicReference<Usage> usageRef = new AtomicReference<>();
+        Flux<RagChatResponseVO> contentFlux = chatClient.prompt()
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId)
                         .param(KnowledgeDocumentRetriever.KNOWLEDGE_BASE_ID_CONTEXT_KEY, kbId)
                         .param(KnowledgeDocumentRetriever.TOP_K_CONTEXT_KEY, request.getTopK())
@@ -187,19 +191,33 @@ public class RagServiceImpl implements RagService {
                 .system(String.format(SYSTEM_PROMPT, kbDesc))
                 .user(request.getQuestion().trim())
                 .stream()
-                .content()
-                .doOnNext(fullAnswer::append);
+                .chatResponse()
+                .map(chatResponse -> {
+                    Usage usage = chatResponse.getMetadata() != null ? chatResponse.getMetadata().getUsage() : null;
+                    if (usage != null) {
+                        usageRef.set(usage);
+                    }
+                    String text = chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null
+                            ? chatResponse.getResult().getOutput().getText() : "";
+                    fullAnswer.append(text);
+                    return RagChatResponseVO.builder().answer(text).build();
+                });
 
         // 5. 组装并处理收尾逻辑
         return Flux.concat(
                 Flux.just(firstChunk),
-                contentFlux.map(text -> RagChatResponseVO.builder().answer(text).build())
+                contentFlux
         ).doOnComplete(() -> {
+            long duration = System.currentTimeMillis() - startTime;
+            Timer.builder(RagMetricEnum.RAG_LATENCY_MS.getValue())
+                    .tag(RagMetricTagEnum.MODE_TAG_KEY.getValue(), RagMetricTagEnum.CALL_MODE_STREAM.getValue())
+                    .register(meterRegistry)
+                    .record(duration, java.util.concurrent.TimeUnit.MILLISECONDS);
             log.info("[RAG流式] 问答流输出完成: userId={}, sessionId={}, 总长度={}", 
                     userId, sessionId, fullAnswer.length());
             // 异步记录审计
-            ragAuditManager.auditStream(userId, sessionId, request.getQuestion(), fullAnswer.toString());
-            RagSearchContext.clear();
+            List<ChunkSourceVO> sources = (List<ChunkSourceVO>) RagSearchContext.getAndClearSources();
+            ragAuditManager.auditStream(userId, sessionId, request.getQuestion(), fullAnswer.toString(), usageRef.get(), sources);
         }).doOnError(e -> {
             log.error("[RAG流式] 问答流执行异常: userId={}, sessionId={}, error={}", userId, sessionId, e.getMessage(), e);
             RagSearchContext.clear();

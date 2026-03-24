@@ -21,18 +21,23 @@ public class KnowledgeProperties {
     private int embeddingDimension = 1536;
 
     /** 分片目标 token 数（Spring AI TokenTextSplitter）。 */
-    private int chunkSize = 800;
+    private int chunkSize = 400;
 
     /** 分片重叠 token 数，用于相邻切片语义衔接。 */
-    private int chunkOverlap = 100;
+    private int chunkOverlap = 50;
 
     /** 默认检索返回条数（RAG 与 {@link com.stephen.cloud.ai.service.KnowledgeRetrievalService}）。 */
     private int defaultTopK = 5;
 
     /**
-     * 相似度下限，低于该值的检索结果将被过滤（具体语义由向量存储实现决定）。
+     * 向量检索相似度下限，低于该值的向量结果会被过滤。
      */
-    private double similarityThreshold = 0.5;
+    private double vectorSimilarityThreshold = 0.5;
+
+    /**
+     * BM25 分值阈值，低于该分值的文本检索结果会被过滤。
+     */
+    private double bm25ScoreThreshold = 0.0;
 
     /**
      * 临时下载缓存根目录。
@@ -88,5 +93,20 @@ public class KnowledgeProperties {
      * 向量入库时的批量大小，防止单次请求过大。
      */
     private int vectorBatchSize = 100;
+
+    /**
+     * 入库时是否对每块调用 LLM 提取 excerpt_keywords（KeywordMetadataEnricher）。默认关闭以降低时延、费用与失败面。
+     */
+    private boolean keywordMetadataEnrichEnabled = false;
+
+    /**
+     * 每块提取关键词条数（仅当 {@link #keywordMetadataEnrichEnabled} 为 true 时生效），对应 Spring AI {@code KeywordMetadataEnricher#keywordCount}。
+     */
+    private int keywordMetadataCount = 5;
+
+    /**
+     * 关键词增强策略：rule / llm / hybrid
+     */
+    private String keywordMetadataMode = "rule";
 
 }

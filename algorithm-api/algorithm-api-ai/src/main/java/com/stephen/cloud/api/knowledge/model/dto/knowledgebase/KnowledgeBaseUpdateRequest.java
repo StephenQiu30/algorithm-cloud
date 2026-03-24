@@ -44,5 +44,29 @@ public class KnowledgeBaseUpdateRequest implements Serializable {
      */
     @Schema(description = "状态 (0-启用, 1-禁用等)")
     private Integer status;
+
+    /**
+     * 向量相似度模式
+     */
+    @Schema(description = "向量相似度模式")
+    private String similarityMode;
+
+    /**
+     * 分片策略
+     */
+    @Schema(description = "分片策略")
+    private String chunkStrategy;
+
+    /**
+     * 分片大小
+     */
+    @Schema(description = "分片大小")
+    private Integer chunkSize;
+
+    /**
+     * 分片重叠
+     */
+    @Schema(description = "分片重叠")
+    private Integer chunkOverlap;
 }
 

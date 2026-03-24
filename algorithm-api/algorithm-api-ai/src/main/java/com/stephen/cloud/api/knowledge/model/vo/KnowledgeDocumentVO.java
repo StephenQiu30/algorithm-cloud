@@ -68,6 +68,30 @@ public class KnowledgeDocumentVO implements Serializable {
     private Long sizeBytes;
 
     /**
+     * 分片总数
+     */
+    @Schema(description = "分片总数")
+    private Integer chunkCount;
+
+    /**
+     * 字符总数
+     */
+    @Schema(description = "字符总数")
+    private Integer totalChars;
+
+    /**
+     * 文档标签 (逗号分隔)
+     */
+    @Schema(description = "文档标签")
+    private String tags;
+
+    /**
+     * 是否包含代码
+     */
+    @Schema(description = "是否包含代码")
+    private Boolean hasCode;
+
+    /**
      * 创建时间
      */
     @Schema(description = "创建时间")

@@ -46,9 +46,29 @@ public class DocumentChunk implements Serializable {
     private String content;
 
     /**
+     * 分片标签（逗号分隔）：算法名、数据结构、复杂度等
+     */
+    private String tags;
+
+    /**
+     * 扩展元数据（JSON）：关键词、摘要、难度等
+     */
+    private String metadataJson;
+
+    /**
      * 分片 Token 估算值
      */
     private Integer tokenEstimate;
+
+    /**
+     * 字符数
+     */
+    private Integer charCount;
+
+    /**
+     * 是否包含代码块
+     */
+    private Integer hasCode;
 
     /**
      * 创建时间

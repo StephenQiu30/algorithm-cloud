@@ -54,168 +54,6 @@ public class AiChatRecordController {
     private RagService ragService;
 
     /**
-     * 创建对话记录
-     *
-     * @param addRequest 创建请求
-     * @return 记录 ID
-     */
-    @PostMapping("/add")
-    @Operation(summary = "创建对话记录", description = "用户发起新的对话并保存初始信息。")
-    @OperationLog(module = "AI 对话模块", action = "创建对话记录")
-    public BaseResponse<Long> addAiChatRecord(@RequestBody AiChatRecordAddRequest addRequest) {
-        if (addRequest == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        AiChatRecord aiChatRecord = AiChatRecordConvert.INSTANCE.addRequestToObj(addRequest);
-        aiChatRecord.setUserId(SecurityUtils.getLoginUserId());
-        aiChatRecordService.validAiChatRecord(aiChatRecord, true);
-        boolean result = aiChatRecordService.save(aiChatRecord);
-        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-        return ResultUtils.success(aiChatRecord.getId());
-    }
-
-    /**
-     * 更新对话记录 (管理员)
-     *
-     * @param updateRequest 更新请求
-     * @return 是否成功
-     */
-    @PostMapping("/update")
-    @Operation(summary = "更新对话记录(管理员)", description = "系统管理员全量更新指定对话记录信息。")
-    @OperationLog(module = "AI 对话模块", action = "更新对话记录(管理员)")
-    @SaCheckRole(UserConstant.ADMIN_ROLE)
-    public BaseResponse<Boolean> updateAiChatRecord(@RequestBody AiChatRecordUpdateRequest updateRequest) {
-        if (updateRequest == null || updateRequest.getId() == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        AiChatRecord aiChatRecord = AiChatRecordConvert.INSTANCE.updateRequestToObj(updateRequest);
-        aiChatRecordService.validAiChatRecord(aiChatRecord, false);
-        long id = updateRequest.getId();
-        AiChatRecord oldRecord = aiChatRecordService.getById(id);
-        ThrowUtils.throwIf(oldRecord == null, ErrorCode.NOT_FOUND_ERROR);
-        boolean result = aiChatRecordService.updateById(aiChatRecord);
-        return ResultUtils.success(result);
-    }
-
-    /**
-     * 编辑对话记录 (用户本人)
-     *
-     * @param editRequest 编辑请求
-     * @return 是否成功
-     */
-    @PostMapping("/edit")
-    @Operation(summary = "编辑对话记录", description = "编辑对话信息，仅本人可操作。")
-    @OperationLog(module = "AI 对话模块", action = "编辑对话记录")
-    public BaseResponse<Boolean> editAiChatRecord(@RequestBody AiChatRecordEditRequest editRequest) {
-        if (editRequest == null || editRequest.getId() == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        AiChatRecord aiChatRecord = AiChatRecordConvert.INSTANCE.editRequestToObj(editRequest);
-        aiChatRecordService.validAiChatRecord(aiChatRecord, false);
-        long id = editRequest.getId();
-        AiChatRecord oldRecord = aiChatRecordService.getById(id);
-        if (oldRecord == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
-        }
-        // 仅本人或管理员可编辑
-        if (!oldRecord.getUserId().equals(SecurityUtils.getLoginUserId()) && !SecurityUtils.isAdmin()) {
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
-        }
-        boolean result = aiChatRecordService.updateById(aiChatRecord);
-        return ResultUtils.success(result);
-    }
-
-    /**
-     * 删除对话记录 (仅限本人 or 管理员)
-     *
-     * @param deleteRequest 包含记录 ID 的请求
-     * @return 是否成功
-     */
-    @PostMapping("/delete")
-    @Operation(summary = "删除对话记录", description = "物理删除单条指定的对话记录，仅本人或管理员可操作。")
-    @OperationLog(module = "AI 对话模块", action = "删除对话记录")
-    public BaseResponse<Boolean> deleteAiChatRecord(@RequestBody DeleteRequest deleteRequest) {
-        if (deleteRequest == null || deleteRequest.getId() <= 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        Long id = deleteRequest.getId();
-        AiChatRecord oldRecord = aiChatRecordService.getById(id);
-        if (oldRecord == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
-        }
-
-        Long userId = SecurityUtils.getLoginUserId();
-        // 鉴权：仅本人或管理员可删
-        if (!oldRecord.getUserId().equals(userId) && !SecurityUtils.isAdmin()) {
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
-        }
-        boolean b = aiChatRecordService.removeById(id);
-        return ResultUtils.success(b);
-    }
-
-    /**
-     * 根据 ID 获取对话记录 (脱敏)
-     *
-     * @param id 记录 ID
-     * @param request 请求对象
-     * @return 对话记录 VO
-     */
-    @GetMapping("/get/vo")
-    @Operation(summary = "获取对话记录详情", description = "根据 ID 获取单条对话记录的脱敏信息。")
-    public BaseResponse<AiChatRecordVO> getAiChatRecordVOById(@RequestParam("id") long id, HttpServletRequest request) {
-        ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
-        AiChatRecord aiChatRecord = aiChatRecordService.getById(id);
-        ThrowUtils.throwIf(aiChatRecord == null, ErrorCode.NOT_FOUND_ERROR);
-        return ResultUtils.success(aiChatRecordService.getAiChatRecordVO(aiChatRecord, request));
-    }
-
-    /**
-     * 分页查询当前登录用户的对话历史
-     *
-     * @param queryRequest 分页查询请求
-     * @param request      请求对象
-     * @return 对话记录分页
-     */
-    @PostMapping("/my/list/page/vo")
-    @Operation(summary = "分页获取我的对话历史", description = "获取当前登录用户的历史对话列表，支持搜索。")
-    public BaseResponse<Page<AiChatRecordVO>> listMyAiChatRecordVOByPage(@RequestBody AiChatRecordQueryRequest queryRequest, HttpServletRequest request) {
-        if (queryRequest == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        queryRequest.setUserId(SecurityUtils.getLoginUserId());
-        long current = queryRequest.getCurrent();
-        long size = queryRequest.getPageSize();
-        // 防御式编程：限制查询页大小
-        if (size > 50) {
-            size = 50;
-        }
-        Page<AiChatRecord> aiChatRecordPage = aiChatRecordService.page(new Page<>(current, size),
-                aiChatRecordService.getQueryWrapper(queryRequest));
-        return ResultUtils.success(aiChatRecordService.getAiChatRecordVOPage(aiChatRecordPage, request));
-    }
-
-    /**
-     * 分页查询所有对话记录 (管理员)
-     *
-     * @param queryRequest 分页查询请求
-     * @param request      请求对象
-     * @return 对话记录分页
-     */
-    @PostMapping("/list/page/vo")
-    @Operation(summary = "管理员分页获取对话记录", description = "管理员视角的分页查询。")
-    @SaCheckRole(UserConstant.ADMIN_ROLE)
-    public BaseResponse<Page<AiChatRecordVO>> listAiChatRecordVOByPage(@RequestBody AiChatRecordQueryRequest queryRequest, HttpServletRequest request) {
-        if (queryRequest == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        long current = queryRequest.getCurrent();
-        long size = queryRequest.getPageSize();
-        Page<AiChatRecord> aiChatRecordPage = aiChatRecordService.page(new Page<>(current, size),
-                aiChatRecordService.getQueryWrapper(queryRequest));
-        return ResultUtils.success(aiChatRecordService.getAiChatRecordVOPage(aiChatRecordPage, request));
-    }
-
-    /**
      * 发起 RAG 问答请求
      *
      * @param request 问答请求配置
@@ -229,7 +67,7 @@ public class AiChatRecordController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         Long userId = SecurityUtils.getLoginUserId();
-        log.info("[AiChatRecordController] Combined RAG chat requested by userId={}", userId);
+        log.info("[RAG问答] 收到问答请求: userId={}, kbId={}", userId, request.getKnowledgeBaseId());
         RagChatResponseVO response = ragService.ragChat(request, userId);
         return ResultUtils.success(response);
     }
@@ -248,7 +86,92 @@ public class AiChatRecordController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         Long userId = SecurityUtils.getLoginUserId();
-        log.info("[AiChatRecordController] Streaming RAG chat requested by userId={}", userId);
+        log.info("[RAG流式] 收到流式问答请求: userId={}, kbId={}", userId, request.getKnowledgeBaseId());
         return ragService.streamRagChat(request, userId);
+    }
+
+    /**
+     * 分页查询当前用户的对话历史
+     *
+     * @param queryRequest 分页查询请求
+     * @param request      请求对象
+     * @return 对话记录分页
+     */
+    @PostMapping("/my/list/page/vo")
+    @Operation(summary = "分页获取我的对话历史", description = "获取当前登录用户的历史对话列表。")
+    public BaseResponse<Page<AiChatRecordVO>> listMyAiChatRecordVOByPage(@RequestBody AiChatRecordQueryRequest queryRequest, HttpServletRequest request) {
+        if (queryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        queryRequest.setUserId(SecurityUtils.getLoginUserId());
+        long current = queryRequest.getCurrent();
+        long size = Math.min(queryRequest.getPageSize(), 50);
+        Page<AiChatRecord> aiChatRecordPage = aiChatRecordService.page(new Page<>(current, size),
+                aiChatRecordService.getQueryWrapper(queryRequest));
+        return ResultUtils.success(aiChatRecordService.getAiChatRecordVOPage(aiChatRecordPage, request));
+    }
+
+    /**
+     * 根据 ID 获取对话记录详情
+     *
+     * @param id 记录 ID
+     * @param request 请求对象
+     * @return 对话记录 VO
+     */
+    @GetMapping("/get/vo")
+    @Operation(summary = "获取对话记录详情", description = "根据 ID 获取单条对话记录的详细信息。")
+    public BaseResponse<AiChatRecordVO> getAiChatRecordVOById(@RequestParam("id") long id, HttpServletRequest request) {
+        ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
+        AiChatRecord aiChatRecord = aiChatRecordService.getById(id);
+        ThrowUtils.throwIf(aiChatRecord == null, ErrorCode.NOT_FOUND_ERROR);
+        return ResultUtils.success(aiChatRecordService.getAiChatRecordVO(aiChatRecord, request));
+    }
+
+    /**
+     * 删除对话记录（仅限本人或管理员）
+     *
+     * @param deleteRequest 包含记录 ID 的请求
+     * @return 是否成功
+     */
+    @PostMapping("/delete")
+    @Operation(summary = "删除对话记录", description = "删除指定的对话记录，仅本人或管理员可操作。")
+    @OperationLog(module = "AI 对话模块", action = "删除对话记录")
+    public BaseResponse<Boolean> deleteAiChatRecord(@RequestBody DeleteRequest deleteRequest) {
+        if (deleteRequest == null || deleteRequest.getId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        Long id = deleteRequest.getId();
+        AiChatRecord oldRecord = aiChatRecordService.getById(id);
+        if (oldRecord == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+        }
+
+        Long userId = SecurityUtils.getLoginUserId();
+        if (!oldRecord.getUserId().equals(userId) && !SecurityUtils.isAdmin()) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+        boolean b = aiChatRecordService.removeById(id);
+        return ResultUtils.success(b);
+    }
+
+    /**
+     * 分页查询所有对话记录（管理员）
+     *
+     * @param queryRequest 分页查询请求
+     * @param request      请求对象
+     * @return 对话记录分页
+     */
+    @PostMapping("/list/page/vo")
+    @Operation(summary = "管理员分页获取对话记录", description = "管理员视角查看所有用户的对话记录。")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
+    public BaseResponse<Page<AiChatRecordVO>> listAiChatRecordVOByPage(@RequestBody AiChatRecordQueryRequest queryRequest, HttpServletRequest request) {
+        if (queryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        long current = queryRequest.getCurrent();
+        long size = queryRequest.getPageSize();
+        Page<AiChatRecord> aiChatRecordPage = aiChatRecordService.page(new Page<>(current, size),
+                aiChatRecordService.getQueryWrapper(queryRequest));
+        return ResultUtils.success(aiChatRecordService.getAiChatRecordVOPage(aiChatRecordPage, request));
     }
 }

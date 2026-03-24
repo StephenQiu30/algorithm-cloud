@@ -29,6 +29,9 @@ public class KnowledgeDocumentRetriever implements DocumentRetriever {
     private VectorSearchManager vectorSearchManager;
 
     @Resource
+    private KnowledgeSearchRequestBuilder knowledgeSearchRequestBuilder;
+
+    @Resource
     private KnowledgeProperties knowledgeProperties;
 
     @Override
@@ -50,23 +53,15 @@ public class KnowledgeDocumentRetriever implements DocumentRetriever {
             if (topKObj instanceof Number n) {
                 requestTopK = n.intValue();
             } else if (topKObj != null) {
-                requestTopK = Integer.valueOf(topKObj.toString());
+                try {
+                    requestTopK = Integer.valueOf(topKObj.toString());
+                } catch (NumberFormatException ignored) {
+                    requestTopK = null;
+                }
             }
         }
 
-        // 1. 计算最终 TopK
-        int topK = Math.min(
-                (requestTopK != null && requestTopK > 0) ? requestTopK : knowledgeProperties.getDefaultTopK(),
-                knowledgeProperties.getRetrievalTopKMax()
-        );
-
-        // 2. 构建检索请求
-        SearchRequest searchRequest = SearchRequest.builder()
-                .query(query.text().trim())
-                .topK(topK)
-                .similarityThreshold(knowledgeProperties.getSimilarityThreshold())
-                .filterExpression("knowledgeBaseId == '" + kbId + "'")
-                .build();
+        SearchRequest searchRequest = knowledgeSearchRequestBuilder.build(query.text(), kbId, requestTopK);
 
         // 3. 决定检索模式 (kNN 或 Hybrid)
         VectorSimilarityModeEnum mode = knowledgeProperties.isHybridSearchEnabled()

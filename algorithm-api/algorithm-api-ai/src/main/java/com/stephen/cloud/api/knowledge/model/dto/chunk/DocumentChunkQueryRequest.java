@@ -38,5 +38,17 @@ public class DocumentChunkQueryRequest extends PageRequest implements Serializab
      */
     @Schema(description = "分片序号")
     private Integer chunkIndex;
+
+    /**
+     * 标签过滤 (支持模糊匹配)
+     */
+    @Schema(description = "标签过滤")
+    private String tags;
+
+    /**
+     * 是否包含代码
+     */
+    @Schema(description = "是否包含代码")
+    private Boolean hasCode;
 }
 

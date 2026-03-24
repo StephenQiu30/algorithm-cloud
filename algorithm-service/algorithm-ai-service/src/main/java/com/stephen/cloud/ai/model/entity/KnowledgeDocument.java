@@ -48,9 +48,34 @@ public class KnowledgeDocument implements Serializable {
     private String mimeType;
 
     /**
+     * 文档标签（逗号分隔）
+     */
+    private String tags;
+
+    /**
+     * 是否包含代码 (0-否, 1-是)
+     */
+    private Integer hasCode;
+
+    /**
      * 文件大小 (Bytes)
      */
     private Long sizeBytes;
+
+    /**
+     * 分片总数
+     */
+    private Integer chunkCount;
+
+    /**
+     * 总字符数
+     */
+    private Integer totalChars;
+
+    /**
+     * 总 token 数估算
+     */
+    private Integer totalTokens;
 
     /**
      * 解析状态（0-排队中, 1-切片中, 2-已完成, 3-失败）
