@@ -47,7 +47,7 @@ spring:
     vectorstore:
       elasticsearch:
         index-name: document_chunks
-        dimensions: 1536
+        dimensions: 1024
         similarity: cosine
         initialize-schema: true
 

@@ -6,8 +6,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.stephen.cloud.ai.config.DocumentProcessingProperties;
 import com.stephen.cloud.ai.convert.DocumentConvert;
+import com.stephen.cloud.ai.mapper.DocumentChunkMapper;
 import com.stephen.cloud.ai.mapper.DocumentMapper;
 import com.stephen.cloud.ai.model.entity.Document;
+import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.ai.mq.DocumentProcessProducer;
 import com.stephen.cloud.ai.mq.model.DocumentProcessMessage;
 import com.stephen.cloud.ai.service.DocumentService;
@@ -54,6 +56,9 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
 
     @Resource
     private FileFeignClient fileFeignClient;
+
+    @Resource
+    private DocumentChunkMapper documentChunkMapper;
 
     @Override
     public Long uploadDocument(MultipartFile file, Long knowledgeBaseId, Long userId) {
@@ -182,6 +187,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         ThrowUtils.throwIf(oldDocument == null, ErrorCode.NOT_FOUND_ERROR);
         ThrowUtils.throwIf(!Objects.equals(oldDocument.getUserId(), loginUserId) && !isAdmin, ErrorCode.NO_AUTH_ERROR);
         vectorStoreService.deleteByDocumentId(id);
+        documentChunkMapper.delete(new LambdaQueryWrapper<DocumentChunk>().eq(DocumentChunk::getDocumentId, id));
         return this.removeById(id);
     }
 }

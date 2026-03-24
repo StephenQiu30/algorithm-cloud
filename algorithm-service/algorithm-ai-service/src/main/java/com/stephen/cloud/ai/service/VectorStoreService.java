@@ -11,4 +11,6 @@ public interface VectorStoreService {
     void deleteByKnowledgeBaseId(Long knowledgeBaseId);
 
     void deleteByDocumentId(Long documentId);
+
+    List<Document> searchByDocumentId(String query, Long documentId, Integer topK, Double similarityThreshold);
 }

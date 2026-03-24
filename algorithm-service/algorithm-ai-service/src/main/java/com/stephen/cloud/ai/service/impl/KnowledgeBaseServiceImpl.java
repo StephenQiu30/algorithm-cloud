@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.stephen.cloud.ai.convert.KnowledgeBaseConvert;
+import com.stephen.cloud.ai.mapper.DocumentChunkMapper;
 import com.stephen.cloud.ai.mapper.KnowledgeBaseMapper;
 import com.stephen.cloud.ai.model.entity.Document;
+import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
 import com.stephen.cloud.ai.service.DocumentService;
 import com.stephen.cloud.ai.service.KnowledgeBaseService;
@@ -39,6 +41,9 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
 
     @Resource
     private VectorStoreService vectorStoreService;
+
+    @Resource
+    private DocumentChunkMapper documentChunkMapper;
 
     @Override
     public void validKnowledgeBase(KnowledgeBase knowledgeBase, boolean add) {
@@ -139,6 +144,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
         ThrowUtils.throwIf(oldKnowledgeBase == null, ErrorCode.NOT_FOUND_ERROR);
         ThrowUtils.throwIf(!Objects.equals(oldKnowledgeBase.getUserId(), loginUserId) && !isAdmin, ErrorCode.NO_AUTH_ERROR);
         vectorStoreService.deleteByKnowledgeBaseId(id);
+        documentChunkMapper.delete(new LambdaQueryWrapper<DocumentChunk>().eq(DocumentChunk::getKnowledgeBaseId, id));
         documentService.remove(new LambdaQueryWrapper<Document>().eq(Document::getKnowledgeBaseId, id));
         return this.removeById(id);
     }

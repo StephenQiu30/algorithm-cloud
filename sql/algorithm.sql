@@ -218,6 +218,27 @@ CREATE TABLE `rag_history`
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='RAG问答历史表';
 
+DROP TABLE IF EXISTS `document_chunk`;
+CREATE TABLE `document_chunk`
+(
+    `id`                bigint       NOT NULL AUTO_INCREMENT COMMENT '分片ID',
+    `document_id`       bigint       NOT NULL COMMENT '文档ID',
+    `knowledge_base_id` bigint       NOT NULL COMMENT '知识库ID',
+    `chunk_index`       int          NOT NULL COMMENT '分片索引（从0开始）',
+    `content`           text         NOT NULL COMMENT '分片内容',
+    `word_count`        int                   DEFAULT 0 COMMENT '字符数',
+    `vector_id`         varchar(256)          DEFAULT NULL COMMENT '向量存储ID',
+    `create_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_delete`         tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_document_id` (`document_id`) COMMENT '文档ID索引',
+    KEY `idx_kb_id` (`knowledge_base_id`) COMMENT '知识库ID索引',
+    KEY `idx_doc_chunk` (`document_id`, `chunk_index`) COMMENT '文档+分片索引'
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='文档分片表';
+
 -- ============================================
 -- 模块：系统支撑 (通知、文件、邮件、日志)
 -- ============================================

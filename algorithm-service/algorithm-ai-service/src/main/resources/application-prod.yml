@@ -40,7 +40,7 @@ spring:
     vectorstore:
       elasticsearch:
         index-name: document_chunks
-        dimensions: 1536
+        dimensions: 1024
         similarity: cosine
         initialize-schema: true
 
@@ -70,6 +70,7 @@ rag:
   retrieval:
     top-k: 5
     similarity-threshold: 0.7
+    index-name: document_chunks
   generation:
     max-context-length: 4000
     temperature: 0.7
