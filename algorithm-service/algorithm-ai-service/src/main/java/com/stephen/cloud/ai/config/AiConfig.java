@@ -1,13 +1,13 @@
 package com.stephen.cloud.ai.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.stephen.cloud.ai.repository.RedisJdbcChatMemoryRepository;
 import com.stephen.cloud.ai.repository.RedisChatMemoryRepository;
+import com.stephen.cloud.ai.repository.RedisJdbcChatMemoryRepository;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.repository.jdbc.JdbcChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.ai.chat.memory.repository.jdbc.JdbcChatMemoryRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -30,7 +30,7 @@ public class AiConfig {
     @Bean
     @Primary
     public ChatMemory chatMemory(JdbcChatMemoryRepository jdbcChatMemoryRepository,
-            StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
+                                 StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
         RedisChatMemoryRepository redisRepo = new RedisChatMemoryRepository(redisTemplate, objectMapper);
         RedisJdbcChatMemoryRepository compositeRepo =
                 new RedisJdbcChatMemoryRepository(redisRepo, jdbcChatMemoryRepository);

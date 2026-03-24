@@ -10,7 +10,7 @@ import java.io.Serializable;
 
 /**
  * 知识文档解析消息 (RabbitMQ)
- * 
+ *
  * @author StephenQiu30
  */
 @Data

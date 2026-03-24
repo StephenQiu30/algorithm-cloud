@@ -4,6 +4,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.http.HttpUtil;
 import cn.hutool.json.JSONUtil;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
+import com.stephen.cloud.ai.enums.RagMetricEnum;
 import com.stephen.cloud.ai.knowledge.processor.ContentTextCleaner;
 import com.stephen.cloud.ai.knowledge.processor.DocumentTextExtractor;
 import com.stephen.cloud.ai.knowledge.processor.TextChunker;
@@ -33,7 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 知识文档解析入库服务实现类。
@@ -66,7 +66,7 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
     private MeterRegistry meterRegistry;
 
     private final FilterExpressionTextParser filterParser = new FilterExpressionTextParser();
-    
+
     private static final String CACHE_KEY_PREFIX = "kb:parsed:";
     private static final int MAX_VECTOR_WRITE_RETRIES = 3;
 
@@ -88,29 +88,29 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
 
         log.info("[文档入库] 开始执行文档入库流水线: id={}, name={}", doc.getId(), doc.getOriginalName());
         updateDocumentStatus(doc, KnowledgeParseStatusEnum.PROCESSING, null);
-        
+
         try {
             List<Document> chunkDocs;
             String cacheKey = CACHE_KEY_PREFIX + doc.getId();
             chunkDocs = cacheUtils.get(cacheKey);
-            
+
             if (chunkDocs == null || chunkDocs.isEmpty()) {
                 log.info("[文档入库] 未发现缓存，开始完整解析流程: doc={}", doc.getId());
-                
+
                 log.info("[文档入库] 阶段 1: 准备本地文件: doc={}", doc.getId());
                 Path localPath = prepareLocalFile(doc, message.getStoragePath());
-                
+
                 log.info("[文档入库] 阶段 2: 提取文件文本内容: doc={}", doc.getId());
                 List<Document> extracted = DocumentTextExtractor.readDocuments(localPath, localPath.getFileName().toString().toLowerCase());
                 if (extracted == null || extracted.isEmpty()) {
                     throw new BusinessException(ErrorCode.OPERATION_ERROR, "文本提取失败或文件内容为空");
                 }
-                
+
                 log.info("[文档入库] 阶段 3: 清洗文本并丰富元数据: doc={}", doc.getId());
                 Map<String, Object> commonMeta = createCommonMetadata(doc);
                 List<Document> enriched = enrichMetadata(extracted, commonMeta);
                 List<Document> cleaned = contentTextCleaner.apply(enriched);
-                
+
                 log.info("[文档入库] 阶段 4: 文本分段切块: doc={}", doc.getId());
                 List<Document> chunks = textChunker.splitToChunkDocuments(cleaned);
                 if (chunks == null || chunks.isEmpty()) {
@@ -128,16 +128,16 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
 
             log.info("[文档入库] 阶段 6: 将数据加载至向量库和数据库: doc={}", doc.getId());
             handleLoadPhase(doc, chunkDocs);
-            
+
             // 事务提交后，异步写入向量库
             log.info("[文档入库] 阶段 7: 写入向量库: doc={}", doc.getId());
             List<Document> vectorDocs = buildVectorDocuments(doc, chunkDocs);
             writeToVectorStore(vectorDocs, doc.getId());
-            
+
             updateDocumentStatus(doc, KnowledgeParseStatusEnum.DONE, null);
             log.info("[文档入库] 文档入库流水线执行成功: id={}, name={}", doc.getId(), doc.getOriginalName());
         } catch (Exception e) {
-            log.error("[文档入库] 任务执行失败: id={}, name={}, error={}", 
+            log.error("[文档入库] 任务执行失败: id={}, name={}, error={}",
                     doc.getId(), doc.getOriginalName(), e.getMessage(), e);
             updateDocumentStatus(doc, KnowledgeParseStatusEnum.FAILED, e.getMessage());
         }
@@ -169,7 +169,7 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
     protected void handleLoadPhase(KnowledgeDocument doc, List<Document> chunkDocs) {
         log.info("[数据加载] 清理旧数据: doc={}", doc.getId());
         documentChunkService.deleteByDocumentId(doc.getId());
-        
+
         IntSummaryStatistics stats = chunkDocs.stream()
                 .map(Document::getText)
                 .filter(Objects::nonNull)
@@ -191,17 +191,17 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
         log.info("[数据加载] 将 {} 个分块持久化至数据库: doc={}", chunkDocs.size(), doc.getId());
         List<DocumentChunk> dbChunks = new ArrayList<>();
         int totalTokens = 0;
-        
+
         // 从文档继承标签和代码标识
         String docTags = doc.getTags();
         Integer docHasCode = doc.getHasCode();
-        
+
         for (int i = 0; i < chunkDocs.size(); i++) {
             Document chunkDoc = chunkDocs.get(i);
             String content = chunkDoc.getText();
             int tokenEst = estimateToken(content);
             totalTokens += tokenEst;
-            
+
             DocumentChunk chunk = new DocumentChunk();
             chunk.setDocumentId(doc.getId());
             chunk.setKnowledgeBaseId(doc.getKnowledgeBaseId());
@@ -209,7 +209,7 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
             chunk.setContent(content);
             chunk.setTokenEstimate(tokenEst);
             chunk.setCharCount(content.length());
-            
+
             // 继承文档级别的标签和代码标识
             if (StringUtils.isNotBlank(docTags)) {
                 chunk.setTags(docTags);
@@ -217,7 +217,7 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
             if (docHasCode != null) {
                 chunk.setHasCode(docHasCode);
             }
-            
+
             // 提取关键词元数据
             Map<String, Object> meta = chunkDoc.getMetadata();
             if (meta != null && meta.containsKey("excerpt_keywords")) {
@@ -225,20 +225,20 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
                 jsonMeta.put("excerpt_keywords", meta.get("excerpt_keywords"));
                 chunk.setMetadataJson(JSONUtil.toJsonStr(jsonMeta));
             }
-            
+
             dbChunks.add(chunk);
         }
         documentChunkService.saveBatch(dbChunks);
-        
+
         // 更新文档统计信息
         doc.setChunkCount(dbChunks.size());
         doc.setTotalTokens(totalTokens);
         doc.setTotalChars(dbChunks.stream().mapToInt(DocumentChunk::getCharCount).sum());
         knowledgeDocumentService.updateById(doc);
-        
+
         log.info("[数据加载] 数据库操作完成: doc={}", doc.getId());
     }
-    
+
     /**
      * 构建向量文档列表
      */
@@ -248,22 +248,22 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
                 .eq(DocumentChunk::getDocumentId, doc.getId())
                 .orderByAsc(DocumentChunk::getChunkIndex)
                 .list();
-        
+
         if (dbChunks.size() != chunkDocs.size()) {
-            log.error("[数据加载] 数据库分片数量与内存分片数量不一致: dbSize={}, memSize={}", 
+            log.error("[数据加载] 数据库分片数量与内存分片数量不一致: dbSize={}, memSize={}",
                     dbChunks.size(), chunkDocs.size());
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "分片数据不一致");
         }
-        
+
         log.info("[数据加载] 构建向量文档（包含标签和元数据）: doc={}", doc.getId());
         List<Document> vectorDocs = new ArrayList<>();
         for (int i = 0; i < dbChunks.size(); i++) {
             DocumentChunk dbChunk = dbChunks.get(i);
-            
+
             // 合并所有元数据到向量文档
             Map<String, Object> meta = new HashMap<>(chunkDocs.get(i).getMetadata());
             meta.put("chunkId", String.valueOf(dbChunk.getId()));
-            
+
             // 添加数据库字段到向量元数据（用于 BM25 检索）
             if (StringUtils.isNotBlank(dbChunk.getTags())) {
                 meta.put("tags", dbChunk.getTags());
@@ -276,19 +276,19 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
             if (dbChunk.getCharCount() != null) {
                 meta.put("char_count", dbChunk.getCharCount());
             }
-            
+
             vectorDocs.add(new Document(String.valueOf(dbChunk.getId()), dbChunk.getContent(), meta));
         }
-        
+
         return vectorDocs;
     }
-    
+
     /**
      * 向量库写入（事务外执行，带重试机制）
      */
     private void writeToVectorStore(List<Document> vectorDocs, Long docId) {
         log.info("[数据加载] 开始写入向量库: doc={}, 向量数={}", docId, vectorDocs.size());
-        
+
         // 先清理旧向量（幂等性保证）
         try {
             knowledgeVectorStore.delete(filterParser.parse("documentId == '" + docId + "'"));
@@ -302,10 +302,10 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
         for (int i = 0; i < vectorDocs.size(); i += batchSize) {
             int end = Math.min(i + batchSize, vectorDocs.size());
             List<Document> batch = vectorDocs.subList(i, end);
-            
+
             boolean success = false;
             Exception lastException = null;
-            
+
             // 重试机制
             for (int attempt = 1; attempt <= MAX_VECTOR_WRITE_RETRIES; attempt++) {
                 try {
@@ -315,7 +315,7 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
                     break;
                 } catch (Exception e) {
                     lastException = e;
-                    log.warn("[数据加载] 向量批量写入失败 (尝试 {}/{}): docId={}, batchIndex={}, error={}", 
+                    log.warn("[数据加载] 向量批量写入失败 (尝试 {}/{}): docId={}, batchIndex={}, error={}",
                             attempt, MAX_VECTOR_WRITE_RETRIES, docId, i, e.getMessage());
                     if (attempt < MAX_VECTOR_WRITE_RETRIES) {
                         try {
@@ -327,13 +327,13 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
                     }
                 }
             }
-            
+
             if (!success) {
-                log.error("[数据加载] 向量批量写入最终失败: docId={}, batchIndex={}, 已重试{}次", 
+                log.error("[数据加载] 向量批量写入最终失败: docId={}, batchIndex={}, 已重试{}次",
                         docId, i, MAX_VECTOR_WRITE_RETRIES);
-                throw new BusinessException(ErrorCode.OPERATION_ERROR, 
-                        "向量库写入异常（已重试" + MAX_VECTOR_WRITE_RETRIES + "次）: " + 
-                        (lastException != null ? lastException.getMessage() : "未知错误"));
+                throw new BusinessException(ErrorCode.OPERATION_ERROR,
+                        "向量库写入异常（已重试" + MAX_VECTOR_WRITE_RETRIES + "次）: " +
+                                (lastException != null ? lastException.getMessage() : "未知错误"));
             }
         }
         log.info("[数据加载] 向量加载完成，共 {} 条: doc={}", vectorDocs.size(), docId);
@@ -375,11 +375,11 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
     private List<Document> applyKeywordMetadata(List<Document> chunks, Long docId) {
         String mode = Optional.ofNullable(knowledgeProperties.getKeywordMetadataMode()).orElse("rule").toLowerCase(Locale.ROOT);
         int n = Math.max(1, knowledgeProperties.getKeywordMetadataCount());
-        
+
         // 优化：优先使用 LLM 模式提取关键词，提升检索质量
         if ("llm".equals(mode) && knowledgeProperties.isKeywordMetadataEnrichEnabled()) {
             try {
-                log.info("[关键词增强] 使用 KeywordMetadataEnricher (LLM): doc={}, chunkCount={}, keywordCount={}", 
+                log.info("[关键词增强] 使用 KeywordMetadataEnricher (LLM): doc={}, chunkCount={}, keywordCount={}",
                         docId, chunks.size(), n);
                 KeywordMetadataEnricher enricher = KeywordMetadataEnricher.builder(chatModel)
                         .keywordCount(n)
@@ -396,7 +396,7 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
                         .increment();
             }
         }
-        
+
         // 降级：使用规则提取
         log.info("[关键词增强] 使用规则提取: doc={}, chunkCount={}", docId, chunks.size());
         return applyRuleKeywords(chunks, n);
@@ -463,7 +463,7 @@ public class KnowledgeIngestServiceImpl implements KnowledgeIngestService {
             log.warn("[向量删除] 文档ID为空，跳过删除");
             return;
         }
-        
+
         try {
             knowledgeVectorStore.delete(filterParser.parse("documentId == '" + documentId + "'"));
             log.info("[向量删除] 成功删除文档关联向量: docId={}", documentId);

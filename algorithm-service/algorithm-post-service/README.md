@@ -28,14 +28,14 @@
 
 ## 📡 核心 API 概览
 
-| 模块     | 路径                     | 方法   | 描述      |
-|:-------|:-----------------------|:-----|:--------|
-| **内容** | `/post/add`            | POST | 创建新帖子   |
-| **总结** | `post_summary_queue`   | MQ   | 接收 AI 总结更新  |
-| **自动** | `post_auto_summary_queue`| MQ | 触发 AI 自动总结请求 |
-| **互动** | `/post_thumb`          | POST | 点赞/取消点赞 |
-| **社交** | `/postComment/add`     | POST | 发布评论    |
-| **收藏** | `/post_favour`         | POST | 收藏/取消收藏 |
+| 模块     | 路径                        | 方法   | 描述           |
+|:-------|:--------------------------|:-----|:-------------|
+| **内容** | `/post/add`               | POST | 创建新帖子        |
+| **总结** | `post_summary_queue`      | MQ   | 接收 AI 总结更新   |
+| **自动** | `post_auto_summary_queue` | MQ   | 触发 AI 自动总结请求 |
+| **互动** | `/post_thumb`             | POST | 点赞/取消点赞      |
+| **社交** | `/postComment/add`        | POST | 发布评论         |
+| **收藏** | `/post_favour`            | POST | 收藏/取消收藏      |
 
 ## 🚀 启动与运行
 

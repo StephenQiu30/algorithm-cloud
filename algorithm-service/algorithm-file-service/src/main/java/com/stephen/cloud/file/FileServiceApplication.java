@@ -11,7 +11,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
  *
  * @author StephenQiu30
  */
-@SpringBootApplication(scanBasePackages = { "com.stephen.cloud.file", "com.stephen.cloud.common" })
+@SpringBootApplication(scanBasePackages = {"com.stephen.cloud.file", "com.stephen.cloud.common"})
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.stephen.cloud.api")
 @EnableAsync

@@ -1,12 +1,11 @@
 package com.stephen.cloud.log.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
-import com.stephen.cloud.common.auth.annotation.InternalAuth;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordAddRequest;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordQueryRequest;
-
 import com.stephen.cloud.api.log.model.vo.EmailRecordVO;
+import com.stephen.cloud.common.auth.annotation.InternalAuth;
 import com.stephen.cloud.common.common.*;
 import com.stephen.cloud.common.constants.UserConstant;
 import com.stephen.cloud.common.exception.BusinessException;

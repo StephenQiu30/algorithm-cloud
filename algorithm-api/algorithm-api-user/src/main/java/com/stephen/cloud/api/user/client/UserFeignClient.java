@@ -1,7 +1,6 @@
 package com.stephen.cloud.api.user.client;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.stephen.cloud.api.user.model.dto.UserEditRequest;
 import com.stephen.cloud.api.user.model.dto.UserQueryRequest;
 import com.stephen.cloud.api.user.model.vo.LoginUserVO;
 import com.stephen.cloud.api.user.model.vo.UserVO;

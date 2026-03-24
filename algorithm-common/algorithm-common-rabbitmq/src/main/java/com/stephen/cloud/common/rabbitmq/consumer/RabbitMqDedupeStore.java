@@ -2,10 +2,10 @@ package com.stephen.cloud.common.rabbitmq.consumer;
 
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.RandomUtil;
+import jakarta.annotation.Resource;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;
-import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;

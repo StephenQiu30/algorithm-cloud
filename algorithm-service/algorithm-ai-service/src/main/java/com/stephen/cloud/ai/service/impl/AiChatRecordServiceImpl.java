@@ -201,7 +201,7 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
             vo.setUserVO(finalUserVOMap.get(record.getUserId()));
             return vo;
         }).collect(Collectors.toList());
-        
+
         voPage.setRecords(voList);
         return voPage;
     }

@@ -12,7 +12,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
  *
  * @author StephenQiu30
  */
-@SpringBootApplication(scanBasePackages = { "com.stephen.cloud.notification", "com.stephen.cloud.common" })
+@SpringBootApplication(scanBasePackages = {"com.stephen.cloud.notification", "com.stephen.cloud.common"})
 @MapperScan("com.stephen.cloud.notification.mapper")
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.stephen.cloud.api")

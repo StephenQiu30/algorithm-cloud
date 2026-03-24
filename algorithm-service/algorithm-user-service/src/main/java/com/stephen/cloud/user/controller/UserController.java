@@ -62,7 +62,7 @@ public class UserController {
     @Operation(summary = "GitHub 登录", description = "通过 GitHub 授权码进行登录或注册")
     @OperationLog(module = "用户认证", action = "GitHub登录")
     public BaseResponse<LoginUserVO> userLoginByGitHub(@RequestBody GitHubLoginRequest gitHubLoginRequest,
-            HttpServletRequest request) {
+                                                       HttpServletRequest request) {
         ThrowUtils.throwIf(gitHubLoginRequest == null || StringUtils.isBlank(gitHubLoginRequest.getCode())
                 || StringUtils.isBlank(gitHubLoginRequest.getState()), ErrorCode.PARAMS_ERROR, "code 或 state 不能为空");
         String code = gitHubLoginRequest.getCode();
@@ -101,7 +101,7 @@ public class UserController {
     @Operation(summary = "发送邮箱验证码", description = "向指定邮箱发送登录或注册所需的验证码")
     @OperationLog(module = "用户认证", action = "发送邮箱验证码")
     public BaseResponse<Integer> sendEmailLoginCode(@Validated @RequestBody UserEmailCodeSendRequest request,
-            HttpServletRequest httpRequest) {
+                                                    HttpServletRequest httpRequest) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR, "请求不能为空");
         String clientIp = IpUtils.getClientIp(httpRequest);
         Integer expireSeconds = userEmailService.sendEmailCode(request.getEmail(), clientIp);
@@ -126,14 +126,14 @@ public class UserController {
      * GitHub 登录回调接口
      * 接收 GitHub 授权码并完成用户登录或注册
      *
-     * @param request GitHub 回调参数 (code, state)
+     * @param request     GitHub 回调参数 (code, state)
      * @param httpRequest HTTP 请求
      * @return 登录成功的用户信息
      */
     @GetMapping("/login/github/callback")
     @Operation(summary = "GitHub 登录回调", description = "用于接收 GitHub 授权重定向后的回调请求")
     public BaseResponse<LoginUserVO> gitHubLoginCallback(@ModelAttribute GitHubCallbackRequest request,
-            HttpServletRequest httpRequest) {
+                                                         HttpServletRequest httpRequest) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR, "请求不能为空");
         ThrowUtils.throwIf(StringUtils.isAnyBlank(request.getCode(), request.getState()), ErrorCode.PARAMS_ERROR, "code 或 state 不能为空");
         LoginUserVO loginUserVO = userService.userLoginByGitHub(request.getCode(), request.getState(), httpRequest);
@@ -185,7 +185,7 @@ public class UserController {
     @SaCheckRole(UserConstant.ADMIN_ROLE)
     @OperationLog(module = "用户管理", action = "创建用户")
     public BaseResponse<Long> addUser(@Validated @RequestBody UserAddRequest userAddRequest,
-            HttpServletRequest request) {
+                                      HttpServletRequest request) {
         ThrowUtils.throwIf(userAddRequest == null, ErrorCode.PARAMS_ERROR);
         User user = UserConvert.addRequestToObj(userAddRequest);
         // 数据校验
@@ -222,7 +222,7 @@ public class UserController {
     @Operation(summary = "删除用户", description = "删除指定 ID 的用户，需具备相应权限")
     @OperationLog(module = "用户管理", action = "删除用户")
     public BaseResponse<Boolean> deleteUser(@Validated @RequestBody DeleteRequest deleteRequest,
-            HttpServletRequest request) {
+                                            HttpServletRequest request) {
         ThrowUtils.throwIf(deleteRequest == null || deleteRequest.getId() <= 0, ErrorCode.PARAMS_ERROR);
         User user = userService.getLoginUser(request);
         long id = deleteRequest.getId();
@@ -259,7 +259,7 @@ public class UserController {
     @PostMapping("/update")
     @OperationLog(module = "用户管理", action = "更新用户")
     public BaseResponse<Boolean> updateUser(@Validated @RequestBody UserUpdateRequest userUpdateRequest,
-            HttpServletRequest request) {
+                                            HttpServletRequest request) {
         ThrowUtils.throwIf(userUpdateRequest == null || userUpdateRequest.getId() <= 0, ErrorCode.PARAMS_ERROR);
         User user = UserConvert.updateRequestToObj(userUpdateRequest);
         userService.validUser(user, false);
@@ -362,7 +362,7 @@ public class UserController {
     @PostMapping("/list/page")
     @SaCheckRole(UserConstant.ADMIN_ROLE)
     public BaseResponse<Page<User>> listUserByPage(@RequestBody UserQueryRequest userQueryRequest,
-            HttpServletRequest request) {
+                                                   HttpServletRequest request) {
         long current = userQueryRequest.getCurrent();
         long size = userQueryRequest.getPageSize();
         Page<User> userPage = userService.page(new Page<>(current, size),
@@ -379,7 +379,7 @@ public class UserController {
      */
     @PostMapping("/list/page/vo")
     public BaseResponse<Page<UserVO>> listUserVOByPage(@RequestBody UserQueryRequest userQueryRequest,
-            HttpServletRequest request) {
+                                                       HttpServletRequest request) {
         ThrowUtils.throwIf(userQueryRequest == null, ErrorCode.PARAMS_ERROR);
         long current = userQueryRequest.getCurrent();
         long size = userQueryRequest.getPageSize();
@@ -402,7 +402,7 @@ public class UserController {
     @PostMapping("/edit")
     @OperationLog(module = "用户管理", action = "编辑个人信息")
     public BaseResponse<Boolean> editUser(@Validated @RequestBody UserEditRequest userEditRequest,
-            HttpServletRequest request) {
+                                          HttpServletRequest request) {
         ThrowUtils.throwIf(userEditRequest == null, ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(request);
         User user = UserConvert.editRequestToObj(userEditRequest);

@@ -5,20 +5,14 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.ai.convert.KnowledgeBaseConvert;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
 import com.stephen.cloud.ai.service.KnowledgeBaseService;
-import com.stephen.cloud.api.knowledge.model.dto.retrieval.KnowledgeRetrievalRequest;
-import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import com.stephen.cloud.api.knowledge.model.dto.knowledgebase.KnowledgeBaseAddRequest;
 import com.stephen.cloud.api.knowledge.model.dto.knowledgebase.KnowledgeBaseQueryRequest;
 import com.stephen.cloud.api.knowledge.model.dto.knowledgebase.KnowledgeBaseUpdateRequest;
+import com.stephen.cloud.api.knowledge.model.dto.retrieval.KnowledgeRetrievalRequest;
+import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import com.stephen.cloud.api.knowledge.model.vo.KnowledgeBaseVO;
-import java.util.List;
-import java.util.Map;
 import com.stephen.cloud.common.auth.utils.SecurityUtils;
-import com.stephen.cloud.common.common.BaseResponse;
-import com.stephen.cloud.common.common.DeleteRequest;
-import com.stephen.cloud.common.common.ErrorCode;
-import com.stephen.cloud.common.common.ResultUtils;
-import com.stephen.cloud.common.common.ThrowUtils;
+import com.stephen.cloud.common.common.*;
 import com.stephen.cloud.common.constants.UserConstant;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.log.annotation.OperationLog;
@@ -28,12 +22,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * 知识库管理接口

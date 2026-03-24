@@ -14,8 +14,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * @author stephen
  */
 @EnableScheduling
-@SpringBootApplication(exclude = { DataSourceAutoConfiguration.class }, scanBasePackages = { "com.stephen.cloud.search",
-        "com.stephen.cloud.common" })
+@SpringBootApplication(exclude = {DataSourceAutoConfiguration.class}, scanBasePackages = {"com.stephen.cloud.search",
+        "com.stephen.cloud.common"})
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.stephen.cloud.api")
 @EnableElasticsearchRepositories(basePackages = "com.stephen.cloud.search.repository")

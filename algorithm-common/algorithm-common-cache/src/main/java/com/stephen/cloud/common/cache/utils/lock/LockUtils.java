@@ -233,7 +233,7 @@ public class LockUtils {
      * @return 返回结果
      */
     public <T> T lockEventWithRetry(String key, int maxRetryTimes, long retryInterval, Supplier<T> getLock,
-            Supplier<T> getNone) {
+                                    Supplier<T> getNone) {
         if (getLock == null || getNone == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "Suppliers cannot be null");
         }

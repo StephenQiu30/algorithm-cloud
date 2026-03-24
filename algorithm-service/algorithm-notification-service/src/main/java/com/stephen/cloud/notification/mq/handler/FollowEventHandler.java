@@ -57,7 +57,7 @@ public class FollowEventHandler implements RabbitMqHandler<FollowEvent> {
         notificationService.addNotification(notification);
 
         log.info("[FollowEventHandler] 关注通知创建成功" +
-                ", followId: {}, notificationId: {}",
+                        ", followId: {}, notificationId: {}",
                 event.getFollowId(), notification.getId());
     }
 

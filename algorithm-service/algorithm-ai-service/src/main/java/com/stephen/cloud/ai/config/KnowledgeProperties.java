@@ -14,19 +14,29 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app.knowledge")
 public class KnowledgeProperties {
 
-    /** Elasticsearch 向量索引名。 */
+    /**
+     * Elasticsearch 向量索引名。
+     */
     private String vectorIndex = "algorithm-knowledge-vectors";
 
-    /** 嵌入向量维度，须与所用 embedding 模型一致。 */
+    /**
+     * 嵌入向量维度，须与所用 embedding 模型一致。
+     */
     private int embeddingDimension = 1536;
 
-    /** 分片目标 token 数（Spring AI TokenTextSplitter）。 */
+    /**
+     * 分片目标 token 数（Spring AI TokenTextSplitter）。
+     */
     private int chunkSize = 400;
 
-    /** 分片重叠 token 数，用于相邻切片语义衔接。 */
+    /**
+     * 分片重叠 token 数，用于相邻切片语义衔接。
+     */
     private int chunkOverlap = 50;
 
-    /** 默认检索返回条数（RAG 与 {@link com.stephen.cloud.ai.service.KnowledgeRetrievalService}）。 */
+    /**
+     * 默认检索返回条数（RAG 与 {@link com.stephen.cloud.ai.service.KnowledgeRetrievalService}）。
+     */
     private int defaultTopK = 5;
 
     /**
@@ -50,7 +60,9 @@ public class KnowledgeProperties {
      */
     private String localLibraryDir = "./data/algorithm-kb-library";
 
-    /** 入库时写入 {@code embedding_vector} 表的嵌入模型名称。 */
+    /**
+     * 入库时写入 {@code embedding_vector} 表的嵌入模型名称。
+     */
     private String embeddingModelName = "text-embedding-v2";
 
     /**
@@ -78,10 +90,14 @@ public class KnowledgeProperties {
      */
     private int chunkParagraphMergeCharBudget = 2500;
 
-    /** RAG 检索 topK 上限（{@link com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade}）。 */
+    /**
+     * RAG 检索 topK 上限（{@link com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade}）。
+     */
     private int ragTopKMax = 20;
 
-    /** 诊断检索 topK 上限（{@link com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade}）。 */
+    /**
+     * 诊断检索 topK 上限（{@link com.stephen.cloud.ai.manager.KnowledgeChunkSearchFacade}）。
+     */
     private int retrievalTopKMax = 50;
 
     /**

@@ -1,11 +1,10 @@
 package com.stephen.cloud.common.web.config;
 
 import com.stephen.cloud.common.web.filter.TraceFilter;
+import jakarta.servlet.DispatcherType;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import jakarta.servlet.DispatcherType;
 
 /**
  * 过滤器配置

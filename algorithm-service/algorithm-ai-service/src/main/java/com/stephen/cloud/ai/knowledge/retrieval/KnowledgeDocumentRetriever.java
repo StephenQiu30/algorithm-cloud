@@ -3,6 +3,7 @@ package com.stephen.cloud.ai.knowledge.retrieval;
 import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.knowledge.context.RagSearchContext;
 import com.stephen.cloud.api.knowledge.model.enums.VectorSimilarityModeEnum;
+import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.Query;
@@ -10,7 +11,6 @@ import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.stereotype.Component;
 
-import jakarta.annotation.Resource;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -75,7 +75,7 @@ public class KnowledgeDocumentRetriever implements DocumentRetriever {
         if (documents != null && !documents.isEmpty()) {
             RagSearchContext.addSources(vectorSearchManager.mapToVO(documents));
         }
-        
+
         return documents != null ? documents : Collections.emptyList();
     }
 }

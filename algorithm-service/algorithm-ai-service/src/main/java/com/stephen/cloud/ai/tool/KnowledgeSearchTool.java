@@ -2,13 +2,12 @@ package com.stephen.cloud.ai.tool;
 
 import com.stephen.cloud.ai.config.KnowledgeProperties;
 import com.stephen.cloud.ai.knowledge.context.RagSearchContext;
-import com.stephen.cloud.ai.knowledge.retrieval.VectorSearchManager;
 import com.stephen.cloud.ai.service.KnowledgeBaseService;
 import com.stephen.cloud.api.ai.model.enums.AiToolEnum;
 import com.stephen.cloud.api.knowledge.model.dto.retrieval.KnowledgeRetrievalRequest;
 import com.stephen.cloud.api.knowledge.model.dto.search.KnowledgeSearchRequest;
-import com.stephen.cloud.api.knowledge.model.vo.KnowledgeSearchVO;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
+import com.stephen.cloud.api.knowledge.model.vo.KnowledgeSearchVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,7 +31,7 @@ public class KnowledgeSearchTool {
      * 该 Bean 会被自动注入到 ChatClient 的 Tool Registry 中。
      *
      * @param knowledgeBaseService 知识库服务
-     * @param knowledgeProperties 配置属性：获取默认检索阈值 and TopK
+     * @param knowledgeProperties  配置属性：获取默认检索阈值 and TopK
      * @return 函数接口实现
      */
     @Bean(AiToolEnum.ALGORITHM_KNOWLEDGE_SEARCH_VALUE)
@@ -43,10 +42,10 @@ public class KnowledgeSearchTool {
         return request -> {
             log.info("Tool algorithmKnowledgeSearch calling: query={}, kbId={}", request.getQuery(), request.getKnowledgeBaseId());
             KnowledgeRetrievalRequest retrievalRequest = KnowledgeRetrievalRequest.builder()
-                .knowledgeBaseId(request.getKnowledgeBaseId())
-                .query(request.getQuery())
-                .topK(knowledgeProperties.getDefaultTopK())
-                .build();
+                    .knowledgeBaseId(request.getKnowledgeBaseId())
+                    .query(request.getQuery())
+                    .topK(knowledgeProperties.getDefaultTopK())
+                    .build();
             List<ChunkSourceVO> sources = knowledgeBaseService.searchChunks(retrievalRequest, null);
             // 记录检索过程中的原始内容，以便在 RAG 最终响应中通过 RagSearchContext 返回引用
             RagSearchContext.addSources(sources);

@@ -12,7 +12,7 @@ public enum RagMetricTagEnum {
 
     // 检索模式标签
     MODE_TAG_KEY("mode"),
-    
+
     // RAG 调用模式标签值
     CALL_MODE_SYNC("sync"),
     CALL_MODE_STREAM("stream");

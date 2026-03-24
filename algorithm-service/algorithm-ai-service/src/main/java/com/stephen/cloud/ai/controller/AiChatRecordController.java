@@ -2,38 +2,25 @@ package com.stephen.cloud.ai.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.stephen.cloud.ai.convert.AiChatRecordConvert;
 import com.stephen.cloud.ai.model.entity.AiChatRecord;
 import com.stephen.cloud.ai.service.AiChatRecordService;
 import com.stephen.cloud.ai.service.RagService;
+import com.stephen.cloud.api.ai.model.dto.AiChatRecordQueryRequest;
+import com.stephen.cloud.api.ai.model.vo.AiChatRecordVO;
 import com.stephen.cloud.api.knowledge.model.dto.rag.RagChatRequest;
 import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
-import com.stephen.cloud.api.ai.model.dto.AiChatRecordAddRequest;
-import com.stephen.cloud.api.ai.model.dto.AiChatRecordEditRequest;
-import com.stephen.cloud.api.ai.model.dto.AiChatRecordQueryRequest;
-import com.stephen.cloud.api.ai.model.dto.AiChatRecordUpdateRequest;
-import com.stephen.cloud.api.ai.model.vo.AiChatRecordVO;
 import com.stephen.cloud.common.auth.utils.SecurityUtils;
-import com.stephen.cloud.common.common.BaseResponse;
-import com.stephen.cloud.common.common.DeleteRequest;
-import com.stephen.cloud.common.common.ErrorCode;
-import com.stephen.cloud.common.common.ResultUtils;
+import com.stephen.cloud.common.common.*;
 import com.stephen.cloud.common.constants.UserConstant;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.log.annotation.OperationLog;
-import com.stephen.cloud.common.common.ThrowUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 /**
@@ -114,7 +101,7 @@ public class AiChatRecordController {
     /**
      * 根据 ID 获取对话记录详情
      *
-     * @param id 记录 ID
+     * @param id      记录 ID
      * @param request 请求对象
      * @return 对话记录 VO
      */

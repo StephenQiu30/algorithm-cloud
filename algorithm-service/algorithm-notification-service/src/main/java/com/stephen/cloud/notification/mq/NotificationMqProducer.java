@@ -1,8 +1,8 @@
 package com.stephen.cloud.notification.mq;
 
 import com.stephen.cloud.api.notification.model.vo.NotificationVO;
-import com.stephen.cloud.common.rabbitmq.model.NotificationMessage;
 import com.stephen.cloud.common.rabbitmq.enums.MqBizTypeEnum;
+import com.stephen.cloud.common.rabbitmq.model.NotificationMessage;
 import com.stephen.cloud.common.rabbitmq.producer.RabbitMqSender;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;

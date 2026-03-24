@@ -8,7 +8,7 @@ import java.io.Serializable;
 
 /**
  * 知识库创建请求
- * 
+ *
  * @author StephenQiu30
  */
 @Data

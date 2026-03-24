@@ -25,7 +25,7 @@ public interface KnowledgeFeignClient {
 
     @GetMapping("/{kbId}/document/{docId}")
     BaseResponse<KnowledgeDocumentVO> getDocument(@PathVariable("kbId") Long kbId,
-            @PathVariable("docId") Long docId);
+                                                  @PathVariable("docId") Long docId);
 
     @PostMapping("/{kbId}/chat")
     BaseResponse<RagChatResponseVO> ragChat(@PathVariable("kbId") Long kbId, @RequestBody RagChatRequest request);

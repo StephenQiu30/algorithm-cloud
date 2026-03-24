@@ -100,7 +100,7 @@ public class KnowledgeBaseVO implements Serializable {
      */
     @Schema(description = "创建时间")
     private Date createTime;
-    
+
     /**
      * 用户详细信息
      */

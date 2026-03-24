@@ -5,13 +5,12 @@ import cn.dev33.satoken.context.SaHolder;
 import cn.dev33.satoken.filter.SaServletFilter;
 import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.router.SaRouter;
-import cn.dev33.satoken.util.SaResult;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
+import com.stephen.cloud.common.auth.config.condition.SaCondition;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ResultUtils;
 import com.stephen.cloud.common.constants.SecurityConstant;
-import com.stephen.cloud.common.auth.config.condition.SaCondition;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -69,17 +68,17 @@ public class SaTokenConfiguration implements WebMvcConfigurer {
     public void addInterceptors(@NonNull InterceptorRegistry registry) {
         // 注册路由拦截器，自定义验证规则
         registry.addInterceptor(new SaInterceptor(handle -> {
-            // 校验上下文是否初始化
-            if (!SaManager.getSaTokenContext().isValid()) {
-                return;
-            }
-            // 自定义放行逻辑：如果请求头中包含内部调用标识，则放行
-            String fromSource = SaHolder.getRequest().getHeader(SecurityConstant.FROM_SOURCE);
-            if (StrUtil.equals(fromSource, SecurityConstant.INNER)) {
-                SaRouter.stop();
-            }
-            // 默认校验登录状态（如果需要更细粒度的校验，可以使用注解或在此处继续添加逻辑）
-        }))
+                    // 校验上下文是否初始化
+                    if (!SaManager.getSaTokenContext().isValid()) {
+                        return;
+                    }
+                    // 自定义放行逻辑：如果请求头中包含内部调用标识，则放行
+                    String fromSource = SaHolder.getRequest().getHeader(SecurityConstant.FROM_SOURCE);
+                    if (StrUtil.equals(fromSource, SecurityConstant.INNER)) {
+                        SaRouter.stop();
+                    }
+                    // 默认校验登录状态（如果需要更细粒度的校验，可以使用注解或在此处继续添加逻辑）
+                }))
                 .addPathPatterns("/**")
                 .excludePathPatterns(SA_TOKEN_NOT_NEED_INTERCEPT_URI);
     }

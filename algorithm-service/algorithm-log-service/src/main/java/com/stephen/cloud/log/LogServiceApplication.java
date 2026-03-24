@@ -11,7 +11,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *
  * @author StephenQiu30
  */
-@SpringBootApplication(scanBasePackages = { "com.stephen.cloud.log", "com.stephen.cloud.common" })
+@SpringBootApplication(scanBasePackages = {"com.stephen.cloud.log", "com.stephen.cloud.common"})
 @MapperScan("com.stephen.cloud.log.mapper")
 @EnableDiscoveryClient
 @EnableScheduling

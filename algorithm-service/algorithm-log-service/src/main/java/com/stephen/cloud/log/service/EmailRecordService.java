@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordAddRequest;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordQueryRequest;
-
 import com.stephen.cloud.log.model.entity.EmailRecord;
 
 /**
@@ -21,7 +20,6 @@ public interface EmailRecordService extends IService<EmailRecord> {
      * @return 是否添加成功
      */
     boolean addRecord(EmailRecordAddRequest request);
-
 
 
     /**

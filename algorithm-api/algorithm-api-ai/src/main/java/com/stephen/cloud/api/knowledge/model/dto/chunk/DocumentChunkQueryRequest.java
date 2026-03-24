@@ -10,7 +10,7 @@ import java.io.Serializable;
 
 /**
  * 文档分片查询请求
- * 
+ *
  * @author StephenQiu30
  */
 @Data

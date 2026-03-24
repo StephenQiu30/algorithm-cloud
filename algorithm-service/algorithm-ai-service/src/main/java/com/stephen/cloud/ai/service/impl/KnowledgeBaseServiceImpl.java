@@ -20,8 +20,8 @@ import com.stephen.cloud.ai.service.KnowledgeIngestService;
 import com.stephen.cloud.api.file.client.FileFeignClient;
 import com.stephen.cloud.api.file.model.enums.FileUploadBizEnum;
 import com.stephen.cloud.api.file.model.vo.FileUploadVO;
-import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocIngestMessage;
 import com.stephen.cloud.api.knowledge.model.dto.knowledgebase.KnowledgeBaseQueryRequest;
+import com.stephen.cloud.api.knowledge.model.dto.knowledgedocument.KnowledgeDocIngestMessage;
 import com.stephen.cloud.api.knowledge.model.dto.retrieval.KnowledgeRetrievalRequest;
 import com.stephen.cloud.api.knowledge.model.enums.KnowledgeDocumentTypeEnum;
 import com.stephen.cloud.api.knowledge.model.enums.KnowledgeParseStatusEnum;
@@ -151,20 +151,21 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long uploadDocument(Long knowledgeBaseId, MultipartFile file, Long userId) {
-        if (knowledgeBaseId == null || knowledgeBaseId <= 0) throw new BusinessException(ErrorCode.PARAMS_ERROR, "知识库 ID 无效");
+        if (knowledgeBaseId == null || knowledgeBaseId <= 0)
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "知识库 ID 无效");
         if (file == null || file.isEmpty()) throw new BusinessException(ErrorCode.PARAMS_ERROR, "上传文件不能为空");
         if (file.getSize() > MAX_FILE_BYTES) throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件过大，上限 20MB");
-        
+
         String original = StringUtils.defaultString(file.getOriginalFilename());
-        log.info("[知识库] 开始上传文档: kbId={}, name={}, size={} 字节, userId={}", 
+        log.info("[知识库] 开始上传文档: kbId={}, name={}, size={} 字节, userId={}",
                 knowledgeBaseId, original, file.getSize(), userId);
-        
+
         String ext = FileUtil.extName(original).toLowerCase();
         if (!ALLOWED_EXT.contains(ext)) {
             log.error("[知识库] 不支持的文件格式: {} (kbId={})", ext, knowledgeBaseId);
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "不支持该文件格式: " + ext);
         }
-        
+
         if (this.getById(knowledgeBaseId) == null) {
             log.error("[知识库] 目标知识库不存在: kbId={}", knowledgeBaseId);
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "目标知识库不存在");
@@ -193,7 +194,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
         }
 
         dispatchIngestMessageAfterCommit(doc, knowledgeBaseId, userId, cosUrl);
-        
+
         return doc.getId();
     }
 
@@ -201,7 +202,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
     @Transactional(rollbackFor = Exception.class)
     public boolean deleteDocumentAndAssociated(Long documentId, Long userId) {
         log.info("[知识库] 请求删除文档及关联数据: docId={}, userId={}", documentId, userId);
-        
+
         // 先删除向量库数据（带异常处理）
         try {
             knowledgeIngestService.deleteVectors(documentId);
@@ -210,7 +211,7 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
             log.error("[知识库] 向量库删除失败，继续删除数据库记录: docId={}, error={}", documentId, e.getMessage(), e);
             // 不中断流程，继续删除数据库记录
         }
-        
+
         documentChunkService.deleteByDocumentId(documentId);
         log.debug("[知识库] 数据库关联分块已清理: docId={}", documentId);
         boolean removed = knowledgeDocumentService.removeById(documentId);
@@ -231,15 +232,15 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
         int topK = request.getTopK() != null ? request.getTopK() : knowledgeProperties.getDefaultTopK();
         ThrowUtils.throwIf(topK <= 0, ErrorCode.PARAMS_ERROR, "topK 必须大于 0");
         int finalTopK = knowledgeSearchRequestBuilder.resolveTopK(request.getTopK());
-        
-        log.info("[知识库] 执行分块检索: query='{}', kbId={}, topK={}, userId={}", 
+
+        log.info("[知识库] 执行分块检索: query='{}', kbId={}, topK={}, userId={}",
                 request.getQuery(), request.getKnowledgeBaseId(), finalTopK, userId);
-        
+
         SearchRequest searchRequest = knowledgeSearchRequestBuilder.build(request.getQuery(), request.getKnowledgeBaseId(), finalTopK);
-        
+
         List<Document> docs = similaritySearch(searchRequest);
         log.info("[知识库] 检索返回文档数: {} (kbId={})", docs.size(), request.getKnowledgeBaseId());
-        
+
         return vectorSearchManager.mapToVO(docs);
     }
 

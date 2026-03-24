@@ -2,12 +2,10 @@ package com.stephen.cloud.mail.service.impl;
 
 import com.stephen.cloud.api.log.client.LogFeignClient;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordAddRequest;
-
 import com.stephen.cloud.api.mail.model.dto.EmailAttachment;
-import com.stephen.cloud.api.mail.model.enums.EmailStatusEnum;
 import com.stephen.cloud.api.mail.model.dto.MailSendCodeRequest;
 import com.stephen.cloud.api.mail.model.dto.MailSendRequest;
-
+import com.stephen.cloud.api.mail.model.enums.EmailStatusEnum;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.exception.BusinessException;

@@ -4,8 +4,6 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.io.FileUtil;
 import com.stephen.cloud.api.file.model.dto.FileUploadLogDTO;
 import com.stephen.cloud.api.file.model.dto.FileUploadRequest;
-import com.stephen.cloud.file.config.properties.FileStorageProperties;
-
 import com.stephen.cloud.api.file.model.enums.FileUploadBizEnum;
 import com.stephen.cloud.api.file.model.vo.FileUploadVO;
 import com.stephen.cloud.common.common.BaseResponse;
@@ -14,6 +12,7 @@ import com.stephen.cloud.common.common.ResultUtils;
 import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.log.annotation.OperationLog;
+import com.stephen.cloud.file.config.properties.FileStorageProperties;
 import com.stephen.cloud.file.service.FileStorageService;
 import com.stephen.cloud.file.service.FileUploadRecordService;
 import io.swagger.v3.oas.annotations.Operation;

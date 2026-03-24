@@ -5,8 +5,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordAddRequest;
 import com.stephen.cloud.api.log.model.dto.email.EmailRecordQueryRequest;
-
-
 import com.stephen.cloud.common.constants.CommonConstant;
 import com.stephen.cloud.common.mysql.utils.SqlUtils;
 import com.stephen.cloud.log.mapper.EmailRecordMapper;
@@ -14,7 +12,6 @@ import com.stephen.cloud.log.model.entity.EmailRecord;
 import com.stephen.cloud.log.service.EmailRecordService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-
 import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -65,7 +62,6 @@ public class EmailRecordServiceImpl extends ServiceImpl<EmailRecordMapper, Email
         }
         return false;
     }
-
 
 
     @Override

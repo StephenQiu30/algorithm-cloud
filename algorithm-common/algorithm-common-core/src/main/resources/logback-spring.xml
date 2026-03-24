@@ -30,9 +30,13 @@
             <writeBufferSize>16384</writeBufferSize>
             <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
                 <providers>
-                    <timestamp><timeZone>UTC</timeZone></timestamp>
+                    <timestamp>
+                        <timeZone>UTC</timeZone>
+                    </timestamp>
                     <pattern>
-                        <pattern>{"severity":"%level","service":"${spring.application.name:-}","traceId":"%X{traceId:-}","userId":"%X{userId:-}","pid":"${PID:-}","thread":"%thread","class":"%logger{40}","rest":"%message"}</pattern>
+                        <pattern>
+                            {"severity":"%level","service":"${spring.application.name:-}","traceId":"%X{traceId:-}","userId":"%X{userId:-}","pid":"${PID:-}","thread":"%thread","class":"%logger{40}","rest":"%message"}
+                        </pattern>
                     </pattern>
                     <stackTrace>
                         <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">

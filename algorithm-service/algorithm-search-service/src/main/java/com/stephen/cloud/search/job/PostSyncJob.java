@@ -2,8 +2,8 @@ package com.stephen.cloud.search.job;
 
 import com.stephen.cloud.common.rabbitmq.enums.EsSyncDataTypeEnum;
 import com.stephen.cloud.common.rabbitmq.enums.EsSyncTypeEnum;
-import com.stephen.cloud.common.rabbitmq.model.SyncCommandMessage;
 import com.stephen.cloud.common.rabbitmq.enums.MqBizTypeEnum;
+import com.stephen.cloud.common.rabbitmq.model.SyncCommandMessage;
 import com.stephen.cloud.common.rabbitmq.producer.RabbitMqSender;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;

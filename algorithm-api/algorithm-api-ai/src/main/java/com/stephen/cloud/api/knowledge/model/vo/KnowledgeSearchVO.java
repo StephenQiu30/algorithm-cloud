@@ -12,7 +12,7 @@ import java.util.List;
 
 /**
  * 知识库检索响应视图
- * 
+ *
  * @author StephenQiu30
  */
 @Data

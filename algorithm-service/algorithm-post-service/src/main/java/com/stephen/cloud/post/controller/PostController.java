@@ -10,11 +10,11 @@ import com.stephen.cloud.api.post.model.dto.post.PostUpdateRequest;
 import com.stephen.cloud.api.post.model.dto.review.PostReviewRequest;
 import com.stephen.cloud.api.post.model.enums.PostReviewStatusEnum;
 import com.stephen.cloud.api.post.model.vo.PostVO;
+import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.common.*;
 import com.stephen.cloud.common.constants.UserConstant;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.log.annotation.OperationLog;
-import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.post.convert.PostConvert;
 import com.stephen.cloud.post.model.entity.Post;
 import com.stephen.cloud.post.service.PostService;
@@ -52,7 +52,7 @@ public class PostController {
     @OperationLog(module = "帖子管理", action = "创建帖子")
     @Operation(summary = "创建帖子", description = "创建新帖子，初始状态为待审核")
     public BaseResponse<Long> addPost(@RequestBody PostAddRequest postAddRequest,
-            HttpServletRequest request) {
+                                      HttpServletRequest request) {
         Post post = PostConvert.addRequestToObj(postAddRequest);
         postService.validPost(post, true);
 
@@ -167,7 +167,7 @@ public class PostController {
     @PostMapping("/list/page")
     @Operation(summary = "分页获取帖子列表（用于同步）", description = "获取完整字段的帖子列表，主要用于数据同步")
     public BaseResponse<Page<PostVO>> listPostByPage(@RequestBody PostQueryRequest postQueryRequest,
-            HttpServletRequest request) {
+                                                     HttpServletRequest request) {
         long current = postQueryRequest.getCurrent();
         long size = postQueryRequest.getPageSize();
         Page<Post> postPage = postService.page(new Page<>(current, size),
@@ -187,7 +187,7 @@ public class PostController {
     @PostMapping("/list/page/vo")
     @Operation(summary = "分页获取帖子列表", description = "分页获取已审核通过的帖子脱敏信息列表")
     public BaseResponse<Page<PostVO>> listPostVOByPage(@RequestBody PostQueryRequest postQueryRequest,
-            HttpServletRequest request) {
+                                                       HttpServletRequest request) {
         if (postQueryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -214,7 +214,7 @@ public class PostController {
     @PostMapping("/my/list/page/vo")
     @Operation(summary = "我的帖子列表", description = "分页获取当前登录用户创建的帖子列表")
     public BaseResponse<Page<PostVO>> listMyPostVOByPage(@RequestBody PostQueryRequest postQueryRequest,
-            HttpServletRequest request) {
+                                                         HttpServletRequest request) {
         if (postQueryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }

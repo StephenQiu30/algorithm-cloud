@@ -3,8 +3,8 @@ package com.stephen.cloud.ai.repository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.messages.*;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
+import org.springframework.ai.chat.messages.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.ArrayList;
@@ -59,14 +59,14 @@ public class RedisChatMemoryRepository implements ChatMemoryRepository {
             return;
         }
         String key = getKeys(conversationId);
-        
+
         // 清除旧数据，重新写入（维护最新的快照）
         redisTemplate.delete(key);
-        
+
         List<String> jsonMessages = messages.stream()
                 .map(this::toJson)
                 .collect(Collectors.toList());
-        
+
         redisTemplate.opsForList().rightPushAll(key, jsonMessages);
         redisTemplate.expire(key, DEFAULT_TTL_MINUTES, TimeUnit.MINUTES);
     }
@@ -114,9 +114,20 @@ public class RedisChatMemoryRepository implements ChatMemoryRepository {
         private String content;
         private String type;
 
-        public String getContent() { return content; }
-        public void setContent(String content) { this.content = content; }
-        public String getType() { return type; }
-        public void setType(String type) { this.type = type; }
+        public String getContent() {
+            return content;
+        }
+
+        public void setContent(String content) {
+            this.content = content;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
     }
 }

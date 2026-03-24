@@ -66,7 +66,7 @@ public class GlobalAuthFilter implements GlobalFilter, Ordered {
      * 4. 认证通过后，将用户信息注入请求头
      *
      * @param exchange ServerWebExchange
-     * @param chain GatewayFilterChain
+     * @param chain    GatewayFilterChain
      * @return Mono<Void>
      */
     @Override

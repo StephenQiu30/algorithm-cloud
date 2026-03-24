@@ -5,14 +5,14 @@ import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import com.stephen.cloud.ai.config.KnowledgeProperties;
+import com.stephen.cloud.ai.enums.RagMetricEnum;
 import com.stephen.cloud.api.knowledge.model.enums.RagMetricTagEnum;
+import com.stephen.cloud.api.knowledge.model.enums.VectorSimilarityModeEnum;
+import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import com.stephen.cloud.ai.config.KnowledgeProperties;
-import com.stephen.cloud.ai.enums.RagMetricEnum;
-import com.stephen.cloud.api.knowledge.model.enums.VectorSimilarityModeEnum;
-import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -139,7 +139,7 @@ public class VectorSearchManager {
                         .tag(RagMetricTagEnum.MODE_TAG_KEY.getValue(), VectorSimilarityModeEnum.HYBRID.name())
                         .register(meterRegistry)
                         .increment();
-                log.warn("[检索链路] BM25返回为空，降级为纯kNN检索: query='{}', topK={}, knnHits={}", 
+                log.warn("[检索链路] BM25返回为空，降级为纯kNN检索: query='{}', topK={}, knnHits={}",
                         searchRequest.getQuery(), topK, knnHits != null ? knnHits.size() : 0);
                 return knnHits;
             }
@@ -164,7 +164,7 @@ public class VectorSearchManager {
                         .tag(RagMetricTagEnum.MODE_TAG_KEY.getValue(), VectorSimilarityModeEnum.HYBRID.name())
                         .register(meterRegistry)
                         .increment();
-                log.warn("[检索链路] 混合检索异常，降级为kNN: query='{}', knnHits={}", 
+                log.warn("[检索链路] 混合检索异常，降级为kNN: query='{}', knnHits={}",
                         searchRequest.getQuery(), fallbackResult.size());
                 return fallbackResult;
             } catch (Exception fallbackEx) {

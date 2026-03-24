@@ -24,10 +24,10 @@ import com.stephen.cloud.common.rabbitmq.enums.EsSyncTypeEnum;
 import com.stephen.cloud.common.rabbitmq.enums.MqBizTypeEnum;
 import com.stephen.cloud.common.rabbitmq.model.EsSyncBatchMessage;
 import com.stephen.cloud.common.rabbitmq.model.EsSyncMessage;
+import com.stephen.cloud.common.rabbitmq.model.event.PostReviewEvent;
 import com.stephen.cloud.common.rabbitmq.producer.RabbitMqSender;
 import com.stephen.cloud.post.convert.PostConvert;
 import com.stephen.cloud.post.mapper.PostFavourMapper;
-import com.stephen.cloud.common.rabbitmq.model.event.PostReviewEvent;
 import com.stephen.cloud.post.mapper.PostMapper;
 import com.stephen.cloud.post.mapper.PostThumbMapper;
 import com.stephen.cloud.post.model.entity.Post;
@@ -83,13 +83,13 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         }
         String title = post.getTitle();
         String content = post.getContent();
-        
+
         // 1. 基础必填项校验
         if (add) {
             ThrowUtils.throwIf(StringUtils.isBlank(title), ErrorCode.PARAMS_ERROR, "标题不能为空");
             ThrowUtils.throwIf(StringUtils.isBlank(content), ErrorCode.PARAMS_ERROR, "内容不能为空");
         }
-        
+
         // 2. 标题长度校验，防止 UI 渲染问题
         ThrowUtils.throwIf(StringUtils.isNotBlank(title) && title.length() > 80, ErrorCode.PARAMS_ERROR, "标题过长");
     }
@@ -419,7 +419,7 @@ public class PostServiceImpl extends ServiceImpl<PostMapper, Post> implements Po
         Long id = postReviewRequest.getId();
         Integer reviewStatus = postReviewRequest.getReviewStatus();
         PostReviewStatusEnum reviewStatusEnum = PostReviewStatusEnum.getEnumByValue(reviewStatus);
-        
+
         // 基础参数校验：审核状态不能仍为“待审核”
         ThrowUtils.throwIf(
                 id == null || id <= 0 || reviewStatusEnum == null

@@ -1,11 +1,11 @@
 package com.stephen.cloud.log.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
-import com.stephen.cloud.common.auth.annotation.InternalAuth;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.api.log.model.dto.file.FileUploadRecordAddRequest;
 import com.stephen.cloud.api.log.model.dto.file.FileUploadRecordQueryRequest;
 import com.stephen.cloud.api.log.model.vo.FileUploadRecordVO;
+import com.stephen.cloud.common.auth.annotation.InternalAuth;
 import com.stephen.cloud.common.common.*;
 import com.stephen.cloud.common.constants.UserConstant;
 import com.stephen.cloud.common.exception.BusinessException;

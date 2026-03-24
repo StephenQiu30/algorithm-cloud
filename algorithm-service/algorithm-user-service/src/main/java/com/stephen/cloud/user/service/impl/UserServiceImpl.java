@@ -18,25 +18,25 @@ import com.stephen.cloud.api.user.model.enums.UserRoleEnum;
 import com.stephen.cloud.api.user.model.vo.GitHubUserVO;
 import com.stephen.cloud.api.user.model.vo.LoginUserVO;
 import com.stephen.cloud.api.user.model.vo.UserVO;
+import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.cache.constants.CacheConstant;
 import com.stephen.cloud.common.cache.model.TimeModel;
 import com.stephen.cloud.common.cache.utils.CacheUtils;
 import com.stephen.cloud.common.cache.utils.lock.LockUtils;
-import com.stephen.cloud.user.constant.UserLoginConstants;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.constants.CommonConstant;
 import com.stephen.cloud.common.constants.UserConstant;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.mysql.utils.SqlUtils;
-import com.stephen.cloud.common.rabbitmq.enums.EsSyncTypeEnum;
 import com.stephen.cloud.common.rabbitmq.enums.EsSyncDataTypeEnum;
-import com.stephen.cloud.common.rabbitmq.model.EsSyncBatchMessage;
+import com.stephen.cloud.common.rabbitmq.enums.EsSyncTypeEnum;
 import com.stephen.cloud.common.rabbitmq.enums.MqBizTypeEnum;
+import com.stephen.cloud.common.rabbitmq.model.EsSyncBatchMessage;
 import com.stephen.cloud.common.rabbitmq.producer.RabbitMqSender;
-import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.utils.IpUtils;
 import com.stephen.cloud.common.utils.RegexUtils;
+import com.stephen.cloud.user.constant.UserLoginConstants;
 import com.stephen.cloud.user.convert.UserConvert;
 import com.stephen.cloud.user.mapper.UserMapper;
 import com.stephen.cloud.user.model.dto.UserLoginLogRecordRequest;
@@ -57,7 +57,6 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -113,12 +112,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             ThrowUtils.throwIf(StringUtils.isBlank(userName), ErrorCode.PARAMS_ERROR, "用户名称不能为空");
             ThrowUtils.throwIf(StringUtils.isBlank(userEmail), ErrorCode.PARAMS_ERROR, "用户邮箱不能为空");
         }
-        
+
         // 昵称长度校验
         if (StringUtils.isNotBlank(userName)) {
             ThrowUtils.throwIf(userName.length() < 2 || userName.length() > 30, ErrorCode.PARAMS_ERROR, "用户昵称过短或过长");
         }
-        
+
         // 邮箱格式及唯一性校验
         if (StringUtils.isNotBlank(userEmail)) {
             ThrowUtils.throwIf(!RegexUtils.checkEmail(userEmail), ErrorCode.PARAMS_ERROR, "用户邮箱格式有误");
@@ -128,12 +127,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             long count = this.count(queryWrapper);
             ThrowUtils.throwIf(count > 0, ErrorCode.PARAMS_ERROR, "该邮箱已被占用");
         }
-        
+
         // 手机号格式校验
         if (StringUtils.isNotBlank(userPhone)) {
             ThrowUtils.throwIf(!RegexUtils.checkPhone(userPhone), ErrorCode.PARAMS_ERROR, "用户手机号格式有误");
         }
-        
+
         // 个人简介长度校验
         if (StringUtils.isNotBlank(userProfile)) {
             ThrowUtils.throwIf(userProfile.length() > 500, ErrorCode.PARAMS_ERROR, "用户简介过长");
@@ -325,7 +324,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return 脱敏的登录用户视图，含 token
      */
     private LoginUserVO doAfterLoginSuccess(User user, HttpServletRequest request,
-            LoginTypeEnum loginType, String account) {
+                                            LoginTypeEnum loginType, String account) {
         user.setLastLoginTime(new Date());
         if (request != null) {
             user.setLastLoginIp(IpUtils.getClientIp(request));
@@ -402,7 +401,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                     }
                     return doAfterLoginSuccess(lockedUser, request, LoginTypeEnum.GITHUB, gitHubUserVO.getLogin());
                 },
-                () -> { throw new BusinessException(ErrorCode.OPERATION_ERROR, "登录人数过多，请稍后再试"); });
+                () -> {
+                    throw new BusinessException(ErrorCode.OPERATION_ERROR, "登录人数过多，请稍后再试");
+                });
     }
 
     /**
@@ -446,7 +447,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                     userEmailService.deleteEmailCode(email);
                     return doAfterLoginSuccess(user, request, LoginTypeEnum.EMAIL, email);
                 },
-                () -> { throw new BusinessException(ErrorCode.OPERATION_ERROR, "登录人数过多，请稍后再试"); });
+                () -> {
+                    throw new BusinessException(ErrorCode.OPERATION_ERROR, "登录人数过多，请稍后再试");
+                });
     }
 
     /**

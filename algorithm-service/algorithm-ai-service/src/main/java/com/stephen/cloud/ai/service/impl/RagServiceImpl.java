@@ -1,14 +1,14 @@
 package com.stephen.cloud.ai.service.impl;
 
-import com.stephen.cloud.api.knowledge.model.enums.RagMetricTagEnum;
+import com.stephen.cloud.ai.enums.RagMetricEnum;
 import com.stephen.cloud.ai.knowledge.context.RagSearchContext;
 import com.stephen.cloud.ai.knowledge.retrieval.KnowledgeDocumentRetriever;
 import com.stephen.cloud.ai.manager.RagAuditManager;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
 import com.stephen.cloud.ai.service.KnowledgeBaseService;
 import com.stephen.cloud.ai.service.RagService;
-import com.stephen.cloud.ai.enums.RagMetricEnum;
 import com.stephen.cloud.api.knowledge.model.dto.rag.RagChatRequest;
+import com.stephen.cloud.api.knowledge.model.enums.RagMetricTagEnum;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
 import com.stephen.cloud.common.common.ErrorCode;
@@ -93,9 +93,9 @@ public class RagServiceImpl implements RagService {
         }
         Long kbId = request.getKnowledgeBaseId();
         String sessionId = request.getSessionId();
-        log.info("[RAG问答] 收到统一问答请求: userId={}, kbId={}, sessionId={}, question='{}'", 
+        log.info("[RAG问答] 收到统一问答请求: userId={}, kbId={}, sessionId={}, question='{}'",
                 userId, kbId, sessionId, request.getQuestion().trim());
-        
+
         ThrowUtils.throwIf(kbId == null || kbId <= 0, ErrorCode.PARAMS_ERROR, "知识库 ID 非法");
         ThrowUtils.throwIf(StringUtils.isBlank(sessionId), ErrorCode.PARAMS_ERROR, "会话 ID 不能为空");
 
@@ -138,7 +138,7 @@ public class RagServiceImpl implements RagService {
                     .tag(RagMetricTagEnum.MODE_TAG_KEY.getValue(), RagMetricTagEnum.CALL_MODE_SYNC.getValue())
                     .register(meterRegistry)
                     .record(duration, java.util.concurrent.TimeUnit.MILLISECONDS);
-            log.info("[RAG问答] 问答执行成功: userId={}, sessionId={}, 耗时={}ms, 关联来源数={}", 
+            log.info("[RAG问答] 问答执行成功: userId={}, sessionId={}, 耗时={}ms, 关联来源数={}",
                     userId, sessionId, duration, sources.size());
 
             return RagChatResponseVO.builder()
@@ -160,7 +160,7 @@ public class RagServiceImpl implements RagService {
         Long kbId = request.getKnowledgeBaseId();
         String sessionId = request.getSessionId();
         log.info("[RAG流式] 收到流式问答请求: userId={}, kbId={}, sessionId={}", userId, kbId, sessionId);
-        
+
         ThrowUtils.throwIf(kbId == null || kbId <= 0, ErrorCode.PARAMS_ERROR, "知识库 ID 非法");
         ThrowUtils.throwIf(StringUtils.isBlank(sessionId), ErrorCode.PARAMS_ERROR, "会话 ID 不能为空");
 
@@ -213,7 +213,7 @@ public class RagServiceImpl implements RagService {
                     .tag(RagMetricTagEnum.MODE_TAG_KEY.getValue(), RagMetricTagEnum.CALL_MODE_STREAM.getValue())
                     .register(meterRegistry)
                     .record(duration, java.util.concurrent.TimeUnit.MILLISECONDS);
-            log.info("[RAG流式] 问答流输出完成: userId={}, sessionId={}, 总长度={}", 
+            log.info("[RAG流式] 问答流输出完成: userId={}, sessionId={}, 总长度={}",
                     userId, sessionId, fullAnswer.length());
             // 异步记录审计
             List<ChunkSourceVO> sources = (List<ChunkSourceVO>) RagSearchContext.getAndClearSources();

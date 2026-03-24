@@ -1,19 +1,19 @@
 package com.stephen.cloud.ai.manager;
 
+import cn.hutool.json.JSONUtil;
+import com.stephen.cloud.ai.enums.RagMetricEnum;
 import com.stephen.cloud.ai.service.AiChatRecordService;
 import com.stephen.cloud.api.ai.model.dto.AiChatRecordDTO;
 import com.stephen.cloud.api.ai.model.enums.AiModelTypeEnum;
 import com.stephen.cloud.api.knowledge.model.vo.ChunkSourceVO;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import cn.hutool.json.JSONUtil;
-import com.stephen.cloud.ai.enums.RagMetricEnum;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Component;
 
-import jakarta.annotation.Resource;
 import java.util.List;
 import java.util.Map;
 
@@ -44,7 +44,7 @@ public class RagAuditManager {
         }
         String answer = response.getResult().getOutput().getText();
         Usage usage = response.getMetadata().getUsage();
-        
+
         saveRecord(userId, sessionId, question, answer, usage, sources);
     }
 
@@ -76,7 +76,7 @@ public class RagAuditManager {
                     .completionTokens(completion)
                     .retrievalMetadata(retrievalMetadata)
                     .build();
-            
+
             aiChatRecordService.saveAiChatRecordAsync(record);
             Counter.builder(RagMetricEnum.RAG_TOKEN_TOTAL.getValue()).register(meterRegistry).increment(total);
         } catch (Exception e) {

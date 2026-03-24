@@ -39,7 +39,7 @@
             <groupId>com.algorithm.cloud</groupId>
             <artifactId>algorithm-api-log</artifactId>
         </dependency>
-        
+
         <!-- algorithm-common-auth -->
         <dependency>
             <groupId>com.algorithm.cloud</groupId>

@@ -22,7 +22,7 @@ import java.util.concurrent.Executors;
 /**
  * 知识库向量存储与 ES Java API 客户端配置。
  * <p>
- * {@link VectorStore} 使用 Elasticsearch 作向量库，通过 {@link ElasticsearchVectorStoreOptions} 
+ * {@link VectorStore} 使用 Elasticsearch 作向量库，通过 {@link ElasticsearchVectorStoreOptions}
  * 显式映射字段，确保与 RAG 检索保持语义一致。
  * </p>
  *
@@ -58,13 +58,13 @@ public class KnowledgeVectorStoreConfig {
      */
     @Bean
     public VectorStore knowledgeVectorStore(RestClient restClient, EmbeddingModel embeddingModel,
-            KnowledgeProperties knowledgeProperties) {
+                                            KnowledgeProperties knowledgeProperties) {
         ElasticsearchVectorStoreOptions options = new ElasticsearchVectorStoreOptions();
         options.setIndexName(knowledgeProperties.getVectorIndex());
         options.setDimensions(knowledgeProperties.getEmbeddingDimension());
         // 显式指定余弦相似度
         options.setSimilarity(SimilarityFunction.cosine);
-        
+
         return ElasticsearchVectorStore.builder(restClient, embeddingModel)
                 .options(options)
                 .initializeSchema(true)

@@ -62,7 +62,7 @@ public class SearchController {
     @PostMapping("/post/page")
     @OperationLog(module = "搜索服务", action = "搜索帖子")
     public BaseResponse<Page<?>> searchPostByPage(@RequestBody PostQueryRequest postQueryRequest,
-            HttpServletRequest request) {
+                                                  HttpServletRequest request) {
         long size = postQueryRequest.getPageSize();
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
         Page<PostEsDTO> postPage = (Page<PostEsDTO>) postEsService.searchFromEs(postQueryRequest);
@@ -80,7 +80,7 @@ public class SearchController {
     @PostMapping("/user/page")
     @OperationLog(module = "搜索服务", action = "搜索用户")
     public BaseResponse<Page<?>> searchUserByPage(@RequestBody UserQueryRequest userQueryRequest,
-            HttpServletRequest request) {
+                                                  HttpServletRequest request) {
         long size = userQueryRequest.getPageSize();
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
         Page<UserEsDTO> userPage = (Page<UserEsDTO>) userEsService.searchFromEs(userQueryRequest);
@@ -98,7 +98,7 @@ public class SearchController {
     @PostMapping("/all")
     @OperationLog(module = "搜索服务", action = "聚合搜索")
     public BaseResponse<SearchVO<Object>> doSearchAll(@RequestBody SearchRequest searchRequest,
-            HttpServletRequest request) {
+                                                      HttpServletRequest request) {
         return ResultUtils.success(searchFacade.searchAll(searchRequest, request));
     }
 
