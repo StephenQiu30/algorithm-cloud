@@ -18,14 +18,17 @@ import com.stephen.cloud.api.ai.model.enums.RetrievalStrategyEnum;
 import com.stephen.cloud.ai.service.KeywordSearchService;
 import com.stephen.cloud.ai.service.RAGService;
 import com.stephen.cloud.ai.service.VectorStoreService;
-import com.stephen.cloud.api.ai.model.vo.RAGAnswerVO;
-import com.stephen.cloud.api.ai.model.vo.RAGHistoryVO;
-import com.stephen.cloud.api.ai.model.vo.SourceVO;
+import com.stephen.cloud.api.ai.model.dto.rag.BatchRecallRequest;
+import com.stephen.cloud.api.ai.model.dto.rag.RecallAnalysisRequest;
+import com.stephen.cloud.api.ai.model.dto.rag.RecallTestItem;
+import com.stephen.cloud.api.ai.model.vo.*;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -199,9 +202,11 @@ public class RAGServiceImpl implements RAGService {
         int keywordTopK = ragRetrievalProperties.getKeywordTopK() <= 0 ? finalTopK : ragRetrievalProperties.getKeywordTopK();
         int rrfK = ragRetrievalProperties.getRrfK() <= 0 ? 60 : ragRetrievalProperties.getRrfK();
         RewriteResult rewriteResult = buildRewriteResult(question);
-        List<Document> vectorDocs = vectorStoreService.similaritySearch(rewriteResult.getSemanticQuery(), knowledgeBaseId, vectorTopK, null);
+        Filter.Expression filter = buildFilterExpression(knowledgeBaseId, rewriteResult.getMetadataFilters());
+
+        List<Document> vectorDocs = vectorStoreService.similaritySearch(rewriteResult.getSemanticQuery(), knowledgeBaseId, vectorTopK, ragRetrievalProperties.getSimilarityThreshold());
         List<Document> keywordDocs = keywordSearchService.bm25Search(
-                rewriteResult.getKeywordQuery(), knowledgeBaseId, keywordTopK, rewriteResult.getMetadataFilters());
+                rewriteResult.getKeywordQuery(), knowledgeBaseId, keywordTopK, filter);
         List<Document> fusedDocs = rrfFusionService.fuse(vectorDocs, keywordDocs, finalTopK, rrfK);
         List<Document> rerankedDocs = maybeRerank(fusedDocs, rewriteResult, finalTopK);
         markMatchReason(rerankedDocs, rewriteResult);
@@ -259,6 +264,158 @@ public class RAGServiceImpl implements RAGService {
                 doc.getMetadata().put("matchReason", MatchReasonEnum.HYBRID.getValue());
             }
         }
+    }
+
+    @Override
+    public RecallAnalysisVO analyzeRecall(RecallAnalysisRequest request) {
+        long start = System.currentTimeMillis();
+        String question = request.getQuestion();
+        Long knowledgeBaseId = request.getKnowledgeBaseId();
+        int finalTopK = request.getTopK() == null || request.getTopK() <= 0 ? ragRetrievalProperties.getTopK() : request.getTopK();
+        Double threshold = request.getSimilarityThreshold() == null ? ragRetrievalProperties.getSimilarityThreshold() : request.getSimilarityThreshold();
+
+        // 1. 改写
+        RewriteResult rewriteResult = buildRewriteResult(question);
+        Filter.Expression filter = buildFilterExpression(knowledgeBaseId, rewriteResult.getMetadataFilters());
+
+        // 2. 向量检索
+        List<Document> vectorDocs = vectorStoreService.similaritySearch(rewriteResult.getSemanticQuery(), knowledgeBaseId, finalTopK, threshold);
+
+        // 3. 关键词检索
+        List<Document> keywordDocs = keywordSearchService.bm25Search(
+                rewriteResult.getKeywordQuery(), knowledgeBaseId, finalTopK, filter);
+
+        // 4. 融合
+        int rrfK = ragRetrievalProperties.getRrfK() <= 0 ? 60 : ragRetrievalProperties.getRrfK();
+        List<Document> fusedDocs = rrfFusionService.fuse(vectorDocs, keywordDocs, finalTopK, rrfK);
+
+        // 5. 重排
+        List<Document> finalDocs;
+        if (Boolean.TRUE.equals(request.getEnableRerank()) && ragRetrievalProperties.isRerankEnabled()) {
+            finalDocs = maybeRerank(fusedDocs, rewriteResult, finalTopK);
+            markMatchReason(finalDocs, rewriteResult);
+        } else {
+            finalDocs = fusedDocs;
+        }
+
+        // 6. 构造 VO
+        RecallAnalysisVO vo = new RecallAnalysisVO();
+        vo.setQuestion(question);
+        vo.setVectorHits(convertToHitVOs(vectorDocs));
+        vo.setKeywordHits(convertToHitVOs(keywordDocs));
+        vo.setFusedHits(convertToHitVOs(fusedDocs));
+        vo.setFinalResults(convertToHitVOs(finalDocs));
+        vo.setCostMs(System.currentTimeMillis() - start);
+        return vo;
+    }
+
+    @Override
+    public BatchRecallVO batchAnalyzeRecall(BatchRecallRequest request) {
+        RecallAnalysisRequest config = request.getConfig();
+        List<RecallTestItem> items = request.getItems();
+        if (CollUtil.isEmpty(items)) {
+            return new BatchRecallVO();
+        }
+
+        List<RecallItemResultVO> results = new ArrayList<>();
+        double totalHitRate = 0;
+        double totalRecall = 0;
+        int testCountWithExpectation = 0;
+
+        for (RecallTestItem item : items) {
+            RecallAnalysisRequest itemRequest = new RecallAnalysisRequest();
+            itemRequest.setQuestion(item.getQuestion());
+            itemRequest.setKnowledgeBaseId(config.getKnowledgeBaseId());
+            itemRequest.setTopK(config.getTopK());
+            itemRequest.setSimilarityThreshold(config.getSimilarityThreshold());
+            itemRequest.setEnableRerank(config.getEnableRerank());
+
+            RecallAnalysisVO analysis = analyzeRecall(itemRequest);
+            List<RetrievalHitVO> finalResults = analysis.getFinalResults();
+            List<String> recalledIds = finalResults.stream().map(RetrievalHitVO::getId).toList();
+
+            RecallItemResultVO itemResult = new RecallItemResultVO();
+            itemResult.setQuestion(item.getQuestion());
+            itemResult.setRetrievedChunks(finalResults);
+
+            List<String> expectedIds = item.getExpectedChunkIds();
+            if (CollUtil.isNotEmpty(expectedIds)) {
+                testCountWithExpectation++;
+                long hitCount = expectedIds.stream().filter(recalledIds::contains).count();
+                itemResult.setIsHit(hitCount > 0);
+                itemResult.setRecall(hitCount * 1.0D / expectedIds.size());
+
+                totalHitRate += (hitCount > 0 ? 1 : 0);
+                totalRecall += itemResult.getRecall();
+            }
+            results.add(itemResult);
+        }
+
+        BatchRecallVO vo = new BatchRecallVO();
+        vo.setItemResults(results);
+        if (testCountWithExpectation > 0) {
+            vo.setOverallHitRate(totalHitRate / testCountWithExpectation);
+            vo.setMeanRecall(totalRecall / testCountWithExpectation);
+        }
+        return vo;
+    }
+
+    private List<RetrievalHitVO> convertToHitVOs(List<Document> docs) {
+        if (CollUtil.isEmpty(docs)) {
+            return new ArrayList<>();
+        }
+        return docs.stream().map(doc -> {
+            RetrievalHitVO hit = new RetrievalHitVO();
+            hit.setId(doc.getId());
+            hit.setContent(doc.getText());
+            hit.setDocumentName(toStringValue(doc.getMetadata().get("documentName")));
+            hit.setChunkIndex(toIntegerValue(doc.getMetadata().get("chunkIndex")));
+            hit.setVectorScore(toDoubleValue(doc.getMetadata().get("distance")));
+            hit.setKeywordScore(toDoubleValue(doc.getMetadata().get("keywordScore")));
+            hit.setFusionScore(toDoubleValue(doc.getMetadata().get("fusionScore")));
+            hit.setScore(toDoubleValue(doc.getMetadata().get("score")));
+            hit.setMatchReason(toStringValue(doc.getMetadata().get("matchReason")));
+            return hit;
+        }).toList();
+    }
+
+    private Double toDoubleValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Double.valueOf(String.valueOf(value));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private Integer toIntegerValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(String.valueOf(value));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private Filter.Expression buildFilterExpression(Long knowledgeBaseId, Map<String, String> metadataFilters) {
+        FilterExpressionBuilder b = new FilterExpressionBuilder();
+        FilterExpressionBuilder.Op op = null;
+        if (knowledgeBaseId != null && knowledgeBaseId > 0) {
+            op = b.eq("knowledgeBaseId", knowledgeBaseId);
+        }
+        if (CollUtil.isNotEmpty(metadataFilters)) {
+            for (Map.Entry<String, String> entry : metadataFilters.entrySet()) {
+                if (StringUtils.isNotBlank(entry.getValue())) {
+                    FilterExpressionBuilder.Op next = b.eq(entry.getKey(), entry.getValue());
+                    op = (op == null) ? next : b.and(op, next);
+                }
+            }
+        }
+        return op == null ? null : op.build();
     }
 
     private String toStringValue(Object value) {

@@ -2,13 +2,14 @@ package com.stephen.cloud.ai.convert;
 
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.api.ai.model.vo.ChunkVO;
+import com.stephen.cloud.api.search.model.entity.ChunkEsDTO;
 import org.springframework.beans.BeanUtils;
 
 public class DocumentChunkConvert {
 
     public static final DocumentChunkConvert INSTANCE = new DocumentChunkConvert();
 
-    public ChunkVO objToVo(DocumentChunk chunk) {
+    public static ChunkVO objToVo(DocumentChunk chunk) {
         if (chunk == null) {
             return null;
         }
@@ -17,4 +18,20 @@ public class DocumentChunkConvert {
         chunkVO.setId(String.valueOf(chunk.getId()));
         return chunkVO;
     }
+
+    /**
+     * 对象转 ES DTO
+     *
+     * @param chunk 分片实体
+     * @return ES DTO
+     */
+    public static ChunkEsDTO objToEsDTO(DocumentChunk chunk) {
+        if (chunk == null) {
+            return null;
+        }
+        ChunkEsDTO chunkEsDTO = new ChunkEsDTO();
+        BeanUtils.copyProperties(chunk, chunkEsDTO);
+        return chunkEsDTO;
+    }
+
 }

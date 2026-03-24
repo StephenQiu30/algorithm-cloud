@@ -213,6 +213,11 @@ public interface RabbitMqConstant {
     String SYNC_COMMAND_QUEUE_USER = "algorithm.sync.command.user.queue";
 
     /**
+     * 文档分片数据同步指令队列
+     */
+    String SYNC_COMMAND_QUEUE_CHUNK = "algorithm.sync.command.chunk.queue";
+
+    /**
      * 帖子数据同步指令路由键
      */
     String SYNC_COMMAND_ROUTING_KEY_POST = "algorithm.sync.command.post";
@@ -221,6 +226,11 @@ public interface RabbitMqConstant {
      * 用户数据同步指令路由键
      */
     String SYNC_COMMAND_ROUTING_KEY_USER = "algorithm.sync.command.user";
+
+    /**
+     * 文档分片数据同步指令路由键
+     */
+    String SYNC_COMMAND_ROUTING_KEY_CHUNK = "algorithm.sync.command.chunk";
 
     // ==================== AI 相关 ====================
 

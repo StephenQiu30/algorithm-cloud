@@ -11,7 +11,8 @@ import lombok.Getter;
 public enum EsSyncDataTypeEnum {
 
     POST("post"),
-    USER("user");
+    USER("user"),
+    CHUNK("chunk");
 
     private final String value;
 

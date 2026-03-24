@@ -11,6 +11,7 @@ import com.stephen.cloud.api.search.constant.EsIndexConstant;
 import com.stephen.cloud.api.search.model.entity.BaseEsDTO;
 import com.stephen.cloud.api.search.model.entity.PostEsDTO;
 import com.stephen.cloud.api.search.model.entity.UserEsDTO;
+import com.stephen.cloud.api.search.model.entity.ChunkEsDTO;
 import com.stephen.cloud.common.rabbitmq.consumer.RabbitMqDedupeLock;
 import com.stephen.cloud.common.rabbitmq.consumer.RabbitMqHandler;
 import com.stephen.cloud.common.rabbitmq.enums.EsSyncDataTypeEnum;
@@ -51,6 +52,7 @@ public class EsSyncBatchHandler implements RabbitMqHandler<EsSyncBatchMessage> {
     static {
         DATA_TYPE_CLASS_MAP.put(EsSyncDataTypeEnum.POST, PostEsDTO.class);
         DATA_TYPE_CLASS_MAP.put(EsSyncDataTypeEnum.USER, UserEsDTO.class);
+        DATA_TYPE_CLASS_MAP.put(EsSyncDataTypeEnum.CHUNK, ChunkEsDTO.class);
     }
 
     @Override
@@ -138,6 +140,7 @@ public class EsSyncBatchHandler implements RabbitMqHandler<EsSyncBatchMessage> {
         return switch (type) {
             case POST -> EsIndexConstant.POST_INDEX;
             case USER -> EsIndexConstant.USER_INDEX;
+            case CHUNK -> EsIndexConstant.CHUNK_INDEX;
             default -> null;
         };
     }

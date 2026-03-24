@@ -90,6 +90,12 @@ public enum MqBizTypeEnum {
             RabbitMqConstant.SYNC_COMMAND_ROUTING_KEY_USER),
 
     /**
+     * 文档分片数据同步指令
+     */
+    SYNC_COMMAND_CHUNK("SYNC_COMMAND_CHUNK", RabbitMqConstant.SYNC_COMMAND_EXCHANGE,
+            RabbitMqConstant.SYNC_COMMAND_ROUTING_KEY_CHUNK),
+
+    /**
      * AI 对话记录同步
      */
     AI_CHAT_RECORD("AI_CHAT_RECORD", RabbitMqConstant.AI_CHAT_RECORD_EXCHANGE,

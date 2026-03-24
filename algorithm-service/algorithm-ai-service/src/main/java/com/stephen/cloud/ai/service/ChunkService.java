@@ -7,10 +7,32 @@ import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.api.ai.model.dto.chunk.ChunkQueryRequest;
 import com.stephen.cloud.api.ai.model.dto.chunk.ChunkSearchRequest;
 import com.stephen.cloud.api.ai.model.vo.ChunkVO;
+import com.stephen.cloud.common.rabbitmq.enums.EsSyncTypeEnum;
 
+import java.util.Date;
 import java.util.List;
 
+/**
+ * 文档分片服务
+ *
+ * @author StephenQiu30
+ */
 public interface ChunkService extends IService<DocumentChunk> {
+
+    /**
+     * 同步单个分片到 ES
+     *
+     * @param chunkId 分片 ID
+     */
+    void syncToEs(Long chunkId);
+
+    /**
+     * 同步分片数据到 ES
+     *
+     * @param syncType      同步方式（全量或增量）
+     * @param minUpdateTime 最小更新时间 (仅在增量同步时生效)
+     */
+    void syncToEs(EsSyncTypeEnum syncType, Date minUpdateTime);
 
     /**
      * 获取查询条件

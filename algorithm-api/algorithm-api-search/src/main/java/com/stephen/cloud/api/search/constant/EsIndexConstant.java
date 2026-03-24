@@ -17,4 +17,9 @@ public interface EsIndexConstant {
      */
     String USER_INDEX = "algorithm_user";
 
+    /**
+     * 文档分片索引
+     */
+    String CHUNK_INDEX = "document_chunks";
+
 }
