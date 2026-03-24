@@ -62,6 +62,15 @@ public class RAGHistory implements Serializable {
     @Schema(description = "响应时间")
     private Long responseTime;
 
+    @Schema(description = "改写后的查询")
+    private String rewriteQuery;
+
+    @Schema(description = "检索元数据")
+    private String retrievalMeta;
+
+    @Schema(description = "检索策略")
+    private String retrievalStrategy;
+
     /**
      * 创建时间
      */

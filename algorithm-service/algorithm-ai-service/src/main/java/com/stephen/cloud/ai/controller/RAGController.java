@@ -8,7 +8,9 @@ import com.stephen.cloud.api.ai.model.vo.RAGAnswerVO;
 import com.stephen.cloud.api.ai.model.vo.RAGHistoryVO;
 import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.common.BaseResponse;
+import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ResultUtils;
+import com.stephen.cloud.common.common.ThrowUtils;
 import com.stephen.cloud.common.log.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,15 +26,6 @@ public class RAGController {
 
     @Resource
     private RAGService ragService;
-
-    @PostMapping("/ask")
-    @Operation(summary = "RAG问答")
-    @OperationLog(module = "RAG问答", action = "提问")
-    public BaseResponse<RAGAnswerVO> ask(@RequestBody RAGAskRequest askRequest) {
-        Long userId = SecurityUtils.getLoginUserId();
-        RAGAnswerVO answerVO = ragService.ask(askRequest.getQuestion(), askRequest.getKnowledgeBaseId(), userId, askRequest.getTopK());
-        return ResultUtils.success(answerVO);
-    }
 
     @PostMapping(value = "/ask/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "RAG流式问答")

@@ -29,6 +29,7 @@ public class DocumentController {
     @OperationLog(module = "文档管理", action = "上传文档")
     public BaseResponse<Long> addDocument(@RequestParam("file") MultipartFile file,
                                           @RequestParam("knowledgeBaseId") Long knowledgeBaseId) {
+        ThrowUtils.throwIf(!SecurityUtils.isAdmin(), ErrorCode.NO_AUTH_ERROR);
         Long documentId = documentService.uploadDocument(file, knowledgeBaseId, SecurityUtils.getLoginUserId());
         return ResultUtils.success(documentId);
     }

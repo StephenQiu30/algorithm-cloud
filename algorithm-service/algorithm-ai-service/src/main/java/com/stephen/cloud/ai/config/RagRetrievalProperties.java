@@ -11,5 +11,23 @@ public class RagRetrievalProperties {
 
     private int topK = 5;
 
+    private int vectorTopK = 10;
+
+    private int keywordTopK = 10;
+
+    private int rrfK = 60;
+
     private Double similarityThreshold = 0.7D;
+
+    private boolean rewriteEnabled = true;
+
+    private boolean rerankEnabled = true;
+
+    private int rerankTopN = 10;
+
+    private Double mustTermBoost = 0.2D;
+
+    private Double metadataMatchBoost = 0.1D;
+
+    private String indexName = "document_chunks";
 }

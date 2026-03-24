@@ -27,4 +27,16 @@ public class SourceVO implements Serializable {
 
     @Schema(description = "相似度得分")
     private Double score;
+
+    @Schema(description = "来源类型")
+    private String sourceType;
+
+    @Schema(description = "版本")
+    private String version;
+
+    @Schema(description = "业务标签")
+    private String bizTag;
+
+    @Schema(description = "命中原因")
+    private String matchReason;
 }

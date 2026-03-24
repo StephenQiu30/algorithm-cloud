@@ -9,9 +9,9 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "document.processing")
 public class DocumentProcessingProperties {
 
-    private int chunkSize = 800;
+    private int chunkSize = 400;
 
-    private int overlapSize = 100;
+    private int overlapSize = 80;
 
     private long maxFileSize = 10485760L;
 

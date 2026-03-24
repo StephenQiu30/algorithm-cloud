@@ -74,6 +74,18 @@ public class Document implements Serializable {
     @Schema(description = "分片数量")
     private Integer chunkCount;
 
+    @Schema(description = "来源类型")
+    private String sourceType;
+
+    @Schema(description = "业务标签")
+    private String bizTag;
+
+    @Schema(description = "版本")
+    private String version;
+
+    @Schema(description = "扩展元数据")
+    private String extraMeta;
+
     /**
      * 上传用户ID
      */

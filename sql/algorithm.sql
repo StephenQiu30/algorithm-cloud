@@ -135,29 +135,6 @@ CREATE TABLE `post_favour`
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='帖子收藏表';
 
-DROP TABLE IF EXISTS `ai_chat_record`;
-CREATE TABLE `ai_chat_record`
-(
-    `id`                 bigint   NOT NULL AUTO_INCREMENT COMMENT '对话ID',
-    `user_id`            bigint   NOT NULL COMMENT '用户ID',
-    `message`            text     NOT NULL COMMENT '用户消息',
-    `response`           text              DEFAULT NULL COMMENT 'AI响应内容',
-    `model_type`         varchar(128)      DEFAULT NULL COMMENT '模型类型',
-    `total_tokens`       int               DEFAULT NULL COMMENT '总消耗token',
-    `prompt_tokens`      int               DEFAULT NULL COMMENT '提示消耗token',
-    `completion_tokens`  int               DEFAULT NULL COMMENT '生成消耗token',
-    `post_id`            bigint            DEFAULT NULL COMMENT '关联帖子ID',
-    `retrieval_metadata` json              DEFAULT NULL COMMENT '检索元数据(分片ID、评分等)',
-    `create_time`        datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time`        datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_delete`          tinyint  NOT NULL DEFAULT 0 COMMENT '是否删除',
-    PRIMARY KEY (`id`),
-    KEY `idx_user_id_create` (`user_id`, `create_time` DESC),
-    KEY `idx_post_id` (`post_id`)
-) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci COMMENT ='AI 对话记录表';
-
 DROP TABLE IF EXISTS `SPRING_AI_CHAT_MEMORY`;
 CREATE TABLE `SPRING_AI_CHAT_MEMORY`
 (
@@ -200,6 +177,10 @@ CREATE TABLE `document`
     `status`             varchar(20)  NOT NULL COMMENT '处理状态：PENDING/PROCESSING/COMPLETED/FAILED/TIMEOUT',
     `error_message`      text                  DEFAULT NULL COMMENT '错误信息',
     `chunk_count`        int                   DEFAULT 0 COMMENT '分片数量',
+    `source_type`        varchar(64)           DEFAULT NULL COMMENT '来源类型',
+    `biz_tag`            varchar(256)          DEFAULT NULL COMMENT '业务标签',
+    `version`            varchar(64)           DEFAULT NULL COMMENT '版本',
+    `extra_meta`         json                  DEFAULT NULL COMMENT '扩展元数据',
     `user_id`            bigint       NOT NULL COMMENT '上传用户ID',
     `upload_time`        datetime     NOT NULL COMMENT '上传时间',
     `process_start_time` datetime              DEFAULT NULL COMMENT '开始处理时间',
@@ -225,6 +206,9 @@ CREATE TABLE `rag_history`
     `answer`            text     NOT NULL COMMENT '答案',
     `sources`           json              DEFAULT NULL COMMENT '引用来源（文档ID和片段ID）',
     `response_time`     bigint            DEFAULT NULL COMMENT '响应时间（毫秒）',
+    `rewrite_query`     text              DEFAULT NULL COMMENT '改写后的查询',
+    `retrieval_meta`    json              DEFAULT NULL COMMENT '检索元数据',
+    `retrieval_strategy` varchar(64)      DEFAULT NULL COMMENT '检索策略',
     `create_time`       datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     KEY `idx_kb_id` (`knowledge_base_id`) COMMENT '知识库ID索引',
     KEY `idx_user_id` (`user_id`) COMMENT '用户ID索引',

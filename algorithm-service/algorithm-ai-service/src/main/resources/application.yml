@@ -57,8 +57,8 @@ mybatis-plus:
 # 文档处理配置
 document:
   processing:
-    chunk-size: 800
-    overlap-size: 100
+    chunk-size: 400
+    overlap-size: 80
     max-file-size: 10485760  # 10MB
     timeout: 600000  # 10分钟
     supported-formats:
@@ -75,7 +75,16 @@ document:
 rag:
   retrieval:
     top-k: 5
+    vector-top-k: 10
+    keyword-top-k: 10
+    rrf-k: 60
     similarity-threshold: 0.7
+    index-name: document_chunks
+    rewrite-enabled: true
+    rerank-enabled: true
+    rerank-top-n: 10
+    must-term-boost: 0.2
+    metadata-match-boost: 0.1
   generation:
     max-context-length: 4000
     temperature: 0.7
