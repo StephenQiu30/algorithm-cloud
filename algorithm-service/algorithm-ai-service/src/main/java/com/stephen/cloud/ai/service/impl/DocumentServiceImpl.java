@@ -15,6 +15,7 @@ import com.stephen.cloud.ai.mq.model.DocumentProcessMessage;
 import com.stephen.cloud.ai.service.DocumentService;
 import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.api.ai.model.dto.document.DocumentQueryRequest;
+import com.stephen.cloud.api.ai.model.enums.DocumentParseStatusEnum;
 import com.stephen.cloud.api.ai.model.vo.DocumentVO;
 import com.stephen.cloud.api.file.client.FileFeignClient;
 import com.stephen.cloud.api.file.model.enums.FileUploadBizEnum;
@@ -81,7 +82,7 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         document.setFilePath(fileUrl);
         document.setFileSize(file.getSize());
         document.setFileExtension(extension);
-        document.setStatus("PENDING");
+        document.setStatus(DocumentParseStatusEnum.PENDING.getValue());
         document.setChunkCount(0);
         document.setUserId(userId);
         document.setUploadTime(new Date());

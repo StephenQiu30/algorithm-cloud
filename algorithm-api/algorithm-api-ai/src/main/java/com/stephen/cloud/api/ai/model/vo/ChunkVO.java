@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.Date;
 
 @Data
 @Schema(description = "分片视图对象")
@@ -42,4 +43,7 @@ public class ChunkVO implements Serializable {
 
     @Schema(description = "命中原因")
     private String matchReason;
+
+    @Schema(description = "创建时间")
+    private Date createTime;
 }
