@@ -8,6 +8,7 @@ import com.stephen.cloud.ai.convert.RAGConvert;
 import com.stephen.cloud.ai.mapper.RAGHistoryMapper;
 import com.stephen.cloud.ai.model.entity.RAGHistory;
 import com.stephen.cloud.ai.service.RAGService;
+import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.api.ai.model.vo.RAGAnswerVO;
 import com.stephen.cloud.api.ai.model.vo.RAGHistoryVO;
 import com.stephen.cloud.api.ai.model.vo.SourceVO;
@@ -15,7 +16,6 @@ import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -26,18 +26,18 @@ import java.util.List;
 public class RAGServiceImpl implements RAGService {
 
     @Resource
-    private VectorStore vectorStore;
-
-    @Resource
     private ChatClient chatClient;
 
     @Resource
     private RAGHistoryMapper ragHistoryMapper;
 
+    @Resource
+    private VectorStoreService vectorStoreService;
+
     @Override
     public RAGAnswerVO ask(String question, Long knowledgeBaseId, Long userId, Integer topK) {
         long start = System.currentTimeMillis();
-        List<Document> docs = filterByKnowledgeBase(vectorStore.similaritySearch(question), knowledgeBaseId, topK);
+        List<Document> docs = vectorStoreService.similaritySearch(question, knowledgeBaseId, topK, null);
         String context = buildContext(docs);
         String prompt = buildPrompt(question, context);
         String answer = chatClient.prompt().user(prompt).call().content();
@@ -53,7 +53,7 @@ public class RAGServiceImpl implements RAGService {
 
     @Override
     public Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK) {
-        List<Document> docs = filterByKnowledgeBase(vectorStore.similaritySearch(question), knowledgeBaseId, topK);
+        List<Document> docs = vectorStoreService.similaritySearch(question, knowledgeBaseId, topK, null);
         String context = buildContext(docs);
         String prompt = buildPrompt(question, context);
         return chatClient.prompt().user(prompt).stream().content();
@@ -139,17 +139,4 @@ public class RAGServiceImpl implements RAGService {
         return sourceList;
     }
 
-    private List<Document> filterByKnowledgeBase(List<Document> docs, Long knowledgeBaseId, Integer topK) {
-        if (CollUtil.isEmpty(docs)) {
-            return List.of();
-        }
-        int limit = topK == null || topK <= 0 ? 5 : topK;
-        return docs.stream().filter(doc -> {
-            if (knowledgeBaseId == null || knowledgeBaseId <= 0) {
-                return true;
-            }
-            Object kbIdObj = doc.getMetadata().get("knowledgeBaseId");
-            return kbIdObj != null && String.valueOf(knowledgeBaseId).equals(String.valueOf(kbIdObj));
-        }).limit(limit).toList();
-    }
 }

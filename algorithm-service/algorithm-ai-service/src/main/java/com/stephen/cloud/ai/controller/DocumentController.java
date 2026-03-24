@@ -40,12 +40,11 @@ public class DocumentController {
         if (deleteRequest == null || deleteRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        Long id = deleteRequest.getId();
-        Document oldDocument = documentService.getById(id);
-        ThrowUtils.throwIf(oldDocument == null, ErrorCode.NOT_FOUND_ERROR);
-        Long userId = SecurityUtils.getLoginUserId();
-        ThrowUtils.throwIf(!oldDocument.getUserId().equals(userId) && !SecurityUtils.isAdmin(), ErrorCode.NO_AUTH_ERROR);
-        return ResultUtils.success(documentService.removeById(id));
+        return ResultUtils.success(documentService.deleteDocumentById(
+                deleteRequest.getId(),
+                SecurityUtils.getLoginUserId(),
+                SecurityUtils.isAdmin()
+        ));
     }
 
     @GetMapping("/get/vo")

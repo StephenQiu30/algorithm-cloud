@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 public class DocumentETLPipeline {
@@ -35,6 +36,12 @@ public class DocumentETLPipeline {
             document.getMetadata().putAll(metadata);
         }
         List<Document> chunks = tokenTextSplitter.apply(documents);
+        for (int i = 0; i < chunks.size(); i++) {
+            Document chunk = chunks.get(i);
+            chunk.getMetadata().put("chunkIndex", i);
+            String chunkId = metadata.get("documentId") + "_" + i + "_" + UUID.randomUUID();
+            chunk.getMetadata().put("chunkId", chunkId);
+        }
         vectorStore.add(chunks);
         return chunks.size();
     }

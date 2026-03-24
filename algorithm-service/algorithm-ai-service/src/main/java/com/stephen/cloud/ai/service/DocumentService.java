@@ -22,4 +22,6 @@ public interface DocumentService extends IService<Document> {
     Page<DocumentVO> getDocumentVOPage(Page<Document> page, HttpServletRequest request);
 
     void sendDocumentProcessMessage(Long documentId);
+
+    boolean deleteDocumentById(Long id, Long loginUserId, boolean isAdmin);
 }

@@ -1,13 +1,10 @@
 package com.stephen.cloud.ai.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.ai.convert.KnowledgeBaseConvert;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
-import com.stephen.cloud.ai.service.DocumentService;
 import com.stephen.cloud.ai.service.KnowledgeBaseService;
-import com.stephen.cloud.api.ai.model.dto.document.DocumentQueryRequest;
 import com.stephen.cloud.api.ai.model.dto.knowledgebase.KnowledgeBaseAddRequest;
 import com.stephen.cloud.api.ai.model.dto.knowledgebase.KnowledgeBaseEditRequest;
 import com.stephen.cloud.api.ai.model.dto.knowledgebase.KnowledgeBaseQueryRequest;
@@ -32,9 +29,6 @@ public class KnowledgeBaseController {
     @Resource
     private KnowledgeBaseService knowledgeBaseService;
 
-    @Resource
-    private DocumentService documentService;
-
     @PostMapping("/add")
     @Operation(summary = "创建知识库")
     @OperationLog(module = "知识库管理", action = "创建知识库")
@@ -56,15 +50,11 @@ public class KnowledgeBaseController {
         if (deleteRequest == null || deleteRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        Long id = deleteRequest.getId();
-        KnowledgeBase oldKnowledgeBase = knowledgeBaseService.getById(id);
-        ThrowUtils.throwIf(oldKnowledgeBase == null, ErrorCode.NOT_FOUND_ERROR);
-        Long userId = SecurityUtils.getLoginUserId();
-        ThrowUtils.throwIf(!oldKnowledgeBase.getUserId().equals(userId) && !SecurityUtils.isAdmin(), ErrorCode.NO_AUTH_ERROR);
-        documentService.remove(new LambdaQueryWrapper<com.stephen.cloud.ai.model.entity.Document>()
-                .eq(com.stephen.cloud.ai.model.entity.Document::getKnowledgeBaseId, id));
-        boolean result = knowledgeBaseService.removeById(id);
-        return ResultUtils.success(result);
+        return ResultUtils.success(knowledgeBaseService.deleteKnowledgeBaseById(
+                deleteRequest.getId(),
+                SecurityUtils.getLoginUserId(),
+                SecurityUtils.isAdmin()
+        ));
     }
 
     @PostMapping("/update")

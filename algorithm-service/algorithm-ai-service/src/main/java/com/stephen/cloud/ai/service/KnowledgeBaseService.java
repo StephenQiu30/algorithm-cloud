@@ -19,4 +19,6 @@ public interface KnowledgeBaseService extends IService<KnowledgeBase> {
     Page<KnowledgeBaseVO> getKnowledgeBaseVOPage(Page<KnowledgeBase> page, HttpServletRequest request);
 
     boolean isNameUnique(String name, Long excludeId);
+
+    boolean deleteKnowledgeBaseById(Long id, Long loginUserId, boolean isAdmin);
 }

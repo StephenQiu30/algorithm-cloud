@@ -4,12 +4,14 @@ import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.stephen.cloud.ai.config.DocumentProcessingProperties;
 import com.stephen.cloud.ai.convert.DocumentConvert;
 import com.stephen.cloud.ai.mapper.DocumentMapper;
 import com.stephen.cloud.ai.model.entity.Document;
 import com.stephen.cloud.ai.mq.DocumentProcessProducer;
 import com.stephen.cloud.ai.mq.model.DocumentProcessMessage;
 import com.stephen.cloud.ai.service.DocumentService;
+import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.api.ai.model.dto.document.DocumentQueryRequest;
 import com.stephen.cloud.api.ai.model.vo.DocumentVO;
 import com.stephen.cloud.api.user.client.UserFeignClient;
@@ -22,8 +24,8 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -38,11 +40,8 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
 
     private static final Set<String> SUPPORTED_EXTENSIONS = Set.of("pdf", "doc", "docx", "md", "txt", "ppt", "pptx", "html");
 
-    @Value("${document.processing.max-file-size:10485760}")
-    private long maxFileSize;
-
-    @Value("${document.processing.upload-path:uploads/knowledge}")
-    private String uploadPath;
+    @Resource
+    private DocumentProcessingProperties documentProcessingProperties;
 
     @Resource
     private DocumentProcessProducer documentProcessProducer;
@@ -50,17 +49,20 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     @Resource
     private UserFeignClient userFeignClient;
 
+    @Resource
+    private VectorStoreService vectorStoreService;
+
     @Override
     public Long uploadDocument(MultipartFile file, Long knowledgeBaseId, Long userId) {
         ThrowUtils.throwIf(file == null || file.isEmpty(), ErrorCode.PARAMS_ERROR, "文件不能为空");
         ThrowUtils.throwIf(knowledgeBaseId == null || knowledgeBaseId <= 0, ErrorCode.PARAMS_ERROR);
-        ThrowUtils.throwIf(file.getSize() > maxFileSize, ErrorCode.PARAMS_ERROR, "文件大小超过限制");
+        ThrowUtils.throwIf(file.getSize() > documentProcessingProperties.getMaxFileSize(), ErrorCode.PARAMS_ERROR, "文件大小超过限制");
         String originalFilename = file.getOriginalFilename();
         String extension = StringUtils.lowerCase(FilenameUtils.getExtension(originalFilename));
         ThrowUtils.throwIf(StringUtils.isBlank(extension) || !SUPPORTED_EXTENSIONS.contains(extension),
                 ErrorCode.PARAMS_ERROR, "不支持的文件格式");
         try {
-            Path saveDir = Path.of(uploadPath, String.valueOf(knowledgeBaseId));
+            Path saveDir = Path.of(documentProcessingProperties.getUploadPath(), String.valueOf(knowledgeBaseId));
             Files.createDirectories(saveDir);
             String saveName = System.currentTimeMillis() + "_" + UUID.randomUUID() + "." + extension;
             Path savePath = saveDir.resolve(saveName);
@@ -170,5 +172,16 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         message.setFilePath(document.getFilePath());
         message.setFileExtension(document.getFileExtension());
         documentProcessProducer.sendMessage(message);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean deleteDocumentById(Long id, Long loginUserId, boolean isAdmin) {
+        ThrowUtils.throwIf(id == null || id <= 0, ErrorCode.PARAMS_ERROR);
+        Document oldDocument = this.getById(id);
+        ThrowUtils.throwIf(oldDocument == null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(!Objects.equals(oldDocument.getUserId(), loginUserId) && !isAdmin, ErrorCode.NO_AUTH_ERROR);
+        vectorStoreService.deleteByDocumentId(id);
+        return this.removeById(id);
     }
 }

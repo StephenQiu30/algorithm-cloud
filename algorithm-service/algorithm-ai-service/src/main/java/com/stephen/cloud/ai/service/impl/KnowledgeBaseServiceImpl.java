@@ -6,8 +6,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.stephen.cloud.ai.convert.KnowledgeBaseConvert;
 import com.stephen.cloud.ai.mapper.KnowledgeBaseMapper;
+import com.stephen.cloud.ai.model.entity.Document;
 import com.stephen.cloud.ai.model.entity.KnowledgeBase;
+import com.stephen.cloud.ai.service.DocumentService;
 import com.stephen.cloud.ai.service.KnowledgeBaseService;
+import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.api.ai.model.dto.knowledgebase.KnowledgeBaseQueryRequest;
 import com.stephen.cloud.api.ai.model.vo.KnowledgeBaseVO;
 import com.stephen.cloud.api.user.client.UserFeignClient;
@@ -20,6 +23,7 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -29,6 +33,12 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
 
     @Resource
     private UserFeignClient userFeignClient;
+
+    @Resource
+    private DocumentService documentService;
+
+    @Resource
+    private VectorStoreService vectorStoreService;
 
     @Override
     public void validKnowledgeBase(KnowledgeBase knowledgeBase, boolean add) {
@@ -119,5 +129,17 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
             queryWrapper.ne(KnowledgeBase::getId, excludeId);
         }
         return this.count(queryWrapper) == 0;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean deleteKnowledgeBaseById(Long id, Long loginUserId, boolean isAdmin) {
+        ThrowUtils.throwIf(id == null || id <= 0, ErrorCode.PARAMS_ERROR);
+        KnowledgeBase oldKnowledgeBase = this.getById(id);
+        ThrowUtils.throwIf(oldKnowledgeBase == null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(!Objects.equals(oldKnowledgeBase.getUserId(), loginUserId) && !isAdmin, ErrorCode.NO_AUTH_ERROR);
+        vectorStoreService.deleteByKnowledgeBaseId(id);
+        documentService.remove(new LambdaQueryWrapper<Document>().eq(Document::getKnowledgeBaseId, id));
+        return this.removeById(id);
     }
 }
