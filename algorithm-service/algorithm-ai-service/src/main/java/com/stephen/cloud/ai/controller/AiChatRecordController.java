@@ -4,11 +4,8 @@ import cn.dev33.satoken.annotation.SaCheckRole;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.ai.model.entity.AiChatRecord;
 import com.stephen.cloud.ai.service.AiChatRecordService;
-import com.stephen.cloud.ai.service.RagService;
 import com.stephen.cloud.api.ai.model.dto.AiChatRecordQueryRequest;
 import com.stephen.cloud.api.ai.model.vo.AiChatRecordVO;
-import com.stephen.cloud.api.knowledge.model.dto.rag.RagChatRequest;
-import com.stephen.cloud.api.knowledge.model.vo.RagChatResponseVO;
 import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.common.*;
 import com.stephen.cloud.common.constants.UserConstant;
@@ -19,9 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Flux;
 
 /**
  * AI 对话记录管理接口
@@ -36,46 +31,6 @@ public class AiChatRecordController {
 
     @Resource
     private AiChatRecordService aiChatRecordService;
-
-    @Resource
-    private RagService ragService;
-
-    /**
-     * 发起 RAG 问答请求
-     *
-     * @param request 问答请求配置
-     * @return 问答结果包装类
-     */
-    @PostMapping("/chat")
-    @Operation(summary = "发起 RAG 问答", description = "核心接口：基于指定知识库执行检索增强生成的同步问答。")
-    @OperationLog(module = "AI 对话模块", action = "发起 RAG 问答")
-    public BaseResponse<RagChatResponseVO> ragChat(@RequestBody RagChatRequest request) {
-        if (request == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        Long userId = SecurityUtils.getLoginUserId();
-        log.info("[RAG问答] 收到问答请求: userId={}, kbId={}", userId, request.getKnowledgeBaseId());
-        RagChatResponseVO response = ragService.ragChat(request, userId);
-        return ResultUtils.success(response);
-    }
-
-    /**
-     * 发起流式 RAG 问答请求
-     *
-     * @param request 问答请求配置
-     * @return 响应式流数据
-     */
-    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @Operation(summary = "流式 RAG 问答", description = "基于 SSE 协议的检索增强生成流式输出。")
-    @OperationLog(module = "AI 对话模块", action = "流式 RAG 问答")
-    public Flux<RagChatResponseVO> streamRagChat(@RequestBody RagChatRequest request) {
-        if (request == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        Long userId = SecurityUtils.getLoginUserId();
-        log.info("[RAG流式] 收到流式问答请求: userId={}, kbId={}", userId, request.getKnowledgeBaseId());
-        return ragService.streamRagChat(request, userId);
-    }
 
     /**
      * 分页查询当前用户的对话历史

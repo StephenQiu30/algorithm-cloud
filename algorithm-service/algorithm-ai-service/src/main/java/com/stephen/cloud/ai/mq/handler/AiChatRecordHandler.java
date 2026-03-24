@@ -27,8 +27,7 @@ public class AiChatRecordHandler implements RabbitMqHandler<AiChatRecordDTO> {
 
     @Override
     public void onMessage(AiChatRecordDTO dto, RabbitMessage rabbitMessage) throws Exception {
-        log.info("[AiChatRecordHandler] 收到持久化请求, userId: {}, sessionId: {}",
-                dto.getUserId(), dto.getSessionId());
+        log.info("[AiChatRecordHandler] 收到持久化请求, userId: {}", dto.getUserId());
         AiChatRecord aiChatRecord = new AiChatRecord();
         BeanUtil.copyProperties(dto, aiChatRecord);
         aiChatRecordService.save(aiChatRecord);

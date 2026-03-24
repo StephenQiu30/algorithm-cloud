@@ -108,7 +108,6 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
         }
         Long id = aiChatRecordQueryRequest.getId();
         Long userId = aiChatRecordQueryRequest.getUserId();
-        String sessionId = aiChatRecordQueryRequest.getSessionId();
         String modelType = aiChatRecordQueryRequest.getModelType();
         String searchText = aiChatRecordQueryRequest.getSearchText();
         String sortField = aiChatRecordQueryRequest.getSortField();
@@ -117,7 +116,6 @@ public class AiChatRecordServiceImpl extends ServiceImpl<AiChatRecordMapper, AiC
         // 1. 执行精准字段过滤
         queryWrapper.eq(id != null && id > 0, AiChatRecord::getId, id)
                 .eq(userId != null && userId > 0, AiChatRecord::getUserId, userId)
-                .eq(StringUtils.isNotBlank(sessionId), AiChatRecord::getSessionId, sessionId)
                 .eq(StringUtils.isNotBlank(modelType), AiChatRecord::getModelType, modelType);
 
         // 2. 复合搜索关键词匹配 (消息原文 OR AI 回复内容)

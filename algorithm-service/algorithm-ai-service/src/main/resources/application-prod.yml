@@ -13,7 +13,6 @@ spring:
       - nacos:common-web-prod.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-cache-prod.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-mysql-prod.yml?group=DEFAULT_GROUP&refresh=true
-      - nacos:common-elasticsearch-prod.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-rabbitmq-prod.yml?group=DEFAULT_GROUP&refresh=true
   cloud:
     nacos:
@@ -35,33 +34,6 @@ spring:
       api-key: ${prod.aliyun.dashscope.api-key}
       options:
         model: ${prod.aliyun.dashscope.model-name}
-      embedding:
-        enabled: true
-        options:
-          model: text-embedding-v2
-
-app:
-  knowledge:
-    vector-index: algorithm-knowledge-vectors
-    embedding-dimension: 1536
-    chunk-size: 400
-    chunk-overlap: 50
-    default-top-k: 5
-    vector-similarity-threshold: 0.5
-    bm25-score-threshold: 0.0
-    cache-dir: ./data/algorithm-kb-cache
-    local-library-dir: ./data/algorithm-kb-library
-    hybrid-search-enabled: true
-    hybrid-bm25-fetch-size: 30
-    rrf-rank-constant: 60
-    chunk-paragraph-merge-char-budget: 2500
-    rag-top-k-max: 20
-    retrieval-top-k-max: 50
-    bm25-minimum-should-match: 50%
-    vector-batch-size: 100
-    keyword-metadata-enrich-enabled: false
-    keyword-metadata-count: 5
-    keyword-metadata-mode: rule
 
 # MyBatis-Plus 业务配置
 mybatis-plus:

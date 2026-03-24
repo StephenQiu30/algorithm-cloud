@@ -17,12 +17,6 @@ public class AiChatRecordAddRequest implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 会话 ID
-     */
-    @Schema(description = "会话 id")
-    private String sessionId;
-
-    /**
      * 对话消息
      */
     @Schema(description = "对话消息")

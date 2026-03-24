@@ -36,12 +36,6 @@ public class AiChatRecordVO implements Serializable {
     private Long userId;
 
     /**
-     * 会话 ID
-     */
-    @Schema(description = "会话 ID")
-    private String sessionId;
-
-    /**
      * 对话消息 (用户提问)
      */
     @Schema(description = "对话消息")

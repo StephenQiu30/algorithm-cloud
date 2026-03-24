@@ -34,12 +34,6 @@ public class AiChatRecordDTO implements Serializable {
     private Long userId;
 
     /**
-     * 会话 ID
-     */
-    @Schema(description = "会话 ID")
-    private String sessionId;
-
-    /**
      * 对话消息 (用户提问原文)
      */
     @Schema(description = "对话消息")
@@ -81,9 +75,4 @@ public class AiChatRecordDTO implements Serializable {
     @Schema(description = "生成消耗 token")
     private Integer completionTokens;
 
-    /**
-     * 检索元数据（来源分片、分数等）
-     */
-    @Schema(description = "检索元数据")
-    private String retrievalMetadata;
 }
