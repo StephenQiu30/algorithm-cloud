@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 @RestController
-@RequestMapping("/rag")
+@RequestMapping("/ai/rag")
 @Tag(name = "RAGController", description = "RAG问答")
 public class RAGController {
 

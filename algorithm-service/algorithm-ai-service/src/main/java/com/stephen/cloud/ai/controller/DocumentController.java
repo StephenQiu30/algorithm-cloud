@@ -9,26 +9,38 @@ import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.common.*;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.log.annotation.OperationLog;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/doc")
+@RequestMapping("/ai/doc")
 @Tag(name = "DocumentController", description = "文档管理")
 public class DocumentController {
 
     @Resource
     private DocumentService documentService;
 
-    @PostMapping("/add")
+    @PostMapping(value = "/add", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "上传文档")
     @OperationLog(module = "文档管理", action = "上传文档")
-    public BaseResponse<Long> addDocument(@RequestParam("file") MultipartFile file,
-                                          @RequestParam("knowledgeBaseId") Long knowledgeBaseId) {
+    public BaseResponse<Long> addDocument(
+            @Parameter(
+                    description = "上传文件",
+                    required = true,
+                    content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+                            schema = @Schema(type = "string", format = "binary"))
+            )
+            @RequestParam("file") MultipartFile file,
+            @Parameter(description = "知识库 ID", required = true, example = "1")
+            @RequestParam("knowledgeBaseId") Long knowledgeBaseId) {
         ThrowUtils.throwIf(!SecurityUtils.isAdmin(), ErrorCode.NO_AUTH_ERROR);
         Long documentId = documentService.uploadDocument(file, knowledgeBaseId, SecurityUtils.getLoginUserId());
         return ResultUtils.success(documentId);

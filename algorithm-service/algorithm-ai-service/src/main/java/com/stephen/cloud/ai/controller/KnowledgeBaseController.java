@@ -22,7 +22,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/kb")
+@RequestMapping("/ai/kb")
 @Tag(name = "KnowledgeBaseController", description = "知识库管理")
 public class KnowledgeBaseController {
 
