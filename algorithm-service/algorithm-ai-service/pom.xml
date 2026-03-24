@@ -81,7 +81,7 @@
         <!-- Spring AI Elasticsearch Vector Store -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-elasticsearch-store</artifactId>
+            <artifactId>spring-ai-starter-vector-store-elasticsearch</artifactId>
         </dependency>
 
         <!-- Common Auth -->

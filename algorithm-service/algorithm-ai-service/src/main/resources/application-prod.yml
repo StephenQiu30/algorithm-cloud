@@ -37,6 +37,12 @@ spring:
         model: ${prod.aliyun.dashscope.model-name}
       embedding:
         model: text-embedding-v2
+    vectorstore:
+      elasticsearch:
+        index-name: document_chunks
+        dimensions: 1536
+        similarity: cosine
+        initialize-schema: true
 
 # MyBatis-Plus 业务配置
 mybatis-plus:

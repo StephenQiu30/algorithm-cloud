@@ -49,6 +49,7 @@ spring:
         index-name: document_chunks
         dimensions: 1536
         similarity: cosine
+        initialize-schema: true
 
 # MyBatis-Plus 业务配置
 mybatis-plus:
