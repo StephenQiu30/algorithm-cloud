@@ -1,0 +1,174 @@
+package com.stephen.cloud.ai.service.impl;
+
+import cn.hutool.core.collection.CollUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.stephen.cloud.ai.convert.DocumentConvert;
+import com.stephen.cloud.ai.mapper.DocumentMapper;
+import com.stephen.cloud.ai.model.entity.Document;
+import com.stephen.cloud.ai.mq.DocumentProcessProducer;
+import com.stephen.cloud.ai.mq.model.DocumentProcessMessage;
+import com.stephen.cloud.ai.service.DocumentService;
+import com.stephen.cloud.api.ai.model.dto.document.DocumentQueryRequest;
+import com.stephen.cloud.api.ai.model.vo.DocumentVO;
+import com.stephen.cloud.api.user.client.UserFeignClient;
+import com.stephen.cloud.api.user.model.vo.UserVO;
+import com.stephen.cloud.common.common.ErrorCode;
+import com.stephen.cloud.common.common.ThrowUtils;
+import com.stephen.cloud.common.constants.CommonConstant;
+import com.stephen.cloud.common.exception.BusinessException;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> implements DocumentService {
+
+    private static final Set<String> SUPPORTED_EXTENSIONS = Set.of("pdf", "doc", "docx", "md", "txt", "ppt", "pptx", "html");
+
+    @Value("${document.processing.max-file-size:10485760}")
+    private long maxFileSize;
+
+    @Value("${document.processing.upload-path:uploads/knowledge}")
+    private String uploadPath;
+
+    @Resource
+    private DocumentProcessProducer documentProcessProducer;
+
+    @Resource
+    private UserFeignClient userFeignClient;
+
+    @Override
+    public Long uploadDocument(MultipartFile file, Long knowledgeBaseId, Long userId) {
+        ThrowUtils.throwIf(file == null || file.isEmpty(), ErrorCode.PARAMS_ERROR, "文件不能为空");
+        ThrowUtils.throwIf(knowledgeBaseId == null || knowledgeBaseId <= 0, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(file.getSize() > maxFileSize, ErrorCode.PARAMS_ERROR, "文件大小超过限制");
+        String originalFilename = file.getOriginalFilename();
+        String extension = StringUtils.lowerCase(FilenameUtils.getExtension(originalFilename));
+        ThrowUtils.throwIf(StringUtils.isBlank(extension) || !SUPPORTED_EXTENSIONS.contains(extension),
+                ErrorCode.PARAMS_ERROR, "不支持的文件格式");
+        try {
+            Path saveDir = Path.of(uploadPath, String.valueOf(knowledgeBaseId));
+            Files.createDirectories(saveDir);
+            String saveName = System.currentTimeMillis() + "_" + UUID.randomUUID() + "." + extension;
+            Path savePath = saveDir.resolve(saveName);
+            file.transferTo(savePath.toFile());
+            Document document = new Document();
+            document.setKnowledgeBaseId(knowledgeBaseId);
+            document.setName(StringUtils.defaultIfBlank(originalFilename, saveName));
+            document.setFilePath(savePath.toAbsolutePath().toString());
+            document.setFileSize(file.getSize());
+            document.setFileExtension(extension);
+            document.setStatus("PENDING");
+            document.setChunkCount(0);
+            document.setUserId(userId);
+            document.setUploadTime(new Date());
+            boolean result = this.save(document);
+            ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+            sendDocumentProcessMessage(document.getId());
+            return document.getId();
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "文件保存失败");
+        }
+    }
+
+    @Override
+    public void validDocument(Document document, boolean add) {
+        if (document == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        if (add) {
+            ThrowUtils.throwIf(document.getKnowledgeBaseId() == null || document.getKnowledgeBaseId() <= 0, ErrorCode.PARAMS_ERROR);
+            ThrowUtils.throwIf(StringUtils.isBlank(document.getName()), ErrorCode.PARAMS_ERROR, "文档名称不能为空");
+        }
+    }
+
+    @Override
+    public LambdaQueryWrapper<Document> getQueryWrapper(DocumentQueryRequest queryRequest) {
+        LambdaQueryWrapper<Document> queryWrapper = new LambdaQueryWrapper<>();
+        if (queryRequest == null) {
+            return queryWrapper;
+        }
+        queryWrapper.eq(queryRequest.getId() != null && queryRequest.getId() > 0, Document::getId, queryRequest.getId())
+                .eq(queryRequest.getKnowledgeBaseId() != null && queryRequest.getKnowledgeBaseId() > 0, Document::getKnowledgeBaseId, queryRequest.getKnowledgeBaseId())
+                .eq(queryRequest.getUserId() != null && queryRequest.getUserId() > 0, Document::getUserId, queryRequest.getUserId())
+                .eq(StringUtils.isNotBlank(queryRequest.getStatus()), Document::getStatus, queryRequest.getStatus())
+                .like(StringUtils.isNotBlank(queryRequest.getName()), Document::getName, queryRequest.getName());
+        String sortField = queryRequest.getSortField();
+        String sortOrder = queryRequest.getSortOrder();
+        if (StringUtils.isNotBlank(sortField) && "createTime".equals(sortField)) {
+            queryWrapper.orderBy(true, CommonConstant.SORT_ORDER_ASC.equalsIgnoreCase(sortOrder), Document::getCreateTime);
+        } else {
+            queryWrapper.orderByDesc(Document::getCreateTime);
+        }
+        return queryWrapper;
+    }
+
+    @Override
+    public DocumentVO getDocumentVO(Document document, HttpServletRequest request) {
+        if (document == null) {
+            return null;
+        }
+        DocumentVO documentVO = DocumentConvert.INSTANCE.objToVo(document);
+        Long userId = document.getUserId();
+        if (userId != null && userId > 0) {
+            UserVO userVO = userFeignClient.getUserVOById(userId).getData();
+            documentVO.setUserVO(userVO);
+        }
+        return documentVO;
+    }
+
+    @Override
+    public Page<DocumentVO> getDocumentVOPage(Page<Document> page, HttpServletRequest request) {
+        List<Document> records = page.getRecords();
+        Page<DocumentVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        if (CollUtil.isEmpty(records)) {
+            return voPage;
+        }
+        Set<Long> userIds = records.stream().map(Document::getUserId).collect(Collectors.toSet());
+        Map<Long, UserVO> userMap = new HashMap<>();
+        if (CollUtil.isNotEmpty(userIds)) {
+            List<UserVO> userVOList = userFeignClient.getUserVOByIds(new ArrayList<>(userIds)).getData();
+            if (CollUtil.isNotEmpty(userVOList)) {
+                userMap = userVOList.stream().collect(Collectors.toMap(UserVO::getId, item -> item));
+            }
+        }
+        Map<Long, UserVO> finalUserMap = userMap;
+        List<DocumentVO> voList = records.stream().map(record -> {
+            DocumentVO vo = DocumentConvert.INSTANCE.objToVo(record);
+            vo.setUserVO(finalUserMap.get(record.getUserId()));
+            return vo;
+        }).collect(Collectors.toList());
+        voPage.setRecords(voList);
+        return voPage;
+    }
+
+    @Override
+    public void sendDocumentProcessMessage(Long documentId) {
+        if (documentId == null || documentId <= 0) {
+            return;
+        }
+        Document document = this.getById(documentId);
+        if (document == null) {
+            return;
+        }
+        DocumentProcessMessage message = new DocumentProcessMessage();
+        message.setDocumentId(document.getId());
+        message.setKnowledgeBaseId(document.getKnowledgeBaseId());
+        message.setFilePath(document.getFilePath());
+        message.setFileExtension(document.getFileExtension());
+        documentProcessProducer.sendMessage(message);
+    }
+}

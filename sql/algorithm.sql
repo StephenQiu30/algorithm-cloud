@@ -170,6 +170,70 @@ CREATE TABLE `SPRING_AI_CHAT_MEMORY`
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT ='Spring AI 标准对话记忆表';
 
+DROP TABLE IF EXISTS `knowledge_base`;
+CREATE TABLE `knowledge_base`
+(
+    `id`             bigint       NOT NULL AUTO_INCREMENT COMMENT '知识库ID',
+    `name`           varchar(255) NOT NULL COMMENT '知识库名称',
+    `description`    text                  DEFAULT NULL COMMENT '知识库描述',
+    `user_id`        bigint       NOT NULL COMMENT '创建用户ID',
+    `document_count` int                   DEFAULT 0 COMMENT '文档数量',
+    `create_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_delete`      tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_name` (`name`) COMMENT '知识库名称唯一索引',
+    KEY `idx_user_id` (`user_id`) COMMENT '创建用户ID索引'
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='知识库表';
+
+DROP TABLE IF EXISTS `document`;
+CREATE TABLE `document`
+(
+    `id`                 bigint       NOT NULL AUTO_INCREMENT COMMENT '文档ID',
+    `knowledge_base_id`  bigint       NOT NULL COMMENT '知识库ID',
+    `name`               varchar(255) NOT NULL COMMENT '文档名称',
+    `file_path`          varchar(512) NOT NULL COMMENT '文件路径',
+    `file_size`          bigint                DEFAULT NULL COMMENT '文件大小（字节）',
+    `file_extension`     varchar(20)           DEFAULT NULL COMMENT '文件扩展名',
+    `status`             varchar(20)  NOT NULL COMMENT '处理状态：PENDING/PROCESSING/COMPLETED/FAILED/TIMEOUT',
+    `error_message`      text                  DEFAULT NULL COMMENT '错误信息',
+    `chunk_count`        int                   DEFAULT 0 COMMENT '分片数量',
+    `user_id`            bigint       NOT NULL COMMENT '上传用户ID',
+    `upload_time`        datetime     NOT NULL COMMENT '上传时间',
+    `process_start_time` datetime              DEFAULT NULL COMMENT '开始处理时间',
+    `process_end_time`   datetime              DEFAULT NULL COMMENT '处理完成时间',
+    `create_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_delete`          tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_kb_id` (`knowledge_base_id`) COMMENT '知识库ID索引',
+    KEY `idx_user_id` (`user_id`) COMMENT '上传用户ID索引',
+    KEY `idx_status` (`status`) COMMENT '处理状态索引'
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='文档表';
+
+DROP TABLE IF EXISTS `rag_history`;
+CREATE TABLE `rag_history`
+(
+    `id`                bigint   NOT NULL AUTO_INCREMENT COMMENT '历史记录ID',
+    `knowledge_base_id` bigint   NOT NULL COMMENT '知识库ID',
+    `user_id`           bigint   NOT NULL COMMENT '用户ID',
+    `question`          text     NOT NULL COMMENT '问题',
+    `answer`            text     NOT NULL COMMENT '答案',
+    `sources`           json              DEFAULT NULL COMMENT '引用来源（文档ID和片段ID）',
+    `response_time`     bigint            DEFAULT NULL COMMENT '响应时间（毫秒）',
+    `create_time`       datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    KEY `idx_kb_id` (`knowledge_base_id`) COMMENT '知识库ID索引',
+    KEY `idx_user_id` (`user_id`) COMMENT '用户ID索引',
+    KEY `idx_create_time` (`create_time`) COMMENT '创建时间索引',
+    PRIMARY KEY (`id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='RAG问答历史表';
+
 -- ============================================
 -- 模块：系统支撑 (通知、文件、邮件、日志)
 -- ============================================

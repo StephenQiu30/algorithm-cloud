@@ -30,13 +30,21 @@ public class AiConfig {
     @Bean
     @Primary
     public ChatMemory chatMemory(JdbcChatMemoryRepository jdbcChatMemoryRepository,
-                                 StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
-        RedisChatMemoryRepository redisRepo = new RedisChatMemoryRepository(redisTemplate, objectMapper);
+                                 StringRedisTemplate redisTemplate,
+                                 ObjectMapper objectMapper,
+                                 ChatMemoryProperties chatMemoryProperties) {
+        RedisChatMemoryRepository redisRepo = new RedisChatMemoryRepository(
+                redisTemplate,
+                objectMapper,
+                chatMemoryProperties.getRedisTtlMinutes(),
+                chatMemoryProperties.getMaxMessages(),
+                chatMemoryProperties.isKeepSystemMessages()
+        );
         RedisJdbcChatMemoryRepository compositeRepo =
                 new RedisJdbcChatMemoryRepository(redisRepo, jdbcChatMemoryRepository);
         return MessageWindowChatMemory.builder()
                 .chatMemoryRepository(compositeRepo)
-                .maxMessages(10)
+                .maxMessages(100)
                 .build();
     }
 

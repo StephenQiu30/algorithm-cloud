@@ -24,14 +24,20 @@ import java.util.stream.Collectors;
 public class RedisChatMemoryRepository implements ChatMemoryRepository {
 
     private static final String KEY_PREFIX = "chat:memory:";
-    private static final long DEFAULT_TTL_MINUTES = 30;
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final long redisTtlMinutes;
+    private final int maxMessages;
+    private final boolean keepSystemMessages;
 
-    public RedisChatMemoryRepository(StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
+    public RedisChatMemoryRepository(StringRedisTemplate redisTemplate, ObjectMapper objectMapper,
+                                     long redisTtlMinutes, int maxMessages, boolean keepSystemMessages) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.redisTtlMinutes = redisTtlMinutes;
+        this.maxMessages = maxMessages;
+        this.keepSystemMessages = keepSystemMessages;
     }
 
     @Override
@@ -59,16 +65,19 @@ public class RedisChatMemoryRepository implements ChatMemoryRepository {
             return;
         }
         String key = getKeys(conversationId);
+        List<Message> trimmedMessages = trimToWindow(messages);
 
-        // 清除旧数据，重新写入（维护最新的快照）
         redisTemplate.delete(key);
 
-        List<String> jsonMessages = messages.stream()
+        List<String> jsonMessages = trimmedMessages.stream()
                 .map(this::toJson)
+                .filter(json -> json != null && !json.isBlank())
                 .collect(Collectors.toList());
-
+        if (jsonMessages.isEmpty()) {
+            return;
+        }
         redisTemplate.opsForList().rightPushAll(key, jsonMessages);
-        redisTemplate.expire(key, DEFAULT_TTL_MINUTES, TimeUnit.MINUTES);
+        redisTemplate.expire(key, redisTtlMinutes, TimeUnit.MINUTES);
     }
 
     @Override
@@ -105,6 +114,27 @@ public class RedisChatMemoryRepository implements ChatMemoryRepository {
             log.error("Deserialize json to message failed", e);
             return null;
         }
+    }
+
+    private List<Message> trimToWindow(List<Message> messages) {
+        int limit = Math.max(1, maxMessages);
+        if (messages.size() <= limit) {
+            return messages;
+        }
+        List<Message> latestMessages = new ArrayList<>(messages.subList(messages.size() - limit, messages.size()));
+        if (!keepSystemMessages) {
+            return latestMessages;
+        }
+        List<Message> systemMessages = messages.stream()
+                .filter(message -> message != null && MessageType.SYSTEM.equals(message.getMessageType()))
+                .toList();
+        if (systemMessages.isEmpty()) {
+            return latestMessages;
+        }
+        List<Message> result = new ArrayList<>(systemMessages.size() + latestMessages.size());
+        result.addAll(systemMessages);
+        result.addAll(latestMessages);
+        return result.stream().distinct().toList();
     }
 
     /**

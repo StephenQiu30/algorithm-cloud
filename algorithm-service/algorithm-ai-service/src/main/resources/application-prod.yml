@@ -14,6 +14,7 @@ spring:
       - nacos:common-cache-prod.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-mysql-prod.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-rabbitmq-prod.yml?group=DEFAULT_GROUP&refresh=true
+      - nacos:common-elasticsearch-prod.yml?group=DEFAULT_GROUP&refresh=true
   cloud:
     nacos:
       discovery:
@@ -32,9 +33,43 @@ spring:
   ai:
     dashscope:
       api-key: ${prod.aliyun.dashscope.api-key}
-      options:
+      chat:
         model: ${prod.aliyun.dashscope.model-name}
+      embedding:
+        model: text-embedding-v2
 
 # MyBatis-Plus 业务配置
 mybatis-plus:
   type-aliases-package: com.stephen.cloud.ai.model.entity
+
+# 文档处理配置
+document:
+  processing:
+    chunk-size: 800
+    overlap-size: 100
+    max-file-size: 10485760  # 10MB
+    timeout: 600000  # 10分钟
+    supported-formats:
+      - pdf
+      - doc
+      - docx
+      - md
+      - txt
+      - ppt
+      - pptx
+      - html
+
+# RAG 配置
+rag:
+  retrieval:
+    top-k: 5
+    similarity-threshold: 0.7
+  generation:
+    max-context-length: 4000
+    temperature: 0.7
+
+chat:
+  memory:
+    redis-ttl-minutes: 30
+    max-messages: 16
+    keep-system-messages: true

@@ -24,19 +24,27 @@ public class RedisJdbcChatMemoryRepository implements ChatMemoryRepository {
 
     @Override
     public List<Message> findByConversationId(String conversationId) {
-        List<Message> messages = redisRepository.findByConversationId(conversationId);
-        if (messages != null && !messages.isEmpty()) {
-            return messages;
+        try {
+            List<Message> redisMessages = redisRepository.findByConversationId(conversationId);
+            if (redisMessages != null && !redisMessages.isEmpty()) {
+                return redisMessages;
+            }
+        } catch (Exception e) {
+            log.warn("[RedisJdbcChatMemoryRepository] Redis读取失败, conversationId={}", conversationId, e);
         }
 
-        log.info("Redis cache miss for conversation {}, falling back to MySQL", conversationId);
-        messages = jdbcRepository.findByConversationId(conversationId);
+        log.info("[RedisJdbcChatMemoryRepository] Redis未命中, 回退JDBC, conversationId={}", conversationId);
+        List<Message> jdbcMessages = jdbcRepository.findByConversationId(conversationId);
 
-        if (messages != null && !messages.isEmpty()) {
-            redisRepository.saveAll(conversationId, messages);
+        if (jdbcMessages != null && !jdbcMessages.isEmpty()) {
+            try {
+                redisRepository.saveAll(conversationId, jdbcMessages);
+            } catch (Exception e) {
+                log.warn("[RedisJdbcChatMemoryRepository] JDBC回填Redis失败, conversationId={}", conversationId, e);
+            }
         }
 
-        return messages;
+        return jdbcMessages;
     }
 
     @Override
@@ -44,20 +52,28 @@ public class RedisJdbcChatMemoryRepository implements ChatMemoryRepository {
         try {
             redisRepository.saveAll(conversationId, messages);
         } catch (Exception e) {
-            log.warn("Failed to save conversation {} to Redis", conversationId, e);
+            log.warn("[RedisJdbcChatMemoryRepository] 写入Redis失败, conversationId={}", conversationId, e);
         }
 
         try {
             jdbcRepository.saveAll(conversationId, messages);
         } catch (Exception e) {
-            log.error("Failed to save conversation {} to MySQL (Official JDBC)", conversationId, e);
+            log.error("[RedisJdbcChatMemoryRepository] 写入JDBC失败, conversationId={}", conversationId, e);
         }
     }
 
     @Override
     public void deleteByConversationId(String conversationId) {
-        redisRepository.deleteByConversationId(conversationId);
-        jdbcRepository.deleteByConversationId(conversationId);
+        try {
+            redisRepository.deleteByConversationId(conversationId);
+        } catch (Exception e) {
+            log.warn("[RedisJdbcChatMemoryRepository] 删除Redis会话失败, conversationId={}", conversationId, e);
+        }
+        try {
+            jdbcRepository.deleteByConversationId(conversationId);
+        } catch (Exception e) {
+            log.error("[RedisJdbcChatMemoryRepository] 删除JDBC会话失败, conversationId={}", conversationId, e);
+        }
     }
 }
 
