@@ -16,6 +16,7 @@ import com.stephen.cloud.common.log.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
@@ -39,10 +40,11 @@ public class RAGController {
 
     @PostMapping("/history/list/page/vo")
     @Operation(summary = "分页获取RAG历史")
-    public BaseResponse<Page<RAGHistoryVO>> listHistoryByPage(@RequestBody RAGHistoryQueryRequest queryRequest) {
+    public BaseResponse<Page<RAGHistoryVO>> listRAGHistoryVOByPage(@RequestBody RAGHistoryQueryRequest queryRequest,
+                                                                  HttpServletRequest request) {
         Long userId = SecurityUtils.getLoginUserId();
-        Page<RAGHistoryVO> page = ragService.listHistoryByPage(queryRequest.getCurrent(), queryRequest.getPageSize(),
-                queryRequest.getKnowledgeBaseId(), userId);
+        queryRequest.setUserId(userId);
+        Page<RAGHistoryVO> page = ragService.listRAGHistoryVOByPage(queryRequest, request);
         return ResultUtils.success(page);
     }
 

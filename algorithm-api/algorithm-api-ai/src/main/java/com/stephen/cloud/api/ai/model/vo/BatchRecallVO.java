@@ -20,6 +20,12 @@ public class BatchRecallVO implements Serializable {
     @Schema(description = "平均召回率 (Mean Recall)")
     private Double meanRecall;
 
+    @Schema(description = "平均准确率 (Mean Precision)")
+    private Double meanPrecision;
+
+    @Schema(description = "平均倒数排名 (Mean MRR)")
+    private Double meanMRR;
+
     @Schema(description = "测试结果详情")
     private List<RecallItemResultVO> itemResults;
 }

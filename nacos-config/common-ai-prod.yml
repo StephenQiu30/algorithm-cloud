@@ -1,0 +1,45 @@
+# 公共 AI/RAG 配置文件 (Production)
+# 生产环境覆盖配置
+
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+# 文档处理配置（生产环境调整）
+document:
+  processing:
+    chunk-strategy: smart
+    chunk-size: 500
+    overlap-size: 100
+    max-chunk-size: 1000
+    max-file-size: 20971520            # 20MB
+
+# RAG 检索配置（生产环境调整）
+rag:
+  retrieval:
+    top-k: 5
+    vector-top-k: 15
+    keyword-top-k: 15
+    rrf-k: 60
+    similarity-threshold: 0.65
+    index-name: document_chunks
+    rewrite-enabled: true
+    llm-rewrite-enabled: false
+    rerank-enabled: true
+    rerank-top-n: 15
+    must-term-boost: 0.2
+    metadata-match-boost: 0.1
+    vector-weight: 1.0
+    keyword-weight: 0.8
+    multi-query-enabled: true
+  generation:
+    max-context-length: 6000
+    temperature: 0.5
+
+# Chat Memory 配置
+chat:
+  memory:
+    redis-ttl-minutes: 60
+    max-messages: 20
+    keep-system-messages: true

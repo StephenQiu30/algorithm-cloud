@@ -32,7 +32,8 @@ public class KnowledgeBaseController {
     @PostMapping("/add")
     @Operation(summary = "创建知识库")
     @OperationLog(module = "知识库管理", action = "创建知识库")
-    public BaseResponse<Long> addKnowledgeBase(@RequestBody KnowledgeBaseAddRequest addRequest) {
+    public BaseResponse<Long> addKnowledgeBase(@RequestBody KnowledgeBaseAddRequest addRequest,
+                                              HttpServletRequest request) {
         KnowledgeBase knowledgeBase = KnowledgeBaseConvert.INSTANCE.addRequestToObj(addRequest);
         knowledgeBaseService.validKnowledgeBase(knowledgeBase, true);
         ThrowUtils.throwIf(!knowledgeBaseService.isNameUnique(knowledgeBase.getName(), null), ErrorCode.OPERATION_ERROR, "知识库名称已存在");
@@ -94,6 +95,20 @@ public class KnowledgeBaseController {
         KnowledgeBase knowledgeBase = knowledgeBaseService.getById(id);
         ThrowUtils.throwIf(knowledgeBase == null, ErrorCode.NOT_FOUND_ERROR, "知识库不存在，id=" + id);
         return ResultUtils.success(knowledgeBaseService.getKnowledgeBaseVO(knowledgeBase, request));
+    }
+
+    @PostMapping("/list/page")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
+    @Operation(summary = "分页获取知识库（管理员）")
+    public BaseResponse<Page<KnowledgeBase>> listKnowledgeBaseByPage(@RequestBody KnowledgeBaseQueryRequest queryRequest) {
+        if (queryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        long current = queryRequest.getCurrent();
+        long size = queryRequest.getPageSize();
+        Page<KnowledgeBase> page = knowledgeBaseService.page(new Page<>(current, size),
+                knowledgeBaseService.getQueryWrapper(queryRequest));
+        return ResultUtils.success(page);
     }
 
     @PostMapping("/list/page/vo")

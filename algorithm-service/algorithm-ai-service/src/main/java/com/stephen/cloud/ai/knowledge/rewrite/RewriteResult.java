@@ -15,4 +15,9 @@ public class RewriteResult {
     private List<String> mustTerms;
 
     private Map<String, String> metadataFilters;
+
+    /**
+     * LLM 拆分的子查询列表（Multi-Query 扩展使用）
+     */
+    private List<String> subQueries;
 }

@@ -23,6 +23,12 @@ public class RecallItemResultVO implements Serializable {
     @Schema(description = "召回率（期望分片被找回的比例）")
     private Double recall;
 
+    @Schema(description = "准确率 (Precision)")
+    private Double precision;
+
+    @Schema(description = "平均倒数排名 (MRR)")
+    private Double mrr;
+
     @Schema(description = "实际召回的分片内容列表")
     private List<RetrievalHitVO> retrievedChunks;
 

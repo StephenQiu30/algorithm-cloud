@@ -17,6 +17,7 @@ spring:
       - nacos:common-mysql.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-rabbitmq.yml?group=DEFAULT_GROUP&refresh=true
       - nacos:common-elasticsearch.yml?group=DEFAULT_GROUP&refresh=true
+      - nacos:common-ai.yml?group=DEFAULT_GROUP&refresh=true
   cloud:
     nacos:
       discovery:
@@ -55,46 +56,3 @@ spring:
 mybatis-plus:
   type-aliases-package: com.stephen.cloud.ai.model.entity
 
-# 文档处理配置
-document:
-  processing:
-    chunk-size: 400
-    overlap-size: 80
-    max-file-size: 10485760  # 10MB
-    timeout: 600000  # 10分钟
-    supported-formats:
-      - pdf
-      - doc
-      - docx
-      - md
-      - txt
-      - ppt
-      - pptx
-      - html
-
-# RAG 配置
-rag:
-  retrieval:
-    top-k: 5
-    vector-top-k: 10
-    keyword-top-k: 10
-    rrf-k: 60
-    similarity-threshold: 0.7
-    index-name: document_chunks
-    rewrite-enabled: true
-    rerank-enabled: true
-    rerank-top-n: 10
-    must-term-boost: 0.2
-    metadata-match-boost: 0.1
-    vector-weight: 1.0
-    keyword-weight: 1.0
-    multi-query-enabled: true
-  generation:
-    max-context-length: 4000
-    temperature: 0.7
-
-chat:
-  memory:
-    redis-ttl-minutes: 30
-    max-messages: 16
-    keep-system-messages: true

@@ -8,6 +8,8 @@ import com.stephen.cloud.api.ai.model.dto.chunk.ChunkQueryRequest;
 import com.stephen.cloud.api.ai.model.dto.chunk.ChunkSearchRequest;
 import com.stephen.cloud.api.ai.model.vo.ChunkVO;
 import com.stephen.cloud.common.rabbitmq.enums.EsSyncTypeEnum;
+import jakarta.servlet.http.HttpServletRequest;
+
 
 import java.util.Date;
 import java.util.List;
@@ -42,12 +44,12 @@ public interface ChunkService extends IService<DocumentChunk> {
     /**
      * 分页查询文档分片列表
      */
-    Page<ChunkVO> getChunkVOPage(Page<DocumentChunk> page);
+    Page<ChunkVO> getChunkVOPage(Page<DocumentChunk> page, HttpServletRequest request);
 
     /**
      * 对象转 VO
      */
-    ChunkVO getChunkVO(DocumentChunk chunk);
+    ChunkVO getChunkVO(DocumentChunk chunk, HttpServletRequest request);
 
     /**
      * 基于内容进行混合检索（向量 + 关键词 + RRF融合）

@@ -189,8 +189,8 @@ CREATE TABLE `document`
     `update_time`        datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_delete`          tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
-    KEY `idx_kb_id` (`knowledge_base_id`) COMMENT '知识库ID索引',
-    KEY `idx_user_id` (`user_id`) COMMENT '上传用户ID索引',
+    KEY `idx_kb_status_delete` (`knowledge_base_id`, `status`, `is_delete`) COMMENT '知识库状态删除组合索引',
+    KEY `idx_user_delete` (`user_id`, `is_delete`) COMMENT '用户文档删除索引',
     KEY `idx_status` (`status`) COMMENT '处理状态索引'
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
@@ -225,15 +225,17 @@ CREATE TABLE `document_chunk`
     `document_id`       bigint       NOT NULL COMMENT '文档ID',
     `knowledge_base_id` bigint       NOT NULL COMMENT '知识库ID',
     `chunk_index`       int          NOT NULL COMMENT '分片索引（从0开始）',
+    `chunk_strategy`    varchar(64)           DEFAULT 'smart' COMMENT '分片策略',
     `content`           text         NOT NULL COMMENT '分片内容',
     `word_count`        int                   DEFAULT 0 COMMENT '字符数',
+    `token_count`       int                   DEFAULT NULL COMMENT 'Token数量',
     `vector_id`         varchar(256)          DEFAULT NULL COMMENT '向量存储ID',
     `create_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_delete`         tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
     KEY `idx_document_id` (`document_id`) COMMENT '文档ID索引',
-    KEY `idx_kb_id` (`knowledge_base_id`) COMMENT '知识库ID索引',
+    KEY `idx_kb_id_is_delete` (`knowledge_base_id`, `is_delete`) COMMENT '知识库ID+逻辑删除索引',
     KEY `idx_doc_chunk` (`document_id`, `chunk_index`) COMMENT '文档+分片索引'
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4

@@ -16,6 +16,9 @@ public class RetrievalHitVO implements Serializable {
     @Schema(description = "分片ID")
     private String id;
 
+    @Schema(description = "文档ID")
+    private Long documentId;
+
     @Schema(description = "文档名称")
     private String documentName;
 

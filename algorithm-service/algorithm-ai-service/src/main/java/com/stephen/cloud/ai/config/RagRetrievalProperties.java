@@ -45,4 +45,9 @@ public class RagRetrievalProperties {
      * 是否开启 Multi-Query 扩展召回
      */
     private boolean multiQueryEnabled = true;
+
+    /**
+     * 是否开启 LLM 语义改写（默认关闭，确保向下兼容）
+     */
+    private boolean llmRewriteEnabled = false;
 }

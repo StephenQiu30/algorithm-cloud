@@ -4,40 +4,40 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.stephen.cloud.ai.config.RagRetrievalProperties;
 import com.stephen.cloud.ai.convert.RAGConvert;
+import com.stephen.cloud.ai.knowledge.retrieval.RetrievalOrchestrator;
 import com.stephen.cloud.ai.knowledge.retrieval.model.RetrievalResult;
-import com.stephen.cloud.ai.knowledge.rerank.RerankService;
-import com.stephen.cloud.ai.knowledge.retrieval.RRFFusionService;
-import com.stephen.cloud.ai.knowledge.rewrite.QueryRewriteService;
-import com.stephen.cloud.ai.knowledge.rewrite.RewriteResult;
 import com.stephen.cloud.ai.mapper.RAGHistoryMapper;
 import com.stephen.cloud.ai.model.entity.RAGHistory;
-import com.stephen.cloud.api.ai.model.enums.MatchReasonEnum;
-import com.stephen.cloud.api.ai.model.enums.RetrievalStrategyEnum;
-import com.stephen.cloud.ai.service.KeywordSearchService;
 import com.stephen.cloud.ai.service.RAGService;
-import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.api.ai.model.dto.rag.BatchRecallRequest;
+import com.stephen.cloud.api.ai.model.dto.rag.RAGHistoryQueryRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RecallAnalysisRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RecallTestItem;
 import com.stephen.cloud.api.ai.model.vo.*;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.filter.Filter;
-import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
+/**
+ * RAG 服务实现
+ * <p>
+ * 核心职责：问答、流式问答、召回分析、批量召回测试。
+ * 检索编排逻辑已提取到 {@link RetrievalOrchestrator}，本类专注于上层业务。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Service
 @Slf4j
 public class RAGServiceImpl implements RAGService {
@@ -49,35 +49,20 @@ public class RAGServiceImpl implements RAGService {
     private RAGHistoryMapper ragHistoryMapper;
 
     @Resource
-    private VectorStoreService vectorStoreService;
-
-    @Resource
-    private KeywordSearchService keywordSearchService;
-
-    @Resource
-    private RRFFusionService rrfFusionService;
-
-    @Resource
-    private RagRetrievalProperties ragRetrievalProperties;
-
-    @Resource
-    private QueryRewriteService queryRewriteService;
-
-    @Resource
-    private RerankService rerankService;
+    private RetrievalOrchestrator retrievalOrchestrator;
 
     @Override
     public RAGAnswerVO ask(String question, Long knowledgeBaseId, Long userId, Integer topK) {
         long start = System.currentTimeMillis();
-        RetrievalResult retrievalResult = retrieveWithHybrid(question, knowledgeBaseId, topK);
-        List<Document> docs = retrievalResult.getDocs();
+        RetrievalResult result = retrievalOrchestrator.retrieve(question, knowledgeBaseId, topK);
+        List<Document> docs = result.getDocs();
         String context = buildContext(docs);
         String prompt = buildPrompt(question, context);
         String answer = chatClient.prompt().user(prompt).call().content();
         List<SourceVO> sources = buildSources(docs);
         long responseTime = System.currentTimeMillis() - start;
         saveHistory(question, answer, knowledgeBaseId, userId, JSONUtil.toJsonStr(sources), responseTime,
-                retrievalResult.getRewriteQuery(), retrievalResult.getRetrievalMeta(), retrievalResult.getRetrievalStrategy());
+                result.getRewriteQuery(), result.getRetrievalMeta(), result.getRetrievalStrategy());
         RAGAnswerVO vo = new RAGAnswerVO();
         vo.setAnswer(answer);
         vo.setSources(sources);
@@ -89,8 +74,8 @@ public class RAGServiceImpl implements RAGService {
     public Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK) {
         return Flux.defer(() -> {
             long start = System.currentTimeMillis();
-            RetrievalResult retrievalResult = retrieveWithHybrid(question, knowledgeBaseId, topK);
-            List<Document> docs = retrievalResult.getDocs();
+            RetrievalResult result = retrievalOrchestrator.retrieve(question, knowledgeBaseId, topK);
+            List<Document> docs = result.getDocs();
             String context = buildContext(docs);
             String prompt = buildPrompt(question, context);
             List<SourceVO> sources = buildSources(docs);
@@ -99,34 +84,146 @@ public class RAGServiceImpl implements RAGService {
                     .doOnNext(answerBuilder::append)
                     .doOnComplete(() -> {
                         long responseTime = System.currentTimeMillis() - start;
-                        saveHistory(question, answerBuilder.toString(), knowledgeBaseId, userId, JSONUtil.toJsonStr(sources), responseTime,
-                                retrievalResult.getRewriteQuery(), retrievalResult.getRetrievalMeta(), retrievalResult.getRetrievalStrategy());
+                        saveHistory(question, answerBuilder.toString(), knowledgeBaseId, userId,
+                                JSONUtil.toJsonStr(sources), responseTime,
+                                result.getRewriteQuery(), result.getRetrievalMeta(), result.getRetrievalStrategy());
                     });
         });
     }
 
     @Override
-    public void saveHistory(String question, String answer, Long knowledgeBaseId, Long userId, String sources, Long responseTime) {
-        saveHistory(question, answer, knowledgeBaseId, userId, sources, responseTime, null, null, null);
-    }
+    public RecallAnalysisVO analyzeRecall(RecallAnalysisRequest request) {
+        long start = System.currentTimeMillis();
+        RetrievalResult result = retrievalOrchestrator.retrieve(
+                request.getQuestion(), request.getKnowledgeBaseId(), request.getTopK(),
+                request.getSimilarityThreshold(), request.getEnableRerank());
 
-    private void saveHistory(String question, String answer, Long knowledgeBaseId, Long userId, String sources, Long responseTime,
-                             String rewriteQuery, String retrievalMeta, String retrievalStrategy) {
-        RAGHistory ragHistory = new RAGHistory();
-        ragHistory.setQuestion(question);
-        ragHistory.setAnswer(answer);
-        ragHistory.setKnowledgeBaseId(knowledgeBaseId);
-        ragHistory.setUserId(userId);
-        ragHistory.setSources(sources);
-        ragHistory.setResponseTime(responseTime);
-        ragHistory.setRewriteQuery(rewriteQuery);
-        ragHistory.setRetrievalMeta(retrievalMeta);
-        ragHistory.setRetrievalStrategy(retrievalStrategy);
-        ragHistoryMapper.insert(ragHistory);
+        // 构造 VO（利用 RetrievalResult 中的各阶段数据）
+        List<RetrievalHitVO> finalHitVOs = convertToHitVOs(result.getDocs());
+        RecallAnalysisVO vo = new RecallAnalysisVO();
+        vo.setQuestion(request.getQuestion());
+        vo.setVectorHits(convertToHitVOs(result.getVectorDocs()));
+        vo.setKeywordHits(convertToHitVOs(result.getKeywordDocs()));
+        vo.setFusedHits(convertToHitVOs(result.getFusedDocs()));
+        vo.setFinalResults(finalHitVOs);
+        vo.setCostMs(System.currentTimeMillis() - start);
+        vo.setRewriteQuery(result.getRewriteSemanticQuery());
+        vo.setRewriteKeywordQuery(result.getRewriteQuery());
+        vo.setRetrievalStrategy(result.getRetrievalStrategy());
+
+        // 各阶段命中统计
+        vo.setVectorHitCount(result.getVectorDocs() == null ? 0 : result.getVectorDocs().size());
+        vo.setKeywordHitCount(result.getKeywordDocs() == null ? 0 : result.getKeywordDocs().size());
+        vo.setFusedHitCount(result.getFusedDocs() == null ? 0 : result.getFusedDocs().size());
+        vo.setFinalHitCount(result.getDocs() == null ? 0 : result.getDocs().size());
+
+        // 去重统计
+        vo.setOverlapCount(computeOverlapCount(result.getVectorDocs(), result.getKeywordDocs()));
+
+        // 相似度统计
+        computeSimilarityStats(finalHitVOs, vo);
+        return vo;
     }
 
     @Override
-    public Page<RAGHistoryVO> listHistoryByPage(long current, long size, Long knowledgeBaseId, Long userId) {
+    public BatchRecallVO batchAnalyzeRecall(BatchRecallRequest request) {
+        RecallAnalysisRequest config = request.getConfig();
+        List<RecallTestItem> items = request.getItems();
+        if (CollUtil.isEmpty(items)) {
+            return new BatchRecallVO();
+        }
+
+        List<RecallItemResultVO> results = new ArrayList<>();
+        double totalHitRate = 0;
+        double totalRecall = 0;
+        double totalPrecision = 0;
+        double totalMRR = 0;
+        int testCountWithExpectation = 0;
+
+        for (RecallTestItem item : items) {
+            RecallAnalysisRequest itemRequest = new RecallAnalysisRequest();
+            itemRequest.setQuestion(item.getQuestion());
+            itemRequest.setKnowledgeBaseId(config.getKnowledgeBaseId());
+            itemRequest.setTopK(config.getTopK());
+            itemRequest.setSimilarityThreshold(config.getSimilarityThreshold());
+            itemRequest.setEnableRerank(config.getEnableRerank());
+
+            RecallAnalysisVO analysis = analyzeRecall(itemRequest);
+            List<RetrievalHitVO> finalResults = analysis.getFinalResults();
+            List<String> recalledIds = finalResults.stream().map(RetrievalHitVO::getId).toList();
+
+            RecallItemResultVO itemResult = new RecallItemResultVO();
+            itemResult.setQuestion(item.getQuestion());
+            itemResult.setRetrievedChunks(finalResults);
+
+            List<String> expectedIds = item.getExpectedChunkIds();
+            if (CollUtil.isNotEmpty(expectedIds)) {
+                testCountWithExpectation++;
+                long hitCount = expectedIds.stream().filter(recalledIds::contains).count();
+                itemResult.setIsHit(hitCount > 0);
+                itemResult.setRecall(hitCount * 1.0D / expectedIds.size());
+                itemResult.setPrecision(finalResults.isEmpty() ? 0D : hitCount * 1.0D / finalResults.size());
+
+                // MRR (1 / first hit rank)
+                double mrr = 0;
+                for (int i = 0; i < recalledIds.size(); i++) {
+                    if (expectedIds.contains(recalledIds.get(i))) {
+                        mrr = 1.0D / (i + 1);
+                        break;
+                    }
+                }
+                itemResult.setMrr(mrr);
+
+                totalHitRate += (hitCount > 0 ? 1 : 0);
+                totalRecall += itemResult.getRecall();
+                totalPrecision += itemResult.getPrecision();
+                totalMRR += itemResult.getMrr();
+            }
+            // 统计相似度
+            if (CollUtil.isNotEmpty(finalResults)) {
+                double simSum = 0;
+                double simMax = 0;
+                int simCount = 0;
+                for (RetrievalHitVO hit : finalResults) {
+                    Double sim = hit.getSimilarityScore() != null ? hit.getSimilarityScore() : hit.getVectorScore();
+                    if (sim != null) {
+                        simSum += sim;
+                        simMax = Math.max(simMax, sim);
+                        simCount++;
+                    }
+                }
+                if (simCount > 0) {
+                    itemResult.setAvgSimilarity(simSum / simCount);
+                    itemResult.setMaxSimilarity(simMax);
+                }
+            }
+            results.add(itemResult);
+        }
+
+        BatchRecallVO vo = new BatchRecallVO();
+        vo.setItemResults(results);
+        if (testCountWithExpectation > 0) {
+            vo.setOverallHitRate(totalHitRate / testCountWithExpectation);
+            vo.setMeanRecall(totalRecall / testCountWithExpectation);
+            vo.setMeanPrecision(totalPrecision / testCountWithExpectation);
+            vo.setMeanMRR(totalMRR / testCountWithExpectation);
+        }
+        return vo;
+    }
+
+    @Override
+    public void saveHistory(String question, String answer, Long knowledgeBaseId, Long userId,
+            String sources, Long responseTime) {
+        saveHistory(question, answer, knowledgeBaseId, userId, sources, responseTime, null, null, null);
+    }
+
+    @Override
+    public Page<RAGHistoryVO> listRAGHistoryVOByPage(RAGHistoryQueryRequest queryRequest, HttpServletRequest request) {
+        long current = queryRequest.getCurrent();
+        long size = queryRequest.getPageSize();
+        Long knowledgeBaseId = queryRequest.getKnowledgeBaseId();
+        Long userId = queryRequest.getUserId();
+
         LambdaQueryWrapper<RAGHistory> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(knowledgeBaseId != null && knowledgeBaseId > 0, RAGHistory::getKnowledgeBaseId, knowledgeBaseId)
                 .eq(userId != null && userId > 0, RAGHistory::getUserId, userId)
@@ -144,6 +241,22 @@ public class RAGServiceImpl implements RAGService {
         }).toList();
         voPage.setRecords(voList);
         return voPage;
+    }
+
+    private void saveHistory(String question, String answer, Long knowledgeBaseId, Long userId,
+            String sources, Long responseTime, String rewriteQuery,
+            String retrievalMeta, String retrievalStrategy) {
+        RAGHistory ragHistory = new RAGHistory();
+        ragHistory.setQuestion(question);
+        ragHistory.setAnswer(answer);
+        ragHistory.setKnowledgeBaseId(knowledgeBaseId);
+        ragHistory.setUserId(userId);
+        ragHistory.setSources(sources);
+        ragHistory.setResponseTime(responseTime);
+        ragHistory.setRewriteQuery(rewriteQuery);
+        ragHistory.setRetrievalMeta(retrievalMeta);
+        ragHistory.setRetrievalStrategy(retrievalStrategy);
+        ragHistoryMapper.insert(ragHistory);
     }
 
     private String buildContext(List<Document> docs) {
@@ -192,7 +305,6 @@ public class RAGServiceImpl implements RAGService {
             if (score != null) {
                 sourceVO.setScore(Double.valueOf(String.valueOf(score)));
             }
-            // 相似度详情
             sourceVO.setVectorSimilarity(toDoubleValue(doc.getMetadata().get("distance")));
             sourceVO.setKeywordRelevance(toDoubleValue(doc.getMetadata().get("keywordScore")));
             sourceList.add(sourceVO);
@@ -200,181 +312,26 @@ public class RAGServiceImpl implements RAGService {
         return sourceList;
     }
 
-    private RetrievalResult retrieveWithHybrid(String question, Long knowledgeBaseId, Integer topK) {
-        int finalTopK = topK == null || topK <= 0 ? ragRetrievalProperties.getTopK() : topK;
-        int vectorTopK = ragRetrievalProperties.getVectorTopK() <= 0 ? finalTopK : ragRetrievalProperties.getVectorTopK();
-        int keywordTopK = ragRetrievalProperties.getKeywordTopK() <= 0 ? finalTopK : ragRetrievalProperties.getKeywordTopK();
-        int rrfK = ragRetrievalProperties.getRrfK() <= 0 ? 60 : ragRetrievalProperties.getRrfK();
-        RewriteResult rewriteResult = buildRewriteResult(question);
-        Filter.Expression filter = buildFilterExpression(knowledgeBaseId, rewriteResult.getMetadataFilters());
-
-        // Multi-Query 扩展：使用改写后的语义 query + 原始 query 进行双路向量检索
-        List<Document> vectorDocs;
-        if (ragRetrievalProperties.isMultiQueryEnabled()
-                && !question.equals(rewriteResult.getSemanticQuery())) {
-            List<Document> semanticDocs = vectorStoreService.similaritySearch(
-                    rewriteResult.getSemanticQuery(), knowledgeBaseId, vectorTopK, ragRetrievalProperties.getSimilarityThreshold());
-            List<Document> rawDocs = vectorStoreService.similaritySearch(
-                    question, knowledgeBaseId, vectorTopK, ragRetrievalProperties.getSimilarityThreshold());
-            vectorDocs = mergeVectorResults(semanticDocs, rawDocs, vectorTopK);
-        } else {
-            vectorDocs = vectorStoreService.similaritySearch(
-                    rewriteResult.getSemanticQuery(), knowledgeBaseId, vectorTopK, ragRetrievalProperties.getSimilarityThreshold());
-        }
-
-        List<Document> keywordDocs = keywordSearchService.bm25Search(
-                rewriteResult.getKeywordQuery(), knowledgeBaseId, keywordTopK, filter);
-
-        // 加权 RRF 融合
-        List<Document> fusedDocs = rrfFusionService.fuse(vectorDocs, keywordDocs, finalTopK, rrfK,
-                ragRetrievalProperties.getVectorWeight(), ragRetrievalProperties.getKeywordWeight());
-        List<Document> rerankedDocs = maybeRerank(fusedDocs, rewriteResult, finalTopK);
-        markMatchReason(rerankedDocs, rewriteResult);
-        Map<String, Object> retrievalMeta = new HashMap<>();
-        retrievalMeta.put("vectorHitCount", vectorDocs.size());
-        retrievalMeta.put("keywordHitCount", keywordDocs.size());
-        retrievalMeta.put("fusedTopK", fusedDocs.size());
-        retrievalMeta.put("finalTopK", rerankedDocs.size());
-        retrievalMeta.put("multiQueryEnabled", ragRetrievalProperties.isMultiQueryEnabled());
-        retrievalMeta.put("vectorWeight", ragRetrievalProperties.getVectorWeight());
-        retrievalMeta.put("keywordWeight", ragRetrievalProperties.getKeywordWeight());
-        log.info("[RAG] recall stats, vectorHits={}, keywordHits={}, fusedTopK={}, finalTopK={}, multiQuery={}",
-                vectorDocs.size(), keywordDocs.size(), fusedDocs.size(), rerankedDocs.size(),
-                ragRetrievalProperties.isMultiQueryEnabled());
-        RetrievalResult result = new RetrievalResult();
-        result.setDocs(rerankedDocs);
-        result.setRewriteQuery(rewriteResult.getKeywordQuery());
-        result.setRetrievalMeta(JSONUtil.toJsonStr(retrievalMeta));
-        result.setRetrievalStrategy(ragRetrievalProperties.isRerankEnabled()
-                ? RetrievalStrategyEnum.HYBRID_RRF_RERANK.getValue()
-                : RetrievalStrategyEnum.HYBRID_RRF.getValue());
-        return result;
-    }
-
-    /**
-     * 合并多路向量检索结果，去重保留最高分
-     */
-    private List<Document> mergeVectorResults(List<Document> docs1, List<Document> docs2, int topK) {
-        Map<String, Document> merged = new LinkedHashMap<>();
-        for (Document doc : docs1) {
-            String key = buildDocKey(doc);
-            merged.putIfAbsent(key, doc);
-        }
-        for (Document doc : docs2) {
-            String key = buildDocKey(doc);
-            merged.putIfAbsent(key, doc);
-        }
-        return merged.values().stream().limit(topK).toList();
-    }
-
-    private String buildDocKey(Document doc) {
-        Object documentId = doc.getMetadata().get("documentId");
-        Object chunkIndex = doc.getMetadata().get("chunkIndex");
-        if (documentId != null && chunkIndex != null) {
-            return documentId + "_" + chunkIndex;
-        }
-        return doc.getId() != null ? doc.getId() : String.valueOf(doc.getText().hashCode());
-    }
-
-    private RewriteResult buildRewriteResult(String question) {
-        if (!ragRetrievalProperties.isRewriteEnabled()) {
-            RewriteResult rewriteResult = new RewriteResult();
-            rewriteResult.setSemanticQuery(question);
-            rewriteResult.setKeywordQuery(question);
-            rewriteResult.setMustTerms(List.of());
-            rewriteResult.setMetadataFilters(Map.of());
-            return rewriteResult;
-        }
-        return queryRewriteService.rewrite(question);
-    }
-
-    private List<Document> maybeRerank(List<Document> fusedDocs, RewriteResult rewriteResult, int finalTopK) {
-        if (!ragRetrievalProperties.isRerankEnabled()) {
-            return fusedDocs;
-        }
-        int rerankTopN = ragRetrievalProperties.getRerankTopN() <= 0 ? finalTopK : ragRetrievalProperties.getRerankTopN();
-        List<Document> candidates = fusedDocs.size() > rerankTopN ? fusedDocs.subList(0, rerankTopN) : fusedDocs;
-        return rerankService.rerank(candidates, rewriteResult.getMustTerms(), rewriteResult.getMetadataFilters(), finalTopK);
-    }
-
-    private void markMatchReason(List<Document> docs, RewriteResult rewriteResult) {
+    private List<RetrievalHitVO> convertToHitVOs(List<Document> docs) {
         if (CollUtil.isEmpty(docs)) {
-            return;
+            return new ArrayList<>();
         }
-        for (Document doc : docs) {
-            Object rerankScore = doc.getMetadata().get("rerankScore");
-            if (rerankScore != null) {
-                doc.getMetadata().put("matchReason", MatchReasonEnum.RERANK.getValue());
-                continue;
-            }
-            if (CollUtil.isNotEmpty(rewriteResult.getMustTerms())) {
-                doc.getMetadata().put("matchReason", MatchReasonEnum.MUST_TERM.getValue());
-            } else {
-                doc.getMetadata().put("matchReason", MatchReasonEnum.HYBRID.getValue());
-            }
-        }
-    }
-
-    @Override
-    public RecallAnalysisVO analyzeRecall(RecallAnalysisRequest request) {
-        long start = System.currentTimeMillis();
-        String question = request.getQuestion();
-        Long knowledgeBaseId = request.getKnowledgeBaseId();
-        int finalTopK = request.getTopK() == null || request.getTopK() <= 0 ? ragRetrievalProperties.getTopK() : request.getTopK();
-        Double threshold = request.getSimilarityThreshold() == null ? ragRetrievalProperties.getSimilarityThreshold() : request.getSimilarityThreshold();
-
-        // 1. 改写
-        RewriteResult rewriteResult = buildRewriteResult(question);
-        Filter.Expression filter = buildFilterExpression(knowledgeBaseId, rewriteResult.getMetadataFilters());
-
-        // 2. 向量检索（支持 Multi-Query）
-        List<Document> vectorDocs;
-        if (ragRetrievalProperties.isMultiQueryEnabled()
-                && !question.equals(rewriteResult.getSemanticQuery())) {
-            List<Document> semanticDocs = vectorStoreService.similaritySearch(
-                    rewriteResult.getSemanticQuery(), knowledgeBaseId, finalTopK, threshold);
-            List<Document> rawDocs = vectorStoreService.similaritySearch(
-                    question, knowledgeBaseId, finalTopK, threshold);
-            vectorDocs = mergeVectorResults(semanticDocs, rawDocs, finalTopK);
-        } else {
-            vectorDocs = vectorStoreService.similaritySearch(
-                    rewriteResult.getSemanticQuery(), knowledgeBaseId, finalTopK, threshold);
-        }
-
-        // 3. 关键词检索
-        List<Document> keywordDocs = keywordSearchService.bm25Search(
-                rewriteResult.getKeywordQuery(), knowledgeBaseId, finalTopK, filter);
-
-        // 4. 加权融合
-        int rrfK = ragRetrievalProperties.getRrfK() <= 0 ? 60 : ragRetrievalProperties.getRrfK();
-        List<Document> fusedDocs = rrfFusionService.fuse(vectorDocs, keywordDocs, finalTopK, rrfK,
-                ragRetrievalProperties.getVectorWeight(), ragRetrievalProperties.getKeywordWeight());
-
-        // 5. 重排
-        List<Document> finalDocs;
-        if (Boolean.TRUE.equals(request.getEnableRerank()) && ragRetrievalProperties.isRerankEnabled()) {
-            finalDocs = maybeRerank(fusedDocs, rewriteResult, finalTopK);
-            markMatchReason(finalDocs, rewriteResult);
-        } else {
-            finalDocs = fusedDocs;
-        }
-
-        // 6. 构造 VO（含相似度统计）
-        List<RetrievalHitVO> finalHitVOs = convertToHitVOs(finalDocs);
-        RecallAnalysisVO vo = new RecallAnalysisVO();
-        vo.setQuestion(question);
-        vo.setVectorHits(convertToHitVOs(vectorDocs));
-        vo.setKeywordHits(convertToHitVOs(keywordDocs));
-        vo.setFusedHits(convertToHitVOs(fusedDocs));
-        vo.setFinalResults(finalHitVOs);
-        vo.setCostMs(System.currentTimeMillis() - start);
-        vo.setRewriteQuery(rewriteResult.getSemanticQuery());
-        vo.setRetrievalStrategy(ragRetrievalProperties.isRerankEnabled()
-                ? RetrievalStrategyEnum.HYBRID_RRF_RERANK.getValue()
-                : RetrievalStrategyEnum.HYBRID_RRF.getValue());
-        // 统计相似度
-        computeSimilarityStats(finalHitVOs, vo);
-        return vo;
+        return docs.stream().map(doc -> {
+            RetrievalHitVO hit = new RetrievalHitVO();
+            hit.setId(doc.getId());
+            hit.setDocumentId(toLongValue(doc.getMetadata().get("documentId")));
+            hit.setContent(doc.getText());
+            hit.setDocumentName(toStringValue(doc.getMetadata().get("documentName")));
+            hit.setChunkIndex(toIntegerValue(doc.getMetadata().get("chunkIndex")));
+            hit.setVectorScore(toDoubleValue(doc.getMetadata().get("distance")));
+            hit.setKeywordScore(toDoubleValue(doc.getMetadata().get("keywordScore")));
+            hit.setFusionScore(toDoubleValue(doc.getMetadata().get("fusionScore")));
+            hit.setScore(toDoubleValue(doc.getMetadata().get("score")));
+            hit.setSimilarityScore(toDoubleValue(doc.getMetadata().get("distance")));
+            hit.setRerankScore(toDoubleValue(doc.getMetadata().get("rerankScore")));
+            hit.setMatchReason(toStringValue(doc.getMetadata().get("matchReason")));
+            return hit;
+        }).toList();
     }
 
     private void computeSimilarityStats(List<RetrievalHitVO> hits, RecallAnalysisVO vo) {
@@ -398,94 +355,30 @@ public class RAGServiceImpl implements RAGService {
         }
     }
 
-    @Override
-    public BatchRecallVO batchAnalyzeRecall(BatchRecallRequest request) {
-        RecallAnalysisRequest config = request.getConfig();
-        List<RecallTestItem> items = request.getItems();
-        if (CollUtil.isEmpty(items)) {
-            return new BatchRecallVO();
+    private int computeOverlapCount(List<Document> vectorDocs, List<Document> keywordDocs) {
+        if (CollUtil.isEmpty(vectorDocs) || CollUtil.isEmpty(keywordDocs)) {
+            return 0;
         }
-
-        List<RecallItemResultVO> results = new ArrayList<>();
-        double totalHitRate = 0;
-        double totalRecall = 0;
-        int testCountWithExpectation = 0;
-
-        for (RecallTestItem item : items) {
-            RecallAnalysisRequest itemRequest = new RecallAnalysisRequest();
-            itemRequest.setQuestion(item.getQuestion());
-            itemRequest.setKnowledgeBaseId(config.getKnowledgeBaseId());
-            itemRequest.setTopK(config.getTopK());
-            itemRequest.setSimilarityThreshold(config.getSimilarityThreshold());
-            itemRequest.setEnableRerank(config.getEnableRerank());
-
-            RecallAnalysisVO analysis = analyzeRecall(itemRequest);
-            List<RetrievalHitVO> finalResults = analysis.getFinalResults();
-            List<String> recalledIds = finalResults.stream().map(RetrievalHitVO::getId).toList();
-
-            RecallItemResultVO itemResult = new RecallItemResultVO();
-            itemResult.setQuestion(item.getQuestion());
-            itemResult.setRetrievedChunks(finalResults);
-
-            List<String> expectedIds = item.getExpectedChunkIds();
-            if (CollUtil.isNotEmpty(expectedIds)) {
-                testCountWithExpectation++;
-                long hitCount = expectedIds.stream().filter(recalledIds::contains).count();
-                itemResult.setIsHit(hitCount > 0);
-                itemResult.setRecall(hitCount * 1.0D / expectedIds.size());
-
-                totalHitRate += (hitCount > 0 ? 1 : 0);
-                totalRecall += itemResult.getRecall();
+        Set<String> vectorKeys = new HashSet<>();
+        for (Document doc : vectorDocs) {
+            vectorKeys.add(buildDocKey(doc));
+        }
+        int count = 0;
+        for (Document doc : keywordDocs) {
+            if (vectorKeys.contains(buildDocKey(doc))) {
+                count++;
             }
-            // 统计相似度
-            if (CollUtil.isNotEmpty(finalResults)) {
-                double simSum = 0;
-                double simMax = 0;
-                int simCount = 0;
-                for (RetrievalHitVO hit : finalResults) {
-                    Double sim = hit.getSimilarityScore() != null ? hit.getSimilarityScore() : hit.getVectorScore();
-                    if (sim != null) {
-                        simSum += sim;
-                        simMax = Math.max(simMax, sim);
-                        simCount++;
-                    }
-                }
-                if (simCount > 0) {
-                    itemResult.setAvgSimilarity(simSum / simCount);
-                    itemResult.setMaxSimilarity(simMax);
-                }
-            }
-            results.add(itemResult);
         }
-
-        BatchRecallVO vo = new BatchRecallVO();
-        vo.setItemResults(results);
-        if (testCountWithExpectation > 0) {
-            vo.setOverallHitRate(totalHitRate / testCountWithExpectation);
-            vo.setMeanRecall(totalRecall / testCountWithExpectation);
-        }
-        return vo;
+        return count;
     }
 
-    private List<RetrievalHitVO> convertToHitVOs(List<Document> docs) {
-        if (CollUtil.isEmpty(docs)) {
-            return new ArrayList<>();
+    private String buildDocKey(Document doc) {
+        Object documentId = doc.getMetadata().get("documentId");
+        Object chunkIndex = doc.getMetadata().get("chunkIndex");
+        if (documentId != null && chunkIndex != null) {
+            return documentId + "_" + chunkIndex;
         }
-        return docs.stream().map(doc -> {
-            RetrievalHitVO hit = new RetrievalHitVO();
-            hit.setId(doc.getId());
-            hit.setContent(doc.getText());
-            hit.setDocumentName(toStringValue(doc.getMetadata().get("documentName")));
-            hit.setChunkIndex(toIntegerValue(doc.getMetadata().get("chunkIndex")));
-            hit.setVectorScore(toDoubleValue(doc.getMetadata().get("distance")));
-            hit.setKeywordScore(toDoubleValue(doc.getMetadata().get("keywordScore")));
-            hit.setFusionScore(toDoubleValue(doc.getMetadata().get("fusionScore")));
-            hit.setScore(toDoubleValue(doc.getMetadata().get("score")));
-            hit.setSimilarityScore(toDoubleValue(doc.getMetadata().get("distance")));
-            hit.setRerankScore(toDoubleValue(doc.getMetadata().get("rerankScore")));
-            hit.setMatchReason(toStringValue(doc.getMetadata().get("matchReason")));
-            return hit;
-        }).toList();
+        return doc.getId() != null ? doc.getId() : String.valueOf(doc.getText().hashCode());
     }
 
     private Double toDoubleValue(Object value) {
@@ -510,25 +403,18 @@ public class RAGServiceImpl implements RAGService {
         }
     }
 
-    private Filter.Expression buildFilterExpression(Long knowledgeBaseId, Map<String, String> metadataFilters) {
-        FilterExpressionBuilder b = new FilterExpressionBuilder();
-        FilterExpressionBuilder.Op op = null;
-        if (knowledgeBaseId != null && knowledgeBaseId > 0) {
-            op = b.eq("knowledgeBaseId", knowledgeBaseId);
+    private Long toLongValue(Object value) {
+        if (value == null) {
+            return null;
         }
-        if (CollUtil.isNotEmpty(metadataFilters)) {
-            for (Map.Entry<String, String> entry : metadataFilters.entrySet()) {
-                if (StringUtils.isNotBlank(entry.getValue())) {
-                    FilterExpressionBuilder.Op next = b.eq(entry.getKey(), entry.getValue());
-                    op = (op == null) ? next : b.and(op, next);
-                }
-            }
+        try {
+            return Long.valueOf(String.valueOf(value));
+        } catch (Exception e) {
+            return null;
         }
-        return op == null ? null : op.build();
     }
 
     private String toStringValue(Object value) {
         return value == null ? null : String.valueOf(value);
     }
-
 }

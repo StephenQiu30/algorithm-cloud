@@ -1,5 +1,6 @@
 package com.stephen.cloud.ai.controller;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.ai.model.entity.Document;
 import com.stephen.cloud.ai.service.DocumentService;
@@ -7,6 +8,7 @@ import com.stephen.cloud.api.ai.model.dto.document.DocumentQueryRequest;
 import com.stephen.cloud.api.ai.model.vo.DocumentVO;
 import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.common.*;
+import com.stephen.cloud.common.constants.UserConstant;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.log.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -69,7 +71,22 @@ public class DocumentController {
         return ResultUtils.success(documentService.getDocumentVO(document, request));
     }
 
+    @PostMapping("/list/page")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
+    @Operation(summary = "分页获取文档（管理员）")
+    public BaseResponse<Page<Document>> listDocumentByPage(@RequestBody DocumentQueryRequest queryRequest) {
+        if (queryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        long current = queryRequest.getCurrent();
+        long size = queryRequest.getPageSize();
+        Page<Document> page = documentService.page(new Page<>(current, size),
+                documentService.getQueryWrapper(queryRequest));
+        return ResultUtils.success(page);
+    }
+
     @PostMapping("/list/page/vo")
+
     @Operation(summary = "分页获取文档")
     public BaseResponse<Page<DocumentVO>> listDocumentVOByPage(@RequestBody DocumentQueryRequest queryRequest,
                                                                 HttpServletRequest request) {

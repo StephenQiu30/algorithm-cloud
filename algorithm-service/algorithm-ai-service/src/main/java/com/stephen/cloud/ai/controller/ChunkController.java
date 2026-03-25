@@ -1,5 +1,6 @@
 package com.stephen.cloud.ai.controller;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.ai.service.ChunkService;
@@ -10,11 +11,13 @@ import com.stephen.cloud.common.common.BaseResponse;
 import com.stephen.cloud.common.common.ErrorCode;
 import com.stephen.cloud.common.common.ResultUtils;
 import com.stephen.cloud.common.common.ThrowUtils;
+import com.stephen.cloud.common.constants.UserConstant;
 import com.stephen.cloud.common.exception.BusinessException;
 import com.stephen.cloud.common.log.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,10 +31,11 @@ public class ChunkController {
     @Resource
     private ChunkService chunkService;
 
-    @PostMapping("/list/page/vo")
-    @Operation(summary = "分页查询文档分片")
-    @OperationLog(module = "文档分片管理", action = "分页查询文档分片")
-    public BaseResponse<Page<ChunkVO>> listChunkVOByPage(@RequestBody ChunkQueryRequest queryRequest) {
+    @PostMapping("/list/page")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
+    @Operation(summary = "分页查询文档分片（管理员）")
+    @OperationLog(module = "文档分片管理", action = "分页查询文档分片（管理员）")
+    public BaseResponse<Page<DocumentChunk>> listChunkByPage(@RequestBody ChunkQueryRequest queryRequest) {
         if (queryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -41,17 +45,35 @@ public class ChunkController {
         long size = queryRequest.getPageSize();
         Page<DocumentChunk> page = chunkService.page(new Page<>(current, size),
                 chunkService.getQueryWrapper(queryRequest));
-        return ResultUtils.success(chunkService.getChunkVOPage(page));
+        return ResultUtils.success(page);
+    }
+
+    @PostMapping("/list/page/vo")
+    @Operation(summary = "分页查询文档分片")
+    @OperationLog(module = "文档分片管理", action = "分页查询文档分片")
+    public BaseResponse<Page<ChunkVO>> listChunkVOByPage(@RequestBody ChunkQueryRequest queryRequest,
+                                                        HttpServletRequest request) {
+        if (queryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        ThrowUtils.throwIf(queryRequest.getDocumentId() == null || queryRequest.getDocumentId() <= 0,
+                ErrorCode.PARAMS_ERROR, "文档ID不能为空");
+        long current = queryRequest.getCurrent();
+        long size = queryRequest.getPageSize();
+        Page<DocumentChunk> page = chunkService.page(new Page<>(current, size),
+                chunkService.getQueryWrapper(queryRequest));
+        return ResultUtils.success(chunkService.getChunkVOPage(page, request));
     }
 
     @GetMapping("/get/vo")
     @Operation(summary = "获取分片详情")
     @OperationLog(module = "文档分片管理", action = "获取分片详情")
-    public BaseResponse<ChunkVO> getChunkVOById(@RequestParam("id") long id) {
+    public BaseResponse<ChunkVO> getChunkVOById(@RequestParam("id") long id,
+                                               HttpServletRequest request) {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
         DocumentChunk chunk = chunkService.getById(id);
         ThrowUtils.throwIf(chunk == null, ErrorCode.NOT_FOUND_ERROR);
-        return ResultUtils.success(chunkService.getChunkVO(chunk));
+        return ResultUtils.success(chunkService.getChunkVO(chunk, request));
     }
 
     @PostMapping("/search")

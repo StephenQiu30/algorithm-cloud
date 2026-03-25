@@ -32,8 +32,11 @@ public class RecallAnalysisVO implements Serializable {
     @Schema(description = "检索耗时（毫秒）")
     private Long costMs;
 
-    @Schema(description = "改写后的查询")
+    @Schema(description = "改写后的语义查询")
     private String rewriteQuery;
+
+    @Schema(description = "改写后的关键词查询")
+    private String rewriteKeywordQuery;
 
     @Schema(description = "最终结果平均相似度")
     private Double avgSimilarity;
@@ -43,4 +46,19 @@ public class RecallAnalysisVO implements Serializable {
 
     @Schema(description = "使用的检索策略")
     private String retrievalStrategy;
+
+    @Schema(description = "向量检索命中数")
+    private Integer vectorHitCount;
+
+    @Schema(description = "关键词检索命中数")
+    private Integer keywordHitCount;
+
+    @Schema(description = "融合后命中数")
+    private Integer fusedHitCount;
+
+    @Schema(description = "最终命中数")
+    private Integer finalHitCount;
+
+    @Schema(description = "向量与关键词交叉命中数（去重分析）")
+    private Integer overlapCount;
 }

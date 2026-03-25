@@ -1,0 +1,40 @@
+# 公共 AI/RAG 配置文件 (Default)
+# 包含：文档处理、RAG 检索、Chat Memory 配置
+
+# 文档处理配置
+document:
+  processing:
+    chunk-strategy: smart              # 分片策略：smart（智能）/ fixed_length（固定长度）/ by_title（按标题）
+    chunk-size: 400                    # 分片目标大小（字符数）
+    overlap-size: 80                   # 分片重叠大小（字符数）
+    max-chunk-size: 800                # 最大分片长度
+    max-file-size: 10485760            # 最大文件大小（10MB）
+
+# RAG 检索配置
+rag:
+  retrieval:
+    top-k: 5                           # 最终返回分片数
+    vector-top-k: 10                   # 向量检索 TopK
+    keyword-top-k: 10                  # 关键词检索 TopK
+    rrf-k: 60                          # RRF 融合常数
+    similarity-threshold: 0.7          # 向量相似度阈值
+    index-name: document_chunks        # ES 索引名称
+    rewrite-enabled: true              # 是否启用 Query 改写
+    llm-rewrite-enabled: false         # 是否启用 LLM 语义改写（默认关闭）
+    rerank-enabled: true               # 是否启用 Rerank
+    rerank-top-n: 10                   # Rerank 候选数
+    must-term-boost: 0.2               # 必要术语加权
+    metadata-match-boost: 0.1          # 元数据匹配加权
+    vector-weight: 1.0                 # 向量检索 RRF 权重
+    keyword-weight: 1.0                # 关键词检索 RRF 权重
+    multi-query-enabled: true          # 是否启用 Multi-Query 扩展召回
+  generation:
+    max-context-length: 4000           # 最大上下文长度
+    temperature: 0.7                   # 生成温度
+
+# Chat Memory 配置
+chat:
+  memory:
+    redis-ttl-minutes: 30              # Redis 缓存过期时间（分钟）
+    max-messages: 16                   # 最大记忆消息数
+    keep-system-messages: true         # 是否保留系统消息

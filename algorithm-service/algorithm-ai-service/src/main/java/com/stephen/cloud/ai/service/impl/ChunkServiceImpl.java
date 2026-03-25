@@ -24,6 +24,7 @@ import com.stephen.cloud.common.rabbitmq.model.EsSyncBatchMessage;
 import com.stephen.cloud.common.rabbitmq.model.EsSyncMessage;
 import com.stephen.cloud.common.rabbitmq.producer.RabbitMqSender;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.document.Document;
@@ -70,21 +71,21 @@ public class ChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, DocumentC
     }
 
     @Override
-    public Page<ChunkVO> getChunkVOPage(Page<DocumentChunk> page) {
+    public Page<ChunkVO> getChunkVOPage(Page<DocumentChunk> page, HttpServletRequest request) {
         List<DocumentChunk> records = page.getRecords();
         Page<ChunkVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
         if (CollUtil.isEmpty(records)) {
             return voPage;
         }
         List<ChunkVO> voList = records.stream()
-                .map(DocumentChunkConvert::objToVo)
+                .map(chunk -> this.getChunkVO(chunk, request))
                 .toList();
         voPage.setRecords(voList);
         return voPage;
     }
 
     @Override
-    public ChunkVO getChunkVO(DocumentChunk chunk) {
+    public ChunkVO getChunkVO(DocumentChunk chunk, HttpServletRequest request) {
         return DocumentChunkConvert.objToVo(chunk);
     }
 

@@ -57,6 +57,12 @@ public class DocumentChunk implements Serializable {
     private Integer wordCount;
 
     /**
+     * Token 数量
+     */
+    @Schema(description = "Token数量")
+    private Integer tokenCount;
+
+    /**
      * 向量存储ID
      */
     @Schema(description = "向量存储ID")

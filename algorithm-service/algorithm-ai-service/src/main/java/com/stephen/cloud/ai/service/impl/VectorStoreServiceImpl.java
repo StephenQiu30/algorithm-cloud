@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Service;
 
@@ -70,9 +69,7 @@ public class VectorStoreServiceImpl implements VectorStoreService {
             var response = elasticsearchClient.deleteByQuery(d -> d
                     .index(indexName)
                     .query(q -> q.queryString(qs -> qs.query(
-                            field + ":" + value + " OR metadata." + field + ":" + value
-                    )))
-            );
+                            field + ":" + value + " OR metadata." + field + ":" + value))));
             log.info("[VectorStore] deleteByQuery success, index={}, field={}, value={}, deleted={}",
                     indexName, field, value, response.deleted());
         } catch (IOException e) {
