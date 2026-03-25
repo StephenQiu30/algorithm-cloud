@@ -30,4 +30,19 @@ public class RagRetrievalProperties {
     private Double metadataMatchBoost = 0.1D;
 
     private String indexName = "document_chunks";
+
+    /**
+     * 向量检索在 RRF 融合中的权重
+     */
+    private double vectorWeight = 1.0D;
+
+    /**
+     * 关键词检索在 RRF 融合中的权重
+     */
+    private double keywordWeight = 1.0D;
+
+    /**
+     * 是否开启 Multi-Query 扩展召回
+     */
+    private boolean multiQueryEnabled = true;
 }

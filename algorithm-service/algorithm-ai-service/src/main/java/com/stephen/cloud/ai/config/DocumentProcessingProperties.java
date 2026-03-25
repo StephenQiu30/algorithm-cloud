@@ -16,4 +16,14 @@ public class DocumentProcessingProperties {
     private long maxFileSize = 10485760L;
 
     private String uploadPath = "uploads/knowledge";
+
+    /**
+     * 分段策略：smart（智能切分）、fixed_length（按长度）、by_title（按标题）
+     */
+    private String chunkStrategy = "smart";
+
+    /**
+     * 最大分段长度
+     */
+    private int maxChunkSize = 800;
 }

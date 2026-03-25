@@ -86,6 +86,9 @@ rag:
     rerank-top-n: 10
     must-term-boost: 0.2
     metadata-match-boost: 0.1
+    vector-weight: 1.0
+    keyword-weight: 1.0
+    multi-query-enabled: true
   generation:
     max-context-length: 4000
     temperature: 0.7

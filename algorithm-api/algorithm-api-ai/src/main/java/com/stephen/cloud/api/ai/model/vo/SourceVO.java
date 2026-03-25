@@ -28,6 +28,12 @@ public class SourceVO implements Serializable {
     @Schema(description = "相似度得分")
     private Double score;
 
+    @Schema(description = "向量 cosine 相似度（0~1）")
+    private Double vectorSimilarity;
+
+    @Schema(description = "关键词相关性分数")
+    private Double keywordRelevance;
+
     @Schema(description = "来源类型")
     private String sourceType;
 

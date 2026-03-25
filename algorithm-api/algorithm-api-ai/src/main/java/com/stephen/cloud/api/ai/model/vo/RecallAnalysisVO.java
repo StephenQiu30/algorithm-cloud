@@ -31,4 +31,16 @@ public class RecallAnalysisVO implements Serializable {
 
     @Schema(description = "检索耗时（毫秒）")
     private Long costMs;
+
+    @Schema(description = "改写后的查询")
+    private String rewriteQuery;
+
+    @Schema(description = "最终结果平均相似度")
+    private Double avgSimilarity;
+
+    @Schema(description = "最终结果最高相似度")
+    private Double maxSimilarity;
+
+    @Schema(description = "使用的检索策略")
+    private String retrievalStrategy;
 }

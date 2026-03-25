@@ -25,4 +25,10 @@ public class RecallItemResultVO implements Serializable {
 
     @Schema(description = "实际召回的分片内容列表")
     private List<RetrievalHitVO> retrievedChunks;
+
+    @Schema(description = "平均相似度")
+    private Double avgSimilarity;
+
+    @Schema(description = "最高相似度")
+    private Double maxSimilarity;
 }

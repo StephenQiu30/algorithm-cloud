@@ -44,7 +44,11 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
         int finalTopK = topK == null || topK <= 0 ? defaultTopK : topK;
 
         BoolQuery.Builder boolBuilder = new BoolQuery.Builder();
-        boolBuilder.must(m -> m.match(mm -> mm.field("content").query(query)));
+        boolBuilder.must(m -> m.multiMatch(mm -> mm
+                .fields("content", "metadata.documentName")
+                .query(query)
+                .type(co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType.BestFields)
+        ));
 
         // 应用知识库过滤
         if (knowledgeBaseId != null && knowledgeBaseId > 0) {

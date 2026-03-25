@@ -130,8 +130,9 @@ public class ChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, DocumentC
                     .toList();
         }
 
-        // RRF 融合
-        List<Document> fusedDocs = rrfFusionService.fuse(vectorDocs, keywordDocs, finalTopK, rrfK);
+        // 加权 RRF 融合
+        List<Document> fusedDocs = rrfFusionService.fuse(vectorDocs, keywordDocs, finalTopK, rrfK,
+                ragRetrievalProperties.getVectorWeight(), ragRetrievalProperties.getKeywordWeight());
 
         log.info("[ChunkSearch] query='{}', vectorHits={}, keywordHits={}, fusedTopK={}",
                 query, vectorDocs.size(), keywordDocs.size(), fusedDocs.size());

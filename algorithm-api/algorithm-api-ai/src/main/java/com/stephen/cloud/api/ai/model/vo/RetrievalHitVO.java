@@ -37,6 +37,12 @@ public class RetrievalHitVO implements Serializable {
     @Schema(description = "最终评分")
     private Double score;
 
+    @Schema(description = "向量 cosine 相似度（0~1）")
+    private Double similarityScore;
+
+    @Schema(description = "重排分数")
+    private Double rerankScore;
+
     @Schema(description = "命中原因")
     private String matchReason;
 }

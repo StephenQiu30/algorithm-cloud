@@ -15,10 +15,16 @@ public class RRFFusionServiceImpl implements RRFFusionService {
 
     @Override
     public List<Document> fuse(List<Document> vectorDocs, List<Document> keywordDocs, int finalTopK, int rrfK) {
+        return fuse(vectorDocs, keywordDocs, finalTopK, rrfK, 1.0D, 1.0D);
+    }
+
+    @Override
+    public List<Document> fuse(List<Document> vectorDocs, List<Document> keywordDocs, int finalTopK, int rrfK,
+                               double vectorWeight, double keywordWeight) {
         Map<String, Document> docMap = new LinkedHashMap<>();
         Map<String, Double> scoreMap = new LinkedHashMap<>();
-        accumulate(vectorDocs, "vector", docMap, scoreMap, rrfK);
-        accumulate(keywordDocs, "keyword", docMap, scoreMap, rrfK);
+        accumulate(vectorDocs, "vector", docMap, scoreMap, rrfK, vectorWeight);
+        accumulate(keywordDocs, "keyword", docMap, scoreMap, rrfK, keywordWeight);
         List<Map.Entry<String, Double>> sorted = new ArrayList<>(scoreMap.entrySet());
         sorted.sort(Map.Entry.<String, Double>comparingByValue(Comparator.reverseOrder()));
         List<Document> result = new ArrayList<>();
@@ -39,17 +45,18 @@ public class RRFFusionServiceImpl implements RRFFusionService {
     }
 
     private void accumulate(List<Document> docs, String sourceType, Map<String, Document> docMap,
-                            Map<String, Double> scoreMap, int rrfK) {
+                            Map<String, Double> scoreMap, int rrfK, double weight) {
         if (CollUtil.isEmpty(docs)) {
             return;
         }
         int k = rrfK <= 0 ? 60 : rrfK;
+        double w = weight <= 0 ? 1.0D : weight;
         for (int i = 0; i < docs.size(); i++) {
             Document doc = docs.get(i);
             String key = buildKey(doc, i);
             doc.getMetadata().putIfAbsent("sourceType", sourceType);
             docMap.putIfAbsent(key, doc);
-            double delta = 1.0D / (k + i + 1);
+            double delta = w / (k + i + 1);
             scoreMap.put(key, scoreMap.getOrDefault(key, 0D) + delta);
         }
     }
