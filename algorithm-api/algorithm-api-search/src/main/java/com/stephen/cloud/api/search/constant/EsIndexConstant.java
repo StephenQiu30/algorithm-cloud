@@ -10,7 +10,7 @@ public interface EsIndexConstant {
     /**
      * 帖子索引
      */
-    String POST_INDEX = "post";
+    String POST_INDEX = "algorithm_post";
 
     /**
      * 用户索引

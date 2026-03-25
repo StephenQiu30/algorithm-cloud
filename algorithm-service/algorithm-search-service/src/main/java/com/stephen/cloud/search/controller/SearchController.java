@@ -2,8 +2,8 @@ package com.stephen.cloud.search.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.api.post.model.dto.post.PostQueryRequest;
-import com.stephen.cloud.api.search.model.SearchRequest;
-import com.stephen.cloud.api.search.model.SearchVO;
+import com.stephen.cloud.api.search.model.dto.SearchRequest;
+import com.stephen.cloud.api.search.model.vo.SearchVO;
 import com.stephen.cloud.api.search.model.entity.PostEsDTO;
 import com.stephen.cloud.api.search.model.entity.UserEsDTO;
 import com.stephen.cloud.api.user.model.dto.UserQueryRequest;

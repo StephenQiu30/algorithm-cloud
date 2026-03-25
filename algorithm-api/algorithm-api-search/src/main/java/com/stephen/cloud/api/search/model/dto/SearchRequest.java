@@ -1,4 +1,4 @@
-package com.stephen.cloud.api.search.model;
+package com.stephen.cloud.api.search.model.dto;
 
 import com.stephen.cloud.common.common.PageRequest;
 import io.swagger.v3.oas.annotations.media.Schema;

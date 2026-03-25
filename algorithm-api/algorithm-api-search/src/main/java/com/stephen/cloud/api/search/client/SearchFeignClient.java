@@ -1,7 +1,7 @@
 package com.stephen.cloud.api.search.client;
 
-import com.stephen.cloud.api.search.model.SearchRequest;
-import com.stephen.cloud.api.search.model.SearchVO;
+import com.stephen.cloud.api.search.model.dto.SearchRequest;
+import com.stephen.cloud.api.search.model.vo.SearchVO;
 import com.stephen.cloud.api.search.model.entity.PostEsDTO;
 import com.stephen.cloud.api.search.model.entity.UserEsDTO;
 import com.stephen.cloud.common.common.BaseResponse;

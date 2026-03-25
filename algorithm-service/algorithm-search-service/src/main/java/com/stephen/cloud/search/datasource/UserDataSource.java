@@ -1,7 +1,7 @@
 package com.stephen.cloud.search.datasource;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.stephen.cloud.api.search.model.SearchRequest;
+import com.stephen.cloud.api.search.model.dto.SearchRequest;
 import com.stephen.cloud.api.search.model.entity.UserEsDTO;
 import com.stephen.cloud.api.user.model.dto.UserQueryRequest;
 import com.stephen.cloud.search.annotation.DataSourceType;

@@ -1,7 +1,7 @@
 package com.stephen.cloud.search.datasource;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.stephen.cloud.api.search.model.SearchRequest;
+import com.stephen.cloud.api.search.model.dto.SearchRequest;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**

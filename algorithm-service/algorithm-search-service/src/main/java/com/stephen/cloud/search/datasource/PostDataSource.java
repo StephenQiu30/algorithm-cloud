@@ -2,7 +2,7 @@ package com.stephen.cloud.search.datasource;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.api.post.model.dto.post.PostQueryRequest;
-import com.stephen.cloud.api.search.model.SearchRequest;
+import com.stephen.cloud.api.search.model.dto.SearchRequest;
 import com.stephen.cloud.api.search.model.entity.PostEsDTO;
 import com.stephen.cloud.search.annotation.DataSourceType;
 import com.stephen.cloud.search.model.enums.SearchTypeEnum;
