@@ -25,14 +25,19 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 操作日志接口
+ * 操作日志管理接口
+ * <p>
+ * 提供操作日志的创建、删除、分页查询等功能。
+ * 操作日志由系统通过 {@link com.stephen.cloud.common.log.annotation.OperationLog} 注解自动采集。
+ * 日志记录包含操作用户、操作模块、操作类型、请求参数、响应结果等信息。
+ * </p>
  *
  * @author StephenQiu30
  */
 @RestController
 @RequestMapping("/log/operation")
 @Slf4j
-@Tag(name = "OperationLogController", description = "操作日志接口")
+@Tag(name = "OperationLogController", description = "操作日志管理")
 public class OperationLogController {
 
     @Resource

@@ -25,14 +25,18 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 邮件记录接口
+ * 邮件发送记录管理接口
+ * <p>
+ * 提供邮件发送记录的创建、删除、分页查询等功能。
+ * 邮件发送记录由邮件服务在发送后异步记录，包含收件人、主题、发送状态等信息。
+ * </p>
  *
  * @author StephenQiu30
  */
 @RestController
 @RequestMapping("/log/email")
 @Slf4j
-@Tag(name = "EmailRecordController", description = "邮件记录接口")
+@Tag(name = "EmailRecordController", description = "邮件发送记录管理")
 public class EmailRecordController {
 
     @Resource

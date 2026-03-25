@@ -19,9 +19,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 邮件管理接口
+ * 邮件发送管理接口
  * <p>
- * 提供通用邮件发送（同步/异步）、验证码模板发送。验证码生成/校验/存储由调用方（如 user-service）负责。
+ * 提供通用邮件发送（同步/异步）、验证码模板发送等功能。
+ * 验证码生成/校验/存储由调用方（如 user-service）负责。
+ * 底层基于 RabbitMQ 实现异步解耦，支持高并发场景。
  * </p>
  *
  * @author StephenQiu30
@@ -29,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequestMapping("/mail")
-@Tag(name = "MailController", description = "邮件发送")
+@Tag(name = "MailController", description = "邮件发送管理")
 public class MailController {
 
     @Resource

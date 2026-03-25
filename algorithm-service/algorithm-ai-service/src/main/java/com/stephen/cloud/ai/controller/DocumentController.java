@@ -22,16 +22,34 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * 文档管理接口
+ * <p>
+ * 提供知识库文档的上传、删除、查询等功能。
+ * 文档上传后将自动触发 ETL 处理流程，完成解析、分片、向量化并入库。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @RestController
 @RequestMapping("/ai/doc")
-@Tag(name = "DocumentController", description = "文档管理")
+@Tag(name = "DocumentController", description = "知识库文档管理")
 public class DocumentController {
 
     @Resource
     private DocumentService documentService;
 
+    /**
+     * 上传文档
+     * <p>
+     * 上传文档到指定知识库，系统将自动进行文档解析、分片和向量化处理。
+     *
+     * @param file           上传的文件
+     * @param knowledgeBaseId 知识库 ID
+     * @return 新创建的文档 ID
+     */
     @PostMapping(value = "/add", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "上传文档")
+    @Operation(summary = "上传文档", description = "上传文档到指定知识库，系统将自动进行文档解析、分片和向量化处理")
     @OperationLog(module = "文档管理", action = "上传文档")
     public BaseResponse<Long> addDocument(
             @Parameter(
@@ -85,9 +103,15 @@ public class DocumentController {
         return ResultUtils.success(page);
     }
 
+    /**
+     * 分页获取文档列表（封装类）
+     *
+     * @param queryRequest 查询请求
+     * @param request      HTTP 请求
+     * @return 文档 VO 分页列表
+     */
     @PostMapping("/list/page/vo")
-
-    @Operation(summary = "分页获取文档")
+    @Operation(summary = "分页获取文档", description = "分页获取文档脱敏信息列表")
     public BaseResponse<Page<DocumentVO>> listDocumentVOByPage(@RequestBody DocumentQueryRequest queryRequest,
                                                                 HttpServletRequest request) {
         if (queryRequest == null) {
@@ -100,8 +124,17 @@ public class DocumentController {
         return ResultUtils.success(documentService.getDocumentVOPage(page, request));
     }
 
+    /**
+     * 我的文档列表
+     * <p>
+     * 分页获取当前登录用户上传的文档列表。
+     *
+     * @param queryRequest 查询请求
+     * @param request      HTTP 请求
+     * @return 用户的文档 VO 分页列表
+     */
     @PostMapping("/my/list/page/vo")
-    @Operation(summary = "分页获取我的文档")
+    @Operation(summary = "我的文档列表", description = "分页获取当前登录用户上传的文档列表")
     public BaseResponse<Page<DocumentVO>> listMyDocumentVOByPage(@RequestBody DocumentQueryRequest queryRequest,
                                                                   HttpServletRequest request) {
         if (queryRequest == null) {

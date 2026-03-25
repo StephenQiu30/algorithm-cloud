@@ -26,7 +26,11 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * 帖子管理接口
- * 提供帖子的增删改查、审核、分页查询及 ES 同步等功能
+ * <p>
+ * 提供帖子的增删改查、审核、分页查询及 ES 同步等功能。
+ * 所有需要登录态的接口通过 Sa-Token 进行身份认证。
+ * 帖子创建/编辑后自动进入待审核状态，需管理员复审后方可公开可见。
+ * </p>
  *
  * @author StephenQiu30
  */

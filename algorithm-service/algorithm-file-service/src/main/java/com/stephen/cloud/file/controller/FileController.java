@@ -31,14 +31,18 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Arrays;
 
 /**
- * 文件接口
+ * 文件管理接口
+ * <p>
+ * 提供统一的文件上传能力，支持按业务类型（用户头像、帖子封面、知识库文档等）进行校验。
+ * 上传成功或失败后会异步记录文件上传日志，详见 {@link com.stephen.cloud.file.service.FileUploadRecordService}
+ * </p>
  *
  * @author StephenQiu30
  */
 @RestController
 @RequestMapping("/file")
 @Slf4j
-@Tag(name = "FileController", description = "文件管理")
+@Tag(name = "FileController", description = "文件上传管理")
 public class FileController {
 
     @Resource

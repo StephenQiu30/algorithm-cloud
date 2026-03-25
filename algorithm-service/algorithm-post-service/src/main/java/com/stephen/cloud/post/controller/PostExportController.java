@@ -22,7 +22,11 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 帖子导出接口
+ * 帖子导出管理接口
+ * <p>
+ * 提供帖子导出为 PDF 或 Word 文档的功能。
+ * 导出为管理员权限操作，用于内容备份或分享。
+ * </p>
  *
  * @author StephenQiu30
  */
@@ -30,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 @RequestMapping("/post/export")
 @SaCheckRole(UserConstant.ADMIN_ROLE)
 @Slf4j
+@io.swagger.v3.oas.annotations.tags.Tag(name = "PostExportController", description = "帖子导出管理")
 public class PostExportController {
 
     @Resource

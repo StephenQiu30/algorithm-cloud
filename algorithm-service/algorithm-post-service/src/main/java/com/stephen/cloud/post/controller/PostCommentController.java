@@ -29,13 +29,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * 帖子评论接口
+ * 帖子评论管理接口
+ * <p>
+ * 提供帖子的评论 CRUD、分页查询、我的评论列表等功能。
+ * 评论创建后支持异步发送通知事件，详见 {@link com.stephen.cloud.common.rabbitmq.model.event.CommentEvent}
+ * </p>
  *
  * @author StephenQiu30
  */
 @RestController
 @RequestMapping("/post/comment")
 @Slf4j
+@io.swagger.v3.oas.annotations.tags.Tag(name = "PostCommentController", description = "帖子评论管理")
 public class PostCommentController {
 
     @Resource

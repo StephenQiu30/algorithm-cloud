@@ -24,13 +24,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 帖子点赞接口
+ * 帖子点赞管理接口
+ * <p>
+ * 提供帖子点赞/取消点赞、点赞列表查询等功能。
+ * 点赞操作影响帖子的 thumbNum 字段，支持异步更新。
+ * </p>
  *
  * @author StephenQiu30
  */
 @RestController
 @RequestMapping("/post/thumb")
 @Slf4j
+@io.swagger.v3.oas.annotations.tags.Tag(name = "PostThumbController", description = "帖子点赞管理")
 public class PostThumbController {
 
     @Resource

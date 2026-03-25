@@ -24,13 +24,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 帖子收藏接口
+ * 帖子收藏管理接口
+ * <p>
+ * 提供帖子收藏/取消收藏、收藏列表查询等功能。
+ * 收藏操作影响帖子的 favourNum 字段，支持异步更新。
+ * </p>
  *
  * @author StephenQiu30
  */
 @RestController
 @RequestMapping("/post/favour")
 @Slf4j
+@io.swagger.v3.oas.annotations.tags.Tag(name = "PostFavourController", description = "帖子收藏管理")
 public class PostFavourController {
 
     @Resource

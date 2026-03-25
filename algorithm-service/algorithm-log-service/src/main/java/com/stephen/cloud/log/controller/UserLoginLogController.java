@@ -25,14 +25,18 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 用户登录日志接口
+ * 用户登录日志管理接口
+ * <p>
+ * 提供用户登录日志的创建、删除、分页查询等功能。
+ * 登录日志由用户微服务通过 Feign 调用在登录成功后自动记录，包含登录类型、IP、位置等信息。
+ * </p>
  *
  * @author StephenQiu30
  */
 @RestController
 @RequestMapping("/log/login")
 @Slf4j
-@Tag(name = "UserLoginLogController", description = "用户登录日志接口")
+@Tag(name = "UserLoginLogController", description = "用户登录日志管理")
 public class UserLoginLogController {
 
     @Resource

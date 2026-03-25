@@ -30,7 +30,12 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 用户接口
+ * 用户管理接口
+ * <p>
+ * 提供用户注册登录（GitHub/邮箱）、个人信息管理、权限控制等功能。
+ * 支持 GitHub OAuth2.0 授权登录及邮箱验证码登录两种方式。
+ * 用户敏感信息在返回前均经过脱敏处理。
+ * </p>
  *
  * @author StephenQiu30
  */

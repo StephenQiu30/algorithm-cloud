@@ -29,7 +29,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 搜索接口
+ * 搜索服务接口
+ * <p>
+ * 提供基于 Elasticsearch 的全文搜索能力，支持帖子、用户等多类型数据的聚合搜索。
+ * 支持从 ES 分页查询、批量同步等功能，内部通过 {@link com.stephen.cloud.search.manager.SearchFacade} 统一调度。
+ * </p>
  *
  * @author stephen
  */

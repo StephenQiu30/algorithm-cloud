@@ -21,10 +21,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 通知接口
+ * 通知管理接口
  * <p>
  * 提供通知的增删改查、标记已读、未读计数等功能。
- * 支持管理员智能创建通知，支持分页获取“我的通知”。
+ * 支持管理员智能创建通知（全员、指定角色、指定用户列表），支持分页获取"我的通知"。
+ * 通知推送基于 WebSocket 实时下发，详见 {@link com.stephen.cloud.notification.mq.handler.WebSocketPushHandler}
  * </p>
  *
  * @author StephenQiu30

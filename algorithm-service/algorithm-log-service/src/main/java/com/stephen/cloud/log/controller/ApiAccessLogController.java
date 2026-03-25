@@ -25,14 +25,18 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * API访问日志接口
+ * API访问日志管理接口
+ * <p>
+ * 提供 API 访问日志的创建、删除、分页查询等功能。
+ * API 访问日志由网关统一采集，包含请求路径、请求方法、响应状态、耗时等信息。
+ * </p>
  *
  * @author StephenQiu30
  */
 @RestController
 @RequestMapping("/log/access")
 @Slf4j
-@Tag(name = "ApiAccessLogController", description = "API 访问日志接口")
+@Tag(name = "ApiAccessLogController", description = "API访问日志管理")
 public class ApiAccessLogController {
 
     @Resource

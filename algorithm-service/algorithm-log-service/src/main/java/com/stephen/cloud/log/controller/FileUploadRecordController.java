@@ -25,14 +25,18 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 文件上传记录接口
+ * 文件上传记录管理接口
+ * <p>
+ * 提供文件上传记录的创建、删除、分页查询等功能。
+ * 文件上传记录由文件服务在上传统一处理后异步记录，包含文件名、文件大小、上传状态等信息。
+ * </p>
  *
  * @author StephenQiu30
  */
 @RestController
 @RequestMapping("/log/file/upload")
 @Slf4j
-@Tag(name = "FileUploadRecordController", description = "文件上传记录接口")
+@Tag(name = "FileUploadRecordController", description = "文件上传记录管理")
 public class FileUploadRecordController {
 
     @Resource

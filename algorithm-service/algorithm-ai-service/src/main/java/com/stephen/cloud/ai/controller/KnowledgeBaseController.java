@@ -21,6 +21,15 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 知识库管理接口
+ * <p>
+ * 提供知识库的创建、删除、编辑、查询等基础管理功能。
+ * 知识库用于组织和管理多个文档，是 RAG 检索的知识来源单元。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @RestController
 @RequestMapping("/ai/kb")
 @Tag(name = "KnowledgeBaseController", description = "知识库管理")
@@ -44,8 +53,14 @@ public class KnowledgeBaseController {
         return ResultUtils.success(knowledgeBase.getId());
     }
 
+    /**
+     * 删除知识库
+     *
+     * @param deleteRequest 删除请求
+     * @return 是否删除成功
+     */
     @PostMapping("/delete")
-    @Operation(summary = "删除知识库")
+    @Operation(summary = "删除知识库", description = "删除指定知识库，仅本人或管理员可操作")
     @OperationLog(module = "知识库管理", action = "删除知识库")
     public BaseResponse<Boolean> deleteKnowledgeBase(@RequestBody DeleteRequest deleteRequest) {
         if (deleteRequest == null || deleteRequest.getId() <= 0) {
@@ -111,8 +126,15 @@ public class KnowledgeBaseController {
         return ResultUtils.success(page);
     }
 
+    /**
+     * 分页获取知识库列表（封装类）
+     *
+     * @param queryRequest 查询请求
+     * @param request      HTTP 请求
+     * @return 知识库 VO 分页列表
+     */
     @PostMapping("/list/page/vo")
-    @Operation(summary = "分页获取知识库")
+    @Operation(summary = "分页获取知识库", description = "分页获取知识库脱敏信息列表")
     public BaseResponse<Page<KnowledgeBaseVO>> listKnowledgeBaseVOByPage(@RequestBody KnowledgeBaseQueryRequest queryRequest,
                                                                           HttpServletRequest request) {
         if (queryRequest == null) {

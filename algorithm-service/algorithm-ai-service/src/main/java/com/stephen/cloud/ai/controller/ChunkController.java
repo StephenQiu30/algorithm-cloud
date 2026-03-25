@@ -23,6 +23,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * 文档分片管理接口
+ * <p>
+ * 提供文档分片（Chunk）的查询、搜索等功能。
+ * 文档分片是 RAG 检索的最小单元，每个分片包含原始内容及对应的向量表示。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @RestController
 @RequestMapping("/ai/chunk")
 @Tag(name = "ChunkController", description = "文档分片管理")
@@ -31,9 +40,17 @@ public class ChunkController {
     @Resource
     private ChunkService chunkService;
 
+    /**
+     * 分页获取文档分片列表（管理员）
+     * <p>
+     * 获取完整字段的文档分片列表，用于管理员查看和管理。
+     *
+     * @param queryRequest 查询请求
+     * @return 文档分片分页列表
+     */
     @PostMapping("/list/page")
     @SaCheckRole(UserConstant.ADMIN_ROLE)
-    @Operation(summary = "分页查询文档分片（管理员）")
+    @Operation(summary = "分页查询文档分片（管理员）", description = "获取完整字段的文档分片列表，仅限管理员")
     @OperationLog(module = "文档分片管理", action = "分页查询文档分片（管理员）")
     public BaseResponse<Page<DocumentChunk>> listChunkByPage(@RequestBody ChunkQueryRequest queryRequest) {
         if (queryRequest == null) {
@@ -76,8 +93,16 @@ public class ChunkController {
         return ResultUtils.success(chunkService.getChunkVO(chunk, request));
     }
 
+    /**
+     * 内容检索分片
+     * <p>
+     * 基于关键词在指定知识库或文档中搜索相关分片。
+     *
+     * @param searchRequest 搜索请求
+     * @return 匹配的分片列表
+     */
     @PostMapping("/search")
-    @Operation(summary = "内容检索分片")
+    @Operation(summary = "内容检索分片", description = "基于关键词在指定知识库或文档中搜索相关分片")
     @OperationLog(module = "文档分片管理", action = "内容检索分片")
     public BaseResponse<List<ChunkVO>> searchChunks(@RequestBody ChunkSearchRequest searchRequest) {
         if (searchRequest == null) {
