@@ -7,6 +7,12 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 
+/**
+ * RAG答案视图对象
+ * 用于展示RAG问答的答案结果
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "RAG答案视图对象")
 public class RAGAnswerVO implements Serializable {

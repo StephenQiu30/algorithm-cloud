@@ -7,6 +7,12 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 
+/**
+ * 批量召回分析结果视图对象
+ * 用于展示批量召回测试的统计结果
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "批量召回分析结果")
 public class BatchRecallVO implements Serializable {

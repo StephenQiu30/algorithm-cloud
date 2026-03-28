@@ -8,6 +8,12 @@ import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
 
+/**
+ * RAG历史视图对象
+ * 用于展示RAG问答历史记录
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "RAG历史视图对象")
 public class RAGHistoryVO implements Serializable {

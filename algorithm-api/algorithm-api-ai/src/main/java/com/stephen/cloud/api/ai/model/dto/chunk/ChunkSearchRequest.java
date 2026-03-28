@@ -6,6 +6,12 @@ import lombok.Data;
 import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * 分片内容检索请求
+ * 用于基于内容搜索文档分片
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "分片内容检索请求")
 public class ChunkSearchRequest implements Serializable {

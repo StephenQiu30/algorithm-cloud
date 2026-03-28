@@ -8,6 +8,11 @@ import lombok.EqualsAndHashCode;
 import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * RAG历史查询请求
+ *
+ * @author StephenQiu30
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Schema(description = "RAG历史查询请求")

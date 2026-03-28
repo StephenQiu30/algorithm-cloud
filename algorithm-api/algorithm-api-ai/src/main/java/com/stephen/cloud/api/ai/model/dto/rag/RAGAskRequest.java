@@ -6,6 +6,11 @@ import lombok.Data;
 import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * RAG问答请求
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "RAG问答请求")
 public class RAGAskRequest implements Serializable {

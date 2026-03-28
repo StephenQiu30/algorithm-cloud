@@ -7,6 +7,12 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 
+/**
+ * 召回分析视图对象
+ * 用于展示检索召回效果分析结果
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "召回分析视图对象")
 public class RecallAnalysisVO implements Serializable {

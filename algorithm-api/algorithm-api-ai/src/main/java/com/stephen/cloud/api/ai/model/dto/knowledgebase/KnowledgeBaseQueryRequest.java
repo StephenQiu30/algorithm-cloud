@@ -8,6 +8,11 @@ import lombok.EqualsAndHashCode;
 import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * 知识库查询请求
+ *
+ * @author StephenQiu30
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Schema(description = "知识库查询请求")

@@ -249,7 +249,7 @@ public class RAGServiceImpl implements RAGService {
         RAGHistory ragHistory = new RAGHistory();
         ragHistory.setQuestion(question);
         ragHistory.setAnswer(answer);
-        ragHistory.setKnowledgeBaseId(knowledgeBaseId);
+        ragHistory.setKnowledgeBaseId(knowledgeBaseId == null ? 0L : knowledgeBaseId);
         ragHistory.setUserId(userId);
         ragHistory.setSources(sources);
         ragHistory.setResponseTime(responseTime);

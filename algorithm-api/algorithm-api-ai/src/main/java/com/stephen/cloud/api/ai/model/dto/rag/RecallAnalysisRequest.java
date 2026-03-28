@@ -6,6 +6,12 @@ import lombok.Data;
 import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * 召回率分析请求
+ * 用于分析检索召回效果
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "召回率分析请求")
 public class RecallAnalysisRequest implements Serializable {

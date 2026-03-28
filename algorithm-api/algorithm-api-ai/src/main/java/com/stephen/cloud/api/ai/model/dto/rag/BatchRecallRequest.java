@@ -7,6 +7,11 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 
+/**
+ * 批量召回率分析请求
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "批量召回率分析请求")
 public class BatchRecallRequest implements Serializable {

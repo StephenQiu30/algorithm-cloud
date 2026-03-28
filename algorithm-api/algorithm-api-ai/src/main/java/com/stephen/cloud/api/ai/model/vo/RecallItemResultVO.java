@@ -7,6 +7,12 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 
+/**
+ * 单项召回结果视图对象
+ * 用于展示单个问题的召回测试结果
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "单项召回结果")
 public class RecallItemResultVO implements Serializable {

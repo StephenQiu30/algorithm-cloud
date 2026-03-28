@@ -7,6 +7,12 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
 
+/**
+ * 文档分片视图对象
+ * 用于API数据传输
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "分片视图对象")
 public class ChunkVO implements Serializable {

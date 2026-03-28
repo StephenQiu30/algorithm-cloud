@@ -7,6 +7,12 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 
+/**
+ * 召回测试项
+ * 用于批量召回测试的单个测试项
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "个人召回测试项")
 public class RecallTestItem implements Serializable {

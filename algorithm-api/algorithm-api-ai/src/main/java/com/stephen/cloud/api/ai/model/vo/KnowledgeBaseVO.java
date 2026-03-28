@@ -8,6 +8,12 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
 
+/**
+ * 知识库视图对象
+ * 用于API数据传输
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "知识库视图对象")
 public class KnowledgeBaseVO implements Serializable {

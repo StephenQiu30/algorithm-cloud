@@ -6,6 +6,12 @@ import lombok.Data;
 import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * 检索命中详情视图对象
+ * 用于展示检索命中的分片信息
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "检索命中详情")
 public class RetrievalHitVO implements Serializable {

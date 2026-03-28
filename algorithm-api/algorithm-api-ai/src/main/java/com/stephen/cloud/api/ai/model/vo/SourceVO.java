@@ -6,6 +6,12 @@ import lombok.Data;
 import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * 引用来源视图对象
+ * 用于展示RAG回答的引用来源信息
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "引用来源")
 public class SourceVO implements Serializable {

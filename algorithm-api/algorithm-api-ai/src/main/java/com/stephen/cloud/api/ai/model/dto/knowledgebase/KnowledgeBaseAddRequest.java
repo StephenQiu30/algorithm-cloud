@@ -6,6 +6,11 @@ import lombok.Data;
 import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * 创建知识库请求
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "创建知识库请求")
 public class KnowledgeBaseAddRequest implements Serializable {

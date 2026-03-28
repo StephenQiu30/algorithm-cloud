@@ -6,6 +6,11 @@ import lombok.Data;
 import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * 上传文档请求
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Schema(description = "上传文档请求")
 public class DocumentAddRequest implements Serializable {
