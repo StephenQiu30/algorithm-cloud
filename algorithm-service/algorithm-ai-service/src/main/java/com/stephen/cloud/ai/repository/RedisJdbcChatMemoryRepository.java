@@ -50,15 +50,16 @@ public class RedisJdbcChatMemoryRepository implements ChatMemoryRepository {
     @Override
     public void saveAll(String conversationId, List<Message> messages) {
         try {
-            redisRepository.saveAll(conversationId, messages);
-        } catch (Exception e) {
-            log.warn("[RedisJdbcChatMemoryRepository] 写入Redis失败, conversationId={}", conversationId, e);
-        }
-
-        try {
             jdbcRepository.saveAll(conversationId, messages);
         } catch (Exception e) {
             log.error("[RedisJdbcChatMemoryRepository] 写入JDBC失败, conversationId={}", conversationId, e);
+            return;
+        }
+
+        try {
+            redisRepository.saveAll(conversationId, messages);
+        } catch (Exception e) {
+            log.warn("[RedisJdbcChatMemoryRepository] 写入Redis失败, conversationId={}", conversationId, e);
         }
     }
 
@@ -76,4 +77,3 @@ public class RedisJdbcChatMemoryRepository implements ChatMemoryRepository {
         }
     }
 }
-

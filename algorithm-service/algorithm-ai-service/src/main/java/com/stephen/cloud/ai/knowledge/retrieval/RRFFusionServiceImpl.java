@@ -1,6 +1,7 @@
 package com.stephen.cloud.ai.knowledge.retrieval;
 
 import cn.hutool.core.collection.CollUtil;
+import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,9 @@ import java.util.Map;
 
 @Service
 public class RRFFusionServiceImpl implements RRFFusionService {
+
+    @Resource
+    private RagDocumentHelper ragDocumentHelper;
 
     @Override
     public List<Document> fuse(List<Document> vectorDocs, List<Document> keywordDocs, int finalTopK, int rrfK) {
@@ -57,34 +61,29 @@ public class RRFFusionServiceImpl implements RRFFusionService {
         for (int i = 0; i < docs.size(); i++) {
             Document doc = docs.get(i);
             String key = buildKey(doc, i);
-            doc.getMetadata().putIfAbsent("sourceType", sourceType);
-            docMap.putIfAbsent(key, doc);
+            Document existing = docMap.get(key);
+            if (existing == null) {
+                doc.getMetadata().putIfAbsent("sourceType", sourceType);
+                docMap.put(key, doc);
+            } else {
+                String existingSource = String.valueOf(existing.getMetadata().get("sourceType"));
+                String mergedSourceType = StringUtils.equals(existingSource, sourceType) ? existingSource : "hybrid";
+                ragDocumentHelper.mergeMetadata(existing, doc, mergedSourceType);
+            }
             double delta = w / (k + i + 1);
             scoreMap.put(key, scoreMap.getOrDefault(key, 0D) + delta);
         }
     }
 
     private String buildKey(Document doc, int index) {
-        // 优先使用 chunkId (ETL 过程中生成)
-        Object chunkId = doc.getMetadata().get("chunkId");
-        if (chunkId != null && StringUtils.isNotBlank(String.valueOf(chunkId))) {
-            return String.valueOf(chunkId);
+        String key = ragDocumentHelper.buildDocKey(doc);
+        if (StringUtils.isNotBlank(key)) {
+            return key;
         }
-        
-        // 其次使用 documentId + chunkIndex
-        Object documentId = doc.getMetadata().get("documentId");
-        Object chunkIndex = doc.getMetadata().get("chunkIndex");
-        if (documentId != null && chunkIndex != null) {
-            return documentId + "_" + chunkIndex;
-        }
-        
-        // 再次考虑 esId (从 ES 检索结果中带出)
         Object esId = doc.getMetadata().get("esId");
         if (esId != null && StringUtils.isNotBlank(String.valueOf(esId))) {
             return String.valueOf(esId);
         }
-        
-        // 最后兜底：ID 或 内容哈希
         if (StringUtils.isNotBlank(doc.getId())) {
             return doc.getId();
         }

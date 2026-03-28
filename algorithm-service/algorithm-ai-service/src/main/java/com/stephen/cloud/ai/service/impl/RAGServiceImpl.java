@@ -1,10 +1,13 @@
 package com.stephen.cloud.ai.service.impl;
 
+import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.stephen.cloud.ai.config.RagGenerationProperties;
 import com.stephen.cloud.ai.convert.RAGConvert;
+import com.stephen.cloud.ai.knowledge.retrieval.RagDocumentHelper;
 import com.stephen.cloud.ai.knowledge.retrieval.RetrievalOrchestrator;
 import com.stephen.cloud.ai.knowledge.retrieval.model.RetrievalResult;
 import com.stephen.cloud.ai.mapper.RAGHistoryMapper;
@@ -14,13 +17,26 @@ import com.stephen.cloud.api.ai.model.dto.rag.BatchRecallRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RAGHistoryQueryRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RecallAnalysisRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RecallTestItem;
-import com.stephen.cloud.api.ai.model.vo.*;
+import com.stephen.cloud.api.ai.model.vo.BatchRecallVO;
+import com.stephen.cloud.api.ai.model.vo.RAGHistoryVO;
+import com.stephen.cloud.api.ai.model.vo.RecallAnalysisVO;
+import com.stephen.cloud.api.ai.model.vo.RecallItemResultVO;
+import com.stephen.cloud.api.ai.model.vo.RetrievalHitVO;
+import com.stephen.cloud.api.ai.model.vo.SourceVO;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.MessageType;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -33,7 +49,7 @@ import java.util.Set;
  * RAG 服务实现
  * <p>
  * 核心职责：问答、流式问答、召回分析、批量召回测试。
- * 检索编排逻辑已提取到 {@link RetrievalOrchestrator}，本类专注于上层业务。
+ * 当前仅保留流式问答入口，检索编排逻辑已提取到 {@link RetrievalOrchestrator}，本类专注于上层业务。
  * </p>
  *
  * @author StephenQiu30
@@ -42,8 +58,20 @@ import java.util.Set;
 @Slf4j
 public class RAGServiceImpl implements RAGService {
 
+    private static final String RAG_SYSTEM_PROMPT = """
+            你是一个严谨的知识库问答助手。
+            请优先依据检索到的知识片段回答用户问题。
+            如果上下文不足，请明确说明“当前知识库中没有足够信息支持该结论”，不要编造。
+            回答时尽量简洁、准确，并在合适时结合引用片段给出结论。
+            """;
+
+    private static final String NO_CONTEXT_ANSWER = "当前知识库没有检索到足够相关的内容，暂时无法给出可靠回答。";
+
     @Resource
     private ChatClient chatClient;
+
+    @Resource
+    private ChatMemory chatMemory;
 
     @Resource
     private RAGHistoryMapper ragHistoryMapper;
@@ -51,36 +79,34 @@ public class RAGServiceImpl implements RAGService {
     @Resource
     private RetrievalOrchestrator retrievalOrchestrator;
 
-    @Override
-    public RAGAnswerVO ask(String question, Long knowledgeBaseId, Long userId, Integer topK) {
-        long start = System.currentTimeMillis();
-        RetrievalResult result = retrievalOrchestrator.retrieve(question, knowledgeBaseId, topK);
-        List<Document> docs = result.getDocs();
-        String context = buildContext(docs);
-        String prompt = buildPrompt(question, context);
-        String answer = chatClient.prompt().user(prompt).call().content();
-        List<SourceVO> sources = buildSources(docs);
-        long responseTime = System.currentTimeMillis() - start;
-        saveHistory(question, answer, knowledgeBaseId, userId, JSONUtil.toJsonStr(sources), responseTime,
-                result.getRewriteQuery(), result.getRetrievalMeta(), result.getRetrievalStrategy());
-        RAGAnswerVO vo = new RAGAnswerVO();
-        vo.setAnswer(answer);
-        vo.setSources(sources);
-        vo.setResponseTime(responseTime);
-        return vo;
-    }
+    @Resource
+    private RagGenerationProperties ragGenerationProperties;
+
+    @Resource
+    private RagDocumentHelper ragDocumentHelper;
 
     @Override
-    public Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK) {
+    public Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK,
+            String conversationId) {
         return Flux.defer(() -> {
             long start = System.currentTimeMillis();
-            RetrievalResult result = retrievalOrchestrator.retrieve(question, knowledgeBaseId, topK);
+            String resolvedConversationId = resolveConversationId(conversationId, knowledgeBaseId, userId);
+            List<Message> history = loadConversationHistory(resolvedConversationId);
+            RetrievalResult result = retrievalOrchestrator.retrieve(question, knowledgeBaseId, topK, history);
             List<Document> docs = result.getDocs();
-            String context = buildContext(docs);
-            String prompt = buildPrompt(question, context);
             List<SourceVO> sources = buildSources(docs);
+            if (CollUtil.isEmpty(docs)) {
+                appendConversationMemory(resolvedConversationId, question, NO_CONTEXT_ANSWER);
+                long responseTime = System.currentTimeMillis() - start;
+                saveHistory(question, NO_CONTEXT_ANSWER, knowledgeBaseId, userId,
+                        JSONUtil.toJsonStr(sources), responseTime,
+                        result.getRewriteQuery(), result.getRetrievalMeta(), result.getRetrievalStrategy());
+                return Flux.just(NO_CONTEXT_ANSWER);
+            }
             StringBuilder answerBuilder = new StringBuilder();
-            return chatClient.prompt().user(prompt).stream().content()
+            return buildRagRequest(question, resolvedConversationId, docs)
+                    .stream()
+                    .content()
                     .doOnNext(answerBuilder::append)
                     .doOnComplete(() -> {
                         long responseTime = System.currentTimeMillis() - start;
@@ -259,26 +285,6 @@ public class RAGServiceImpl implements RAGService {
         ragHistoryMapper.insert(ragHistory);
     }
 
-    private String buildContext(List<Document> docs) {
-        if (CollUtil.isEmpty(docs)) {
-            return "";
-        }
-        StringBuilder context = new StringBuilder();
-        for (int i = 0; i < docs.size(); i++) {
-            Document doc = docs.get(i);
-            context.append("片段").append(i + 1).append(":\n").append(doc.getText()).append("\n\n");
-        }
-        return context.toString();
-    }
-
-    private String buildPrompt(String question, String context) {
-        if (StringUtils.isBlank(context)) {
-            return "你是知识库问答助手。用户问题是：" + question + "。当前知识库没有检索到相关内容，请明确告知用户。";
-        }
-        return "你是知识库问答助手。请基于以下上下文回答问题，若上下文不足请明确说明。\n\n上下文:\n"
-                + context + "\n问题:\n" + question;
-    }
-
     private List<SourceVO> buildSources(List<Document> docs) {
         List<SourceVO> sourceList = new ArrayList<>();
         if (CollUtil.isEmpty(docs)) {
@@ -289,7 +295,6 @@ public class RAGServiceImpl implements RAGService {
             Object documentId = doc.getMetadata().get("documentId");
             Object documentName = doc.getMetadata().get("documentName");
             Object chunkIndex = doc.getMetadata().get("chunkIndex");
-            Object score = doc.getMetadata().get("distance");
             if (documentId != null) {
                 sourceVO.setDocumentId(Long.valueOf(String.valueOf(documentId)));
             }
@@ -297,16 +302,17 @@ public class RAGServiceImpl implements RAGService {
             if (chunkIndex != null) {
                 sourceVO.setChunkIndex(Integer.valueOf(String.valueOf(chunkIndex)));
             }
+            sourceVO.setChunkId(ragDocumentHelper.resolveChunkId(doc));
             sourceVO.setSourceType(toStringValue(doc.getMetadata().get("sourceType")));
             sourceVO.setVersion(toStringValue(doc.getMetadata().get("version")));
             sourceVO.setBizTag(toStringValue(doc.getMetadata().get("bizTag")));
+            sourceVO.setSectionTitle(toStringValue(doc.getMetadata().get("sectionTitle")));
+            sourceVO.setSectionPath(toStringValue(doc.getMetadata().get("sectionPath")));
             sourceVO.setMatchReason(toStringValue(doc.getMetadata().get("matchReason")));
             sourceVO.setContent(doc.getText());
-            if (score != null) {
-                sourceVO.setScore(Double.valueOf(String.valueOf(score)));
-            }
-            sourceVO.setVectorSimilarity(toDoubleValue(doc.getMetadata().get("distance")));
-            sourceVO.setKeywordRelevance(toDoubleValue(doc.getMetadata().get("keywordScore")));
+            sourceVO.setScore(defaultScore(doc));
+            sourceVO.setVectorSimilarity(ragDocumentHelper.resolveVectorScore(doc));
+            sourceVO.setKeywordRelevance(ragDocumentHelper.resolveKeywordScore(doc));
             sourceList.add(sourceVO);
         }
         return sourceList;
@@ -318,16 +324,20 @@ public class RAGServiceImpl implements RAGService {
         }
         return docs.stream().map(doc -> {
             RetrievalHitVO hit = new RetrievalHitVO();
-            hit.setId(doc.getId());
+            String chunkId = ragDocumentHelper.resolveChunkId(doc);
+            hit.setId(chunkId);
+            hit.setChunkId(chunkId);
             hit.setDocumentId(toLongValue(doc.getMetadata().get("documentId")));
             hit.setContent(doc.getText());
             hit.setDocumentName(toStringValue(doc.getMetadata().get("documentName")));
             hit.setChunkIndex(toIntegerValue(doc.getMetadata().get("chunkIndex")));
-            hit.setVectorScore(toDoubleValue(doc.getMetadata().get("distance")));
-            hit.setKeywordScore(toDoubleValue(doc.getMetadata().get("keywordScore")));
-            hit.setFusionScore(toDoubleValue(doc.getMetadata().get("fusionScore")));
-            hit.setScore(toDoubleValue(doc.getMetadata().get("score")));
-            hit.setSimilarityScore(toDoubleValue(doc.getMetadata().get("distance")));
+            hit.setSectionTitle(toStringValue(doc.getMetadata().get("sectionTitle")));
+            hit.setSectionPath(toStringValue(doc.getMetadata().get("sectionPath")));
+            hit.setVectorScore(ragDocumentHelper.resolveVectorScore(doc));
+            hit.setKeywordScore(ragDocumentHelper.resolveKeywordScore(doc));
+            hit.setFusionScore(ragDocumentHelper.resolveFusionScore(doc));
+            hit.setScore(defaultScore(doc));
+            hit.setSimilarityScore(ragDocumentHelper.resolveVectorScore(doc));
             hit.setRerankScore(toDoubleValue(doc.getMetadata().get("rerankScore")));
             hit.setMatchReason(toStringValue(doc.getMetadata().get("matchReason")));
             return hit;
@@ -373,12 +383,7 @@ public class RAGServiceImpl implements RAGService {
     }
 
     private String buildDocKey(Document doc) {
-        Object documentId = doc.getMetadata().get("documentId");
-        Object chunkIndex = doc.getMetadata().get("chunkIndex");
-        if (documentId != null && chunkIndex != null) {
-            return documentId + "_" + chunkIndex;
-        }
-        return doc.getId() != null ? doc.getId() : String.valueOf(doc.getText().hashCode());
+        return ragDocumentHelper.buildDocKey(doc);
     }
 
     private Double toDoubleValue(Object value) {
@@ -416,5 +421,126 @@ public class RAGServiceImpl implements RAGService {
 
     private String toStringValue(Object value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private ChatClient.ChatClientRequestSpec buildRagRequest(String question, String conversationId, List<Document> docs) {
+        RetrievalAugmentationAdvisor ragAdvisor = RetrievalAugmentationAdvisor.builder()
+                .documentRetriever(query -> docs)
+                .queryAugmenter(ContextualQueryAugmenter.builder()
+                        .allowEmptyContext(true)
+                        .documentFormatter(this::formatDocumentsForPrompt)
+                        .build())
+                .build();
+
+        MessageChatMemoryAdvisor memoryAdvisor = MessageChatMemoryAdvisor.builder(chatMemory).build();
+
+        return chatClient.prompt()
+                .options(buildGenerationOptions())
+                .advisors(memoryAdvisor, ragAdvisor)
+                .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .system(RAG_SYSTEM_PROMPT)
+                .user(question);
+    }
+
+    private DashScopeChatOptions buildGenerationOptions() {
+        DashScopeChatOptions.DashScopeChatOptionsBuilder builder = DashScopeChatOptions.builder();
+        if (ragGenerationProperties.getTemperature() != null) {
+            builder.temperature(ragGenerationProperties.getTemperature());
+        }
+        return builder.build();
+    }
+
+    private String formatDocumentsForPrompt(List<Document> docs) {
+        if (CollUtil.isEmpty(docs)) {
+            return "";
+        }
+        int budget = Math.max(256, ragGenerationProperties.getMaxContextLength());
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < docs.size(); i++) {
+            Document doc = docs.get(i);
+            String chunkId = ragDocumentHelper.resolveChunkId(doc);
+            StringBuilder headerBuilder = new StringBuilder("片段")
+                    .append(i + 1)
+                    .append(" [chunkId=").append(chunkId)
+                    .append(", documentId=").append(toStringValue(doc.getMetadata().get("documentId")))
+                    .append(", documentName=").append(toStringValue(doc.getMetadata().get("documentName")))
+                    .append(", chunkIndex=").append(toStringValue(doc.getMetadata().get("chunkIndex")));
+            String sectionPath = toStringValue(doc.getMetadata().get("sectionPath"));
+            if (StringUtils.isNotBlank(sectionPath)) {
+                headerBuilder.append(", sectionPath=").append(sectionPath);
+            }
+            headerBuilder.append("]\n");
+            String header = headerBuilder.toString();
+            String content = StringUtils.defaultString(doc.getText());
+            int remaining = budget - builder.length() - header.length() - 2;
+            if (remaining <= 0) {
+                break;
+            }
+            if (content.length() > remaining) {
+                content = content.substring(0, remaining);
+            }
+            builder.append(header).append(content).append("\n\n");
+            if (builder.length() >= budget) {
+                break;
+            }
+        }
+        return builder.toString();
+    }
+
+    private List<Message> loadConversationHistory(String conversationId) {
+        if (StringUtils.isBlank(conversationId)) {
+            return List.of();
+        }
+        try {
+            List<Message> messages = chatMemory.get(conversationId);
+            if (CollUtil.isEmpty(messages)) {
+                return List.of();
+            }
+            List<Message> history = new ArrayList<>();
+            for (Message message : messages) {
+                if (message == null) {
+                    continue;
+                }
+                MessageType messageType = message.getMessageType();
+                if (MessageType.USER.equals(messageType) || MessageType.ASSISTANT.equals(messageType)) {
+                    history.add(message);
+                }
+            }
+            return history;
+        } catch (Exception e) {
+            log.warn("[RAG] 加载会话历史失败, conversationId={}, error={}", conversationId, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private void appendConversationMemory(String conversationId, String question, String answer) {
+        if (StringUtils.isBlank(conversationId)) {
+            return;
+        }
+        chatMemory.add(conversationId, List.of(
+                new UserMessage(question),
+                new AssistantMessage(answer)
+        ));
+    }
+
+    private String resolveConversationId(String conversationId, Long knowledgeBaseId, Long userId) {
+        if (StringUtils.isNotBlank(conversationId)) {
+            return conversationId.trim();
+        }
+        String userPart = userId == null ? "anonymous" : String.valueOf(userId);
+        String kbPart = knowledgeBaseId == null ? "0" : String.valueOf(knowledgeBaseId);
+        return "rag:" + userPart + ":" + kbPart;
+    }
+
+    private Double defaultScore(Document doc) {
+        Double fusionScore = ragDocumentHelper.resolveFusionScore(doc);
+        if (fusionScore != null) {
+            return fusionScore;
+        }
+        Double vectorScore = ragDocumentHelper.resolveVectorScore(doc);
+        if (vectorScore != null) {
+            return vectorScore;
+        }
+        return ragDocumentHelper.resolveKeywordScore(doc);
     }
 }

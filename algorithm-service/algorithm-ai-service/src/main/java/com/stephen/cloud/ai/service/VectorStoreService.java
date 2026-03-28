@@ -1,6 +1,7 @@
 package com.stephen.cloud.ai.service;
 
 import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.filter.Filter;
 
 import java.util.List;
 
@@ -18,12 +19,13 @@ public interface VectorStoreService {
      * 相似度检索
      *
      * @param query              查询文本
-     * @param knowledgeBaseId    知识库 ID
+     * @param filterExpression   元数据过滤表达式
      * @param topK               返回数量
      * @param similarityThreshold 相似度阈值
      * @return 相似的文档片段列表
      */
-    List<Document> similaritySearch(String query, Long knowledgeBaseId, Integer topK, Double similarityThreshold);
+    List<Document> similaritySearch(String query, Filter.Expression filterExpression, Integer topK,
+            Double similarityThreshold);
 
     /**
      * 删除指定知识库的所有向量数据

@@ -26,4 +26,7 @@ public class RAGAskRequest implements Serializable {
 
     @Schema(description = "检索数量")
     private Integer topK = 5;
+
+    @Schema(description = "会话ID（用于多轮对话记忆）")
+    private String conversationId;
 }

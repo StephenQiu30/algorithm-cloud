@@ -47,7 +47,32 @@ public class RagRetrievalProperties {
     private boolean multiQueryEnabled = true;
 
     /**
+     * Multi-Query 时是否保留原始问题作为召回候选，降低改写偏移导致的漏召回。
+     */
+    private boolean includeOriginalQuery = true;
+
+    /**
      * 是否开启 LLM 语义改写（默认关闭，确保向下兼容）
      */
     private boolean llmRewriteEnabled = false;
+
+    /**
+     * 低召回时是否自动放宽向量阈值进行二次补召回。
+     */
+    private boolean recallFallbackEnabled = true;
+
+    /**
+     * 触发补召回的最小命中数阈值。
+     */
+    private int recallFallbackMinHits = 3;
+
+    /**
+     * 二次补召回使用的相似度阈值下限。
+     */
+    private Double fallbackSimilarityThreshold = 0.55D;
+
+    /**
+     * 复杂问题最少召回片段数。
+     */
+    private int complexQueryTopK = 12;
 }

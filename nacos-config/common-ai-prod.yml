@@ -25,7 +25,7 @@ rag:
     similarity-threshold: 0.65
     index-name: document_chunks
     rewrite-enabled: true
-    llm-rewrite-enabled: false
+    llm-rewrite-enabled: true
     rerank-enabled: true
     rerank-top-n: 15
     must-term-boost: 0.2
@@ -33,6 +33,11 @@ rag:
     vector-weight: 1.0
     keyword-weight: 0.8
     multi-query-enabled: true
+    include-original-query: true
+    recall-fallback-enabled: true
+    recall-fallback-min-hits: 4
+    fallback-similarity-threshold: 0.5
+    complex-query-top-k: 15
   generation:
     max-context-length: 6000
     temperature: 0.5

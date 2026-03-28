@@ -13,12 +13,12 @@ public class VectorStoreConfig {
 
     @Bean
     public TokenTextSplitter tokenTextSplitter() {
-        return new TokenTextSplitter(
-                documentProcessingProperties.getChunkSize(),
-                documentProcessingProperties.getOverlapSize(),
-                5,
-                10000,
-                true
-        );
+        return TokenTextSplitter.builder()
+                .withChunkSize(documentProcessingProperties.getChunkSize())
+                .withMinChunkSizeChars(documentProcessingProperties.getOverlapSize())
+                .withMinChunkLengthToEmbed(5)
+                .withMaxNumChunks(10000)
+                .withKeepSeparator(true)
+                .build();
     }
 }

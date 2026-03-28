@@ -24,7 +24,11 @@ public class RerankServiceImpl implements RerankService {
             return List.of();
         }
         List<Document> docs = new ArrayList<>(fusedDocs);
-        docs.sort(Comparator.comparingDouble(doc -> -score(doc, mustTerms, metadataFilters)));
+        for (Document doc : docs) {
+            doc.getMetadata().put("rerankScore", calculateScore(doc, mustTerms, metadataFilters));
+        }
+        docs.sort(Comparator.comparingDouble(
+                (Document doc) -> parseDouble(doc.getMetadata().get("rerankScore"))).reversed());
         int limit = finalTopK <= 0 ? 5 : finalTopK;
         if (docs.size() > limit) {
             return docs.subList(0, limit);
@@ -32,17 +36,19 @@ public class RerankServiceImpl implements RerankService {
         return docs;
     }
 
-    private double score(Document doc, List<String> mustTerms, Map<String, String> metadataFilters) {
+    private double calculateScore(Document doc, List<String> mustTerms, Map<String, String> metadataFilters) {
         double baseScore = parseDouble(doc.getMetadata().get("fusionScore"));
         double mustTermScore = computeMustTermScore(doc, mustTerms);
         double metadataScore = computeMetadataScore(doc, metadataFilters);
         double titleScore = computeTitleScore(doc, mustTerms);
-        double score = baseScore
-                + mustTermScore * defaultDouble(ragRetrievalProperties.getMustTermBoost(), 0.2D)
-                + metadataScore * defaultDouble(ragRetrievalProperties.getMetadataMatchBoost(), 0.1D)
+        double mustTermBoost = ragRetrievalProperties.getMustTermBoost() == null ? 0.2D
+                : ragRetrievalProperties.getMustTermBoost();
+        double metadataMatchBoost = ragRetrievalProperties.getMetadataMatchBoost() == null ? 0.1D
+                : ragRetrievalProperties.getMetadataMatchBoost();
+        return baseScore
+                + mustTermScore * mustTermBoost
+                + metadataScore * metadataMatchBoost
                 + titleScore * 0.05D;
-        doc.getMetadata().put("rerankScore", score);
-        return score;
     }
 
     private double computeMustTermScore(Document doc, List<String> mustTerms) {
@@ -74,15 +80,38 @@ public class RerankServiceImpl implements RerankService {
         if (CollUtil.isEmpty(mustTerms)) {
             return 0D;
         }
-        String title = String.valueOf(doc.getMetadata().get("documentName"));
-        if (StringUtils.isBlank(title)) {
+        List<String> candidates = new ArrayList<>(3);
+        Object[] candidateValues = {
+                doc.getMetadata().get("documentName"),
+                doc.getMetadata().get("sectionTitle"),
+                doc.getMetadata().get("sectionPath")
+        };
+        for (Object candidateValue : candidateValues) {
+            if (candidateValue == null) {
+                continue;
+            }
+            String candidate = String.valueOf(candidateValue).trim();
+            if (StringUtils.isNotBlank(candidate)) {
+                candidates.add(candidate.toLowerCase());
+            }
+        }
+        if (candidates.isEmpty()) {
             return 0D;
         }
-        String lowerTitle = title.toLowerCase();
-        return mustTerms.stream()
-                .filter(StringUtils::isNotBlank)
-                .map(String::toLowerCase)
-                .anyMatch(lowerTitle::contains) ? 1D : 0D;
+        long matched = 0;
+        for (String mustTerm : mustTerms) {
+            if (StringUtils.isBlank(mustTerm)) {
+                continue;
+            }
+            String normalizedMustTerm = mustTerm.toLowerCase();
+            for (String candidate : candidates) {
+                if (candidate.contains(normalizedMustTerm)) {
+                    matched++;
+                    break;
+                }
+            }
+        }
+        return matched == 0 ? 0D : matched * 1.0D / mustTerms.size();
     }
 
     private double parseDouble(Object value) {
@@ -94,12 +123,5 @@ public class RerankServiceImpl implements RerankService {
         } catch (Exception e) {
             return 0D;
         }
-    }
-
-    private double defaultDouble(Double value, double defaultValue) {
-        if (value == null) {
-            return defaultValue;
-        }
-        return value;
     }
 }

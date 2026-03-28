@@ -16,6 +16,7 @@ public class DocumentChunkConvert {
         ChunkVO chunkVO = new ChunkVO();
         BeanUtils.copyProperties(chunk, chunkVO);
         chunkVO.setId(String.valueOf(chunk.getId()));
+        chunkVO.setChunkId(chunk.getVectorId());
         return chunkVO;
     }
 

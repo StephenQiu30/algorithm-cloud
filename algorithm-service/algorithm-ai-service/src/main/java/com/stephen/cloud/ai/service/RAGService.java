@@ -5,7 +5,6 @@ import com.stephen.cloud.api.ai.model.dto.rag.BatchRecallRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RAGHistoryQueryRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RecallAnalysisRequest;
 import com.stephen.cloud.api.ai.model.vo.BatchRecallVO;
-import com.stephen.cloud.api.ai.model.vo.RAGAnswerVO;
 import com.stephen.cloud.api.ai.model.vo.RAGHistoryVO;
 import com.stephen.cloud.api.ai.model.vo.RecallAnalysisVO;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,22 +22,9 @@ import reactor.core.publisher.Flux;
 public interface RAGService {
 
     /**
-     * 同步问答
-     * <p>
-     * 根据问题在指定知识库中进行检索增强生成，返回完整答案。
-     *
-     * @param question        用户问题
-     * @param knowledgeBaseId 知识库 ID
-     * @param userId          用户 ID
-     * @param topK            召回片段数量
-     * @return 包含答案及相关片段的响应对象
-     */
-    RAGAnswerVO ask(String question, Long knowledgeBaseId, Long userId, Integer topK);
-
-    /**
      * 流式问答
      * <p>
-     * 与 {@link #ask} 类似，但通过响应体流式输出答案，适合前端实时展示。
+     * 根据问题在指定知识库中进行检索增强生成，并通过响应体流式输出答案。
      *
      * @param question        用户问题
      * @param knowledgeBaseId 知识库 ID
@@ -46,7 +32,7 @@ public interface RAGService {
      * @param topK            召回片段数量
      * @return 答案片段的流
      */
-    Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK);
+    Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK, String conversationId);
 
     /**
      * 保存问答历史

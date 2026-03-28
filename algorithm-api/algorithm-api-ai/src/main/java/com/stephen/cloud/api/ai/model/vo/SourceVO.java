@@ -28,6 +28,9 @@ public class SourceVO implements Serializable {
     @Schema(description = "分片索引")
     private Integer chunkIndex;
 
+    @Schema(description = "稳定分片ID")
+    private String chunkId;
+
     @Schema(description = "分片内容")
     private String content;
 
@@ -48,6 +51,12 @@ public class SourceVO implements Serializable {
 
     @Schema(description = "业务标签")
     private String bizTag;
+
+    @Schema(description = "章节标题")
+    private String sectionTitle;
+
+    @Schema(description = "章节路径")
+    private String sectionPath;
 
     @Schema(description = "命中原因")
     private String matchReason;

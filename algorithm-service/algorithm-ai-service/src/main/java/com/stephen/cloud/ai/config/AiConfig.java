@@ -44,7 +44,7 @@ public class AiConfig {
                 new RedisJdbcChatMemoryRepository(redisRepo, jdbcChatMemoryRepository);
         return MessageWindowChatMemory.builder()
                 .chatMemoryRepository(compositeRepo)
-                .maxMessages(100)
+                .maxMessages(Math.max(1, chatMemoryProperties.getMaxMessages()))
                 .build();
     }
 

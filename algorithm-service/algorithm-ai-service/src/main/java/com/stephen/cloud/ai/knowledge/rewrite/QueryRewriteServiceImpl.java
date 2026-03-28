@@ -1,13 +1,18 @@
 package com.stephen.cloud.ai.knowledge.rewrite;
 
+import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.json.JSONObject;
-import cn.hutool.json.JSONUtil;
 import com.stephen.cloud.ai.config.RagRetrievalProperties;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.MessageType;
+import org.springframework.ai.rag.Query;
+import org.springframework.ai.rag.preretrieval.query.expansion.MultiQueryExpander;
+import org.springframework.ai.rag.preretrieval.query.transformation.CompressionQueryTransformer;
+import org.springframework.ai.rag.preretrieval.query.transformation.RewriteQueryTransformer;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -33,6 +38,8 @@ import java.util.regex.Pattern;
 @Service
 public class QueryRewriteServiceImpl implements QueryRewriteService {
 
+    private static final int DEFAULT_MULTI_QUERY_COUNT = 3;
+
     private static final Pattern VERSION_PATTERN = Pattern.compile("\\b(?:v)?\\d+(?:\\.\\d+){1,2}\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern ERROR_CODE_PATTERN = Pattern.compile("\\b[A-Z]{2,10}-\\d{2,8}\\b");
 
@@ -40,97 +47,117 @@ public class QueryRewriteServiceImpl implements QueryRewriteService {
     private RagRetrievalProperties ragRetrievalProperties;
 
     @Resource
-    private ChatClient chatClient;
+    private ChatClient.Builder chatClientBuilder;
 
     @Override
-    public RewriteResult rewrite(String question) {
-        if (ragRetrievalProperties.isLlmRewriteEnabled()) {
-            try {
-                return llmRewrite(question);
-            } catch (Exception e) {
-                log.warn("[QueryRewrite] LLM 改写失败, 降级为规则改写, error={}", e.getMessage());
-                return ruleRewrite(question);
-            }
+    public RewriteResult rewrite(String question, List<Message> history) {
+        String normalized = normalize(question);
+        if (!ragRetrievalProperties.isLlmRewriteEnabled()) {
+            return ruleRewrite(normalized);
         }
-        return ruleRewrite(question);
-    }
-
-    /**
-     * LLM 增强改写：语义优化 + 关键词抽取 + 多查询拆分
-     */
-    private RewriteResult llmRewrite(String question) {
-        String prompt = buildLlmRewritePrompt(question);
-        String response = chatClient.prompt().user(prompt).call().content();
-        log.info("[QueryRewrite] LLM 改写完成, original={}, response={}", question, response);
-        return parseLlmResponse(response, question);
-    }
-
-    /**
-     * 构造 LLM 改写 Prompt
-     */
-    private String buildLlmRewritePrompt(String question) {
-        return """
-                你是一个专业的搜索查询改写助手。请对用户的查询进行以下处理，并以 JSON 格式返回结果：
-                
-                1. semanticQuery: 将用户查询改写为更适合向量语义搜索的形式，保持语义不变但使表达更清晰完整
-                2. keywordQuery: 提取查询中的核心关键词，用空格分隔，适当添加同义词
-                3. subQueries: 如果原始查询包含多个子问题或多个维度，拆分为多个独立子查询（数组形式）；如果查询简单直接，返回空数组
-                
-                要求：
-                - 只返回 JSON，不要返回其他内容
-                - subQueries 最多拆分 3 个子查询
-                
-                用户查询：""" + question + """
-                
-                返回格式：
-                {"semanticQuery": "...", "keywordQuery": "...", "subQueries": ["...", "..."]}
-                """;
-    }
-
-    /**
-     * 解析 LLM 返回的 JSON
-     */
-    private RewriteResult parseLlmResponse(String response, String originalQuestion) {
-        RewriteResult result = new RewriteResult();
         try {
-            // 提取 JSON 部分（LLM 可能在 JSON 外包裹额外文本）
-            String jsonStr = extractJson(response);
-            if (StringUtils.isNotBlank(jsonStr)) {
-                JSONObject json = JSONUtil.parseObj(jsonStr);
-                result.setSemanticQuery(json.getStr("semanticQuery", originalQuestion));
-                result.setKeywordQuery(json.getStr("keywordQuery", originalQuestion));
-                List<String> subQueries = json.getBeanList("subQueries", String.class);
-                result.setSubQueries(CollUtil.isEmpty(subQueries) ? List.of() : subQueries);
-            } else {
-                result.setSemanticQuery(originalQuestion);
-                result.setKeywordQuery(originalQuestion);
-                result.setSubQueries(List.of());
-            }
+            return llmRewrite(normalized, history);
         } catch (Exception e) {
-            log.warn("[QueryRewrite] 解析 LLM 响应失败, 使用原始查询, error={}", e.getMessage());
-            result.setSemanticQuery(originalQuestion);
-            result.setKeywordQuery(originalQuestion);
-            result.setSubQueries(List.of());
+            log.warn("[QueryRewrite] Spring AI 官方改写失败, 降级为规则改写, error={}", e.getMessage());
+            return ruleRewrite(normalized);
         }
-        // 补充规则层的 mustTerms 和 metadataFilters
-        result.setMustTerms(extractMustTerms(originalQuestion));
-        result.setMetadataFilters(extractMetadataFilters(originalQuestion));
+    }
+
+    /**
+     * 基于 Spring AI 官方 QueryTransformer / MultiQueryExpander 的改写主链。
+     */
+    private RewriteResult llmRewrite(String question, List<Message> history) {
+        ChatClient.Builder lowTemperatureBuilder = buildLowTemperatureChatClientBuilder();
+        String compressedQuery = compressQuestion(question, history, lowTemperatureBuilder);
+        String semanticQuery = rewriteSemanticQuery(compressedQuery, lowTemperatureBuilder);
+        List<String> subQueries = expandQueries(semanticQuery, lowTemperatureBuilder);
+
+        RewriteResult result = ruleRewrite(question);
+        result.setSemanticQuery(StringUtils.defaultIfBlank(semanticQuery, question));
+        result.setSubQueries(subQueries);
+        log.info("[QueryRewrite] Spring AI 改写完成, original={}, compressed={}, semantic={}, subQueries={}",
+                question, compressedQuery, result.getSemanticQuery(), subQueries);
         return result;
     }
 
-    /**
-     * 从文本中提取第一个 JSON 对象
-     */
-    private String extractJson(String text) {
-        if (StringUtils.isBlank(text)) {
-            return null;
+    private ChatClient.Builder buildLowTemperatureChatClientBuilder() {
+        return chatClientBuilder.clone()
+                .defaultOptions(DashScopeChatOptions.builder().temperature(0.0D).build());
+    }
+
+    private String compressQuestion(String question, List<Message> history, ChatClient.Builder lowTemperatureBuilder) {
+        List<Message> retrievalHistory = sanitizeHistory(history);
+        if (CollUtil.isEmpty(retrievalHistory)) {
+            return question;
         }
-        int start = text.indexOf('{');
-        int end = text.lastIndexOf('}');
-        if (start >= 0 && end > start) {
-            return text.substring(start, end + 1);
+        Query query = Query.builder()
+                .text(question)
+                .history(retrievalHistory)
+                .build();
+        Query compressed = CompressionQueryTransformer.builder()
+                .chatClientBuilder(lowTemperatureBuilder.clone())
+                .build()
+                .transform(query);
+        if (compressed == null || StringUtils.isBlank(compressed.text())) {
+            return question;
         }
-        return null;
+        return compressed.text().trim();
+    }
+
+    private String rewriteSemanticQuery(String question, ChatClient.Builder lowTemperatureBuilder) {
+        Query rewritten = RewriteQueryTransformer.builder()
+                .chatClientBuilder(lowTemperatureBuilder.clone())
+                .targetSearchSystem("enterprise knowledge base vector store")
+                .build()
+                .transform(new Query(question));
+        if (rewritten == null || StringUtils.isBlank(rewritten.text())) {
+            return question;
+        }
+        return rewritten.text().trim();
+    }
+
+    private List<String> expandQueries(String semanticQuery, ChatClient.Builder lowTemperatureBuilder) {
+        if (!ragRetrievalProperties.isMultiQueryEnabled()) {
+            return List.of();
+        }
+        List<Query> expandedQueries = MultiQueryExpander.builder()
+                .chatClientBuilder(lowTemperatureBuilder.clone())
+                .includeOriginal(Boolean.FALSE)
+                .numberOfQueries(DEFAULT_MULTI_QUERY_COUNT)
+                .build()
+                .expand(new Query(semanticQuery));
+        if (CollUtil.isEmpty(expandedQueries)) {
+            return List.of();
+        }
+        List<String> subQueries = new ArrayList<>();
+        for (Query expandedQuery : expandedQueries) {
+            if (expandedQuery == null || StringUtils.isBlank(expandedQuery.text())) {
+                continue;
+            }
+            String candidate = expandedQuery.text().trim();
+            if (StringUtils.equalsIgnoreCase(candidate, semanticQuery) || subQueries.contains(candidate)) {
+                continue;
+            }
+            subQueries.add(candidate);
+        }
+        return subQueries;
+    }
+
+    private List<Message> sanitizeHistory(List<Message> history) {
+        if (CollUtil.isEmpty(history)) {
+            return List.of();
+        }
+        List<Message> sanitized = new ArrayList<>();
+        for (Message message : history) {
+            if (message == null) {
+                continue;
+            }
+            MessageType messageType = message.getMessageType();
+            if (MessageType.USER.equals(messageType) || MessageType.ASSISTANT.equals(messageType)) {
+                sanitized.add(message);
+            }
+        }
+        return sanitized;
     }
 
     // ==================== 规则改写（Fallback）====================

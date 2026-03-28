@@ -23,6 +23,9 @@ public class ChunkVO implements Serializable {
     @Schema(description = "分片ID（ES文档ID）")
     private String id;
 
+    @Schema(description = "稳定分片ID")
+    private String chunkId;
+
     @Schema(description = "文档ID")
     private Long documentId;
 
@@ -34,6 +37,12 @@ public class ChunkVO implements Serializable {
 
     @Schema(description = "分片索引")
     private Integer chunkIndex;
+
+    @Schema(description = "章节标题")
+    private String sectionTitle;
+
+    @Schema(description = "章节路径")
+    private String sectionPath;
 
     @Schema(description = "分片内容")
     private String content;

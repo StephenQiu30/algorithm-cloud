@@ -19,10 +19,9 @@ public interface KeywordSearchService {
      * BM25 关键词检索
      *
      * @param query            查询文本
-     * @param knowledgeBaseId  知识库 ID
      * @param topK             返回数量
      * @param filterExpression 过滤表达式
      * @return 匹配的文档片段列表
      */
-    List<Document> bm25Search(String query, Long knowledgeBaseId, Integer topK, Filter.Expression filterExpression);
+    List<Document> bm25Search(String query, Integer topK, Filter.Expression filterExpression);
 }

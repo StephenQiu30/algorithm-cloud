@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.stephen.cloud.ai.config.RagRetrievalProperties;
 import com.stephen.cloud.ai.convert.DocumentChunkConvert;
+import com.stephen.cloud.ai.knowledge.retrieval.RagDocumentHelper;
 import com.stephen.cloud.ai.knowledge.retrieval.RRFFusionService;
 import com.stephen.cloud.ai.mapper.DocumentChunkMapper;
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
@@ -56,6 +57,9 @@ public class ChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, DocumentC
     @Resource
     private RagRetrievalProperties ragRetrievalProperties;
 
+    @Resource
+    private RagDocumentHelper ragDocumentHelper;
+
     @Override
     public LambdaQueryWrapper<DocumentChunk> getQueryWrapper(ChunkQueryRequest queryRequest) {
         LambdaQueryWrapper<DocumentChunk> queryWrapper = new LambdaQueryWrapper<>();
@@ -102,14 +106,6 @@ public class ChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, DocumentC
         int rrfK = ragRetrievalProperties.getRrfK() <= 0 ? 60 : ragRetrievalProperties.getRrfK();
 
         // 向量检索
-        List<Document> vectorDocs;
-        if (request.getDocumentId() != null && request.getDocumentId() > 0) {
-            vectorDocs = vectorStoreService.searchByDocumentId(query, request.getDocumentId(), vectorTopK, request.getSimilarityThreshold());
-        } else {
-            vectorDocs = vectorStoreService.similaritySearch(query, request.getKnowledgeBaseId(), vectorTopK, request.getSimilarityThreshold());
-        }
-
-        // 关键词检索
         FilterExpressionBuilder b = new FilterExpressionBuilder();
         FilterExpressionBuilder.Op op = null;
         if (request.getKnowledgeBaseId() != null && request.getKnowledgeBaseId() > 0) {
@@ -119,17 +115,17 @@ public class ChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, DocumentC
             FilterExpressionBuilder.Op docFilter = b.eq("documentId", request.getDocumentId());
             op = (op == null) ? docFilter : b.and(op, docFilter);
         }
-
         Filter.Expression filterExpression = (op == null) ? null : op.build();
-        List<Document> keywordDocs = keywordSearchService.bm25Search(query, request.getKnowledgeBaseId(), keywordTopK, filterExpression);
 
-        // 如果指定了 documentId，过滤关键词结果
+        List<Document> vectorDocs;
         if (request.getDocumentId() != null && request.getDocumentId() > 0) {
-            String targetDocId = String.valueOf(request.getDocumentId());
-            keywordDocs = keywordDocs.stream()
-                    .filter(doc -> targetDocId.equals(String.valueOf(doc.getMetadata().get("documentId"))))
-                    .toList();
+            vectorDocs = vectorStoreService.searchByDocumentId(query, request.getDocumentId(), vectorTopK, request.getSimilarityThreshold());
+        } else {
+            vectorDocs = vectorStoreService.similaritySearch(query, filterExpression, vectorTopK, request.getSimilarityThreshold());
         }
+
+        // 关键词检索
+        List<Document> keywordDocs = keywordSearchService.bm25Search(query, keywordTopK, filterExpression);
 
         // 加权 RRF 融合
         List<Document> fusedDocs = rrfFusionService.fuse(vectorDocs, keywordDocs, finalTopK, rrfK,
@@ -147,8 +143,10 @@ public class ChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, DocumentC
             Object chunkIndex = doc.getMetadata().get("chunkIndex");
             Object score = doc.getMetadata().get("fusionScore");
             Object knowledgeBaseId = doc.getMetadata().get("knowledgeBaseId");
+            String chunkId = ragDocumentHelper.resolveChunkId(doc);
 
-            vo.setId(doc.getId());
+            vo.setId(StringUtils.defaultIfBlank(doc.getId(), chunkId));
+            vo.setChunkId(chunkId);
             if (documentId != null) {
                 vo.setDocumentId(Long.valueOf(String.valueOf(documentId)));
             }
@@ -159,6 +157,10 @@ public class ChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, DocumentC
             if (knowledgeBaseId != null) {
                 vo.setKnowledgeBaseId(Long.valueOf(String.valueOf(knowledgeBaseId)));
             }
+            vo.setSectionTitle(doc.getMetadata().get("sectionTitle") == null
+                    ? null : String.valueOf(doc.getMetadata().get("sectionTitle")));
+            vo.setSectionPath(doc.getMetadata().get("sectionPath") == null
+                    ? null : String.valueOf(doc.getMetadata().get("sectionPath")));
             vo.setContent(doc.getText());
             vo.setWordCount(doc.getText() == null ? 0 : doc.getText().length());
             if (score != null) {

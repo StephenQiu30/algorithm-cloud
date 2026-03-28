@@ -3,6 +3,7 @@ package com.stephen.cloud.ai.knowledge.etl;
 import org.springframework.ai.document.Document;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -54,13 +55,7 @@ public class SmartTextSplitter {
                 continue;
             }
             Map<String, Object> metadata = doc.getMetadata();
-            List<String> chunks = splitText(text);
-            for (String chunk : chunks) {
-                if (chunk.isBlank()) {
-                    continue;
-                }
-                result.add(new Document(chunk.strip(), Map.copyOf(metadata)));
-            }
+            result.addAll(splitDocument(text, metadata));
         }
         return result;
     }
@@ -72,20 +67,27 @@ public class SmartTextSplitter {
      * 3. 超长段落按句拆分
      * 4. 相邻分片添加 overlap
      */
-    private List<String> splitText(String text) {
-        // Step 1: 按 Markdown 标题切分为逻辑段
-        List<String> sections = splitByHeadings(text);
-
-        // Step 2: 对每个段，按段落拆分并组装分片
-        List<String> chunks = new ArrayList<>();
-        for (String section : sections) {
-            List<String> sectionChunks = splitSectionToChunks(section);
-            chunks.addAll(sectionChunks);
+    private List<Document> splitDocument(String text, Map<String, Object> metadata) {
+        List<SectionBlock> sections = splitByHeadings(text);
+        List<Document> chunks = new ArrayList<>();
+        for (SectionBlock section : sections) {
+            List<String> sectionChunks = splitSectionToChunks(section.content());
+            for (String sectionChunk : sectionChunks) {
+                if (sectionChunk.isBlank()) {
+                    continue;
+                }
+                Map<String, Object> chunkMetadata = new LinkedHashMap<>(metadata);
+                if (section.sectionTitle() != null && !section.sectionTitle().isBlank()) {
+                    chunkMetadata.put("sectionTitle", section.sectionTitle());
+                }
+                if (section.sectionPath() != null && !section.sectionPath().isBlank()) {
+                    chunkMetadata.put("sectionPath", section.sectionPath());
+                }
+                chunks.add(new Document(sectionChunk.strip(), Map.copyOf(chunkMetadata)));
+            }
         }
-
-        // Step 3: 添加 overlap
         if (overlapSize > 0 && chunks.size() > 1) {
-            chunks = addOverlap(chunks);
+            return addOverlap(chunks);
         }
         return chunks;
     }
@@ -94,18 +96,23 @@ public class SmartTextSplitter {
      * 按 Markdown 标题 (#) 切分文本为逻辑段。
      * 每个段以标题行开头（如果有），包含到下一个标题前的所有内容。
      */
-    private List<String> splitByHeadings(String text) {
-        List<String> sections = new ArrayList<>();
+    private List<SectionBlock> splitByHeadings(String text) {
+        List<SectionBlock> sections = new ArrayList<>();
         var matcher = HEADING_PATTERN.matcher(text);
         List<int[]> headingPositions = new ArrayList<>();
+        List<Integer> headingLevels = new ArrayList<>();
+        List<String> headingTitles = new ArrayList<>();
 
         while (matcher.find()) {
             headingPositions.add(new int[]{matcher.start(), matcher.end()});
+            String headingLine = matcher.group();
+            headingLevels.add(resolveHeadingLevel(headingLine));
+            headingTitles.add(resolveHeadingTitle(headingLine));
         }
 
         if (headingPositions.isEmpty()) {
             // 无标题，整篇视为一个段
-            sections.add(text);
+            sections.add(new SectionBlock(text, null, null));
             return sections;
         }
 
@@ -113,17 +120,21 @@ public class SmartTextSplitter {
         if (headingPositions.getFirst()[0] > 0) {
             String before = text.substring(0, headingPositions.getFirst()[0]).strip();
             if (!before.isEmpty()) {
-                sections.add(before);
+                sections.add(new SectionBlock(before, null, null));
             }
         }
 
+        List<String> headingStack = new ArrayList<>();
         // 按标题切分
         for (int i = 0; i < headingPositions.size(); i++) {
             int start = headingPositions.get(i)[0];
             int end = (i + 1 < headingPositions.size()) ? headingPositions.get(i + 1)[0] : text.length();
             String section = text.substring(start, end).strip();
             if (!section.isEmpty()) {
-                sections.add(section);
+                Integer headingLevel = headingLevels.get(i);
+                String headingTitle = headingTitles.get(i);
+                adjustHeadingStack(headingStack, headingLevel, headingTitle);
+                sections.add(new SectionBlock(section, headingTitle, joinHeadingPath(headingStack)));
             }
         }
         return sections;
@@ -226,21 +237,56 @@ public class SmartTextSplitter {
     /**
      * 添加 overlap：每个分片的开头包含上一个分片的尾部文本
      */
-    private List<String> addOverlap(List<String> chunks) {
-        List<String> result = new ArrayList<>();
-        result.add(chunks.getFirst());
+    private List<Document> addOverlap(List<Document> chunks) {
+        List<Document> overlappedChunks = new ArrayList<>();
+        overlappedChunks.add(chunks.getFirst());
         for (int i = 1; i < chunks.size(); i++) {
-            String prevChunk = chunks.get(i - 1);
-            String overlapText = prevChunk.length() <= overlapSize
-                    ? prevChunk
-                    : prevChunk.substring(prevChunk.length() - overlapSize);
-            String combined = overlapText + "\n" + chunks.get(i);
-            // 确保不超过 maxChunkSize
-            if (combined.length() > maxChunkSize) {
-                combined = combined.substring(0, maxChunkSize);
+            Document previousChunk = chunks.get(i - 1);
+            Document currentChunk = chunks.get(i);
+            String previousText = previousChunk.getText() == null ? "" : previousChunk.getText();
+            String currentText = currentChunk.getText() == null ? "" : currentChunk.getText();
+            int availableOverlapSize = Math.max(0, maxChunkSize - currentText.length() - 1);
+            int finalOverlapSize = Math.min(overlapSize, availableOverlapSize);
+            if (finalOverlapSize <= 0) {
+                overlappedChunks.add(new Document(currentText, Map.copyOf(currentChunk.getMetadata())));
+                continue;
             }
-            result.add(combined);
+            String overlapText = previousText.length() <= finalOverlapSize
+                    ? previousText
+                    : previousText.substring(previousText.length() - finalOverlapSize);
+            String combined = overlapText + "\n" + currentText;
+            overlappedChunks.add(new Document(combined.strip(), Map.copyOf(currentChunk.getMetadata())));
         }
-        return result;
+        return overlappedChunks;
     }
+
+    private int resolveHeadingLevel(String headingLine) {
+        int level = 0;
+        while (level < headingLine.length() && headingLine.charAt(level) == '#') {
+            level++;
+        }
+        return level;
+    }
+
+    private String resolveHeadingTitle(String headingLine) {
+        return headingLine.replaceFirst("^#{1,6}\\s+", "").strip();
+    }
+
+    private void adjustHeadingStack(List<String> headingStack, Integer headingLevel, String headingTitle) {
+        if (headingLevel == null || headingLevel <= 0) {
+            return;
+        }
+        while (headingStack.size() >= headingLevel) {
+            headingStack.remove(headingStack.size() - 1);
+        }
+        headingStack.add(headingTitle);
+    }
+
+    private String joinHeadingPath(List<String> headingStack) {
+        if (headingStack.isEmpty()) {
+            return null;
+        }
+        return String.join(" > ", headingStack);
+    }
+
 }

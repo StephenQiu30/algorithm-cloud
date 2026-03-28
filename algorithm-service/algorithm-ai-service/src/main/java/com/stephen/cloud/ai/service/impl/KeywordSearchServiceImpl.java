@@ -9,6 +9,7 @@ import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.stephen.cloud.ai.config.RagRetrievalProperties;
 import com.stephen.cloud.ai.knowledge.retrieval.ElasticsearchFilterExpressionConverter;
+import com.stephen.cloud.ai.knowledge.retrieval.RagDocumentHelper;
 import com.stephen.cloud.ai.service.KeywordSearchService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -33,10 +34,13 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
     @Resource
     private RagRetrievalProperties ragRetrievalProperties;
 
+    @Resource
+    private RagDocumentHelper ragDocumentHelper;
+
     private final ElasticsearchFilterExpressionConverter filterConverter = new ElasticsearchFilterExpressionConverter();
 
     @Override
-    public List<Document> bm25Search(String query, Long knowledgeBaseId, Integer topK, Filter.Expression filterExpression) {
+    public List<Document> bm25Search(String query, Integer topK, Filter.Expression filterExpression) {
         if (StringUtils.isBlank(query)) {
             return List.of();
         }
@@ -45,19 +49,10 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
 
         BoolQuery.Builder boolBuilder = new BoolQuery.Builder();
         boolBuilder.must(m -> m.multiMatch(mm -> mm
-                .fields("content", "metadata.documentName")
+                .fields("content^3", "metadata.sectionTitle^2.5", "metadata.sectionPath^1.5", "metadata.documentName^2")
                 .query(query)
                 .type(co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType.BestFields)
         ));
-
-        // 应用知识库过滤
-        if (knowledgeBaseId != null && knowledgeBaseId > 0) {
-            boolBuilder.filter(f -> f.bool(b -> b
-                    .should(s -> s.term(t -> t.field("metadata.knowledgeBaseId").value(String.valueOf(knowledgeBaseId))))
-                    .should(s -> s.term(t -> t.field("knowledgeBaseId").value(knowledgeBaseId)))
-                    .minimumShouldMatch("1")
-            ));
-        }
 
         // 应用 Spring AI 表达式过滤
         if (filterExpression != null) {
@@ -74,12 +69,13 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
                 .build();
 
         try {
-            SearchResponse<Map> response = elasticsearchClient.search(searchRequest, Map.class);
+            SearchResponse<Map<String, Object>> response = elasticsearchClient.search(searchRequest,
+                    (Class<Map<String, Object>>) (Class<?>) Map.class);
             List<Document> results = new ArrayList<>();
             int rank = 1;
 
             if (response.hits() != null && response.hits().hits() != null) {
-                for (Hit<Map> hit : response.hits().hits()) {
+                for (Hit<Map<String, Object>> hit : response.hits().hits()) {
                     Map<String, Object> source = hit.source();
                     if (source == null) continue;
 
@@ -95,11 +91,14 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
                     addMetadataIfPresent(source, metadata, "chunkIndex");
                     addMetadataIfPresent(source, metadata, "knowledgeBaseId");
 
+                    String chunkId = resolveStableChunkId(metadata, hit.id());
+                    metadata.put("chunkId", chunkId);
+                    metadata.putIfAbsent("vectorId", chunkId);
                     metadata.put("keywordScore", hit.score());
                     metadata.put("keywordRank", rank++);
                     metadata.put("sourceType", "keyword");
                     metadata.put("esId", hit.id());
-                    results.add(new Document(text, metadata));
+                    results.add(new Document(chunkId, text, metadata));
                 }
             }
             return results;
@@ -113,5 +112,19 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
         if (source.get(key) != null) {
             metadata.putIfAbsent(key, source.get(key));
         }
+    }
+
+    private String resolveStableChunkId(Map<String, Object> metadata, String fallbackId) {
+        Object chunkId = metadata.get("chunkId");
+        if (chunkId != null && StringUtils.isNotBlank(String.valueOf(chunkId))) {
+            return String.valueOf(chunkId);
+        }
+        Object vectorId = metadata.get("vectorId");
+        if (vectorId != null && StringUtils.isNotBlank(String.valueOf(vectorId))) {
+            return String.valueOf(vectorId);
+        }
+        Document probe = new Document(fallbackId, "", metadata);
+        String resolved = ragDocumentHelper.resolveChunkId(probe);
+        return StringUtils.defaultIfBlank(resolved, fallbackId);
     }
 }

@@ -84,6 +84,12 @@
             <artifactId>spring-ai-starter-vector-store-elasticsearch</artifactId>
         </dependency>
 
+        <!-- Spring AI RAG Modules -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-rag</artifactId>
+        </dependency>
+
         <!-- Common Auth -->
         <dependency>
             <groupId>com.algorithm.cloud</groupId>

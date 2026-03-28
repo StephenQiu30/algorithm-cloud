@@ -43,7 +43,7 @@ public class RedisChatMemoryRepository implements ChatMemoryRepository {
     @Override
     public List<String> findConversationIds() {
         // 由于通常不需要遍历所有会话，此方法简单实现或返回空
-        return new ArrayList<>();
+        return List.of();
     }
 
     @Override
@@ -56,6 +56,7 @@ public class RedisChatMemoryRepository implements ChatMemoryRepository {
 
         return jsonMessages.stream()
                 .map(this::toMessage)
+                .filter(message -> message != null)
                 .collect(Collectors.toList());
     }
 
@@ -66,6 +67,9 @@ public class RedisChatMemoryRepository implements ChatMemoryRepository {
         }
         String key = getKeys(conversationId);
         List<Message> trimmedMessages = trimToWindow(messages);
+        if (trimmedMessages.isEmpty()) {
+            return;
+        }
 
         redisTemplate.delete(key);
 
@@ -117,16 +121,23 @@ public class RedisChatMemoryRepository implements ChatMemoryRepository {
     }
 
     private List<Message> trimToWindow(List<Message> messages) {
-        int limit = Math.max(1, maxMessages);
-        if (messages.size() <= limit) {
-            return messages;
+        List<Message> validMessages = messages.stream()
+                .filter(message -> message != null)
+                .toList();
+        if (validMessages.isEmpty()) {
+            return List.of();
         }
-        List<Message> latestMessages = new ArrayList<>(messages.subList(messages.size() - limit, messages.size()));
+        int limit = Math.max(1, maxMessages);
+        if (validMessages.size() <= limit) {
+            return validMessages;
+        }
+        List<Message> latestMessages = new ArrayList<>(
+                validMessages.subList(validMessages.size() - limit, validMessages.size()));
         if (!keepSystemMessages) {
             return latestMessages;
         }
-        List<Message> systemMessages = messages.stream()
-                .filter(message -> message != null && MessageType.SYSTEM.equals(message.getMessageType()))
+        List<Message> systemMessages = validMessages.stream()
+                .filter(message -> MessageType.SYSTEM.equals(message.getMessageType()))
                 .toList();
         if (systemMessages.isEmpty()) {
             return latestMessages;

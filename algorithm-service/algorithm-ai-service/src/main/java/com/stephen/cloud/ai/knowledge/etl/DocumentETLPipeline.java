@@ -1,11 +1,13 @@
 package com.stephen.cloud.ai.knowledge.etl;
 
+import com.stephen.cloud.ai.knowledge.retrieval.RagDocumentHelper;
 import com.stephen.cloud.ai.knowledge.reader.DocumentReaderFactory;
 import com.stephen.cloud.ai.mapper.DocumentChunkMapper;
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.ai.config.DocumentProcessingProperties;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.document.DocumentReader;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -14,9 +16,10 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 文档 ETL 管道
@@ -53,8 +56,12 @@ public class DocumentETLPipeline {
     @Resource
     private DocumentProcessingProperties documentProcessingProperties;
 
+    @Resource
+    private RagDocumentHelper ragDocumentHelper;
+
     public int process(String filePath, String fileExtension, Map<String, Object> metadata) {
         long start = System.currentTimeMillis();
+        Map<String, Object> baseMetadata = sanitizeMetadata(metadata);
         String location = resolveLocation(filePath);
         org.springframework.core.io.Resource springResource = resourceLoader.getResource(location);
         DocumentReader reader = documentReaderFactory.getReader(fileExtension, springResource);
@@ -62,34 +69,46 @@ public class DocumentETLPipeline {
 
         // 注入元数据
         for (Document document : documents) {
-            document.getMetadata().putAll(metadata);
+            document.getMetadata().putAll(baseMetadata);
         }
 
         // 根据策略选择分片器
         String strategy = documentProcessingProperties.getChunkStrategy();
-        List<Document> chunks = splitByStrategy(documents, strategy);
+        List<Document> chunks = assignStableChunkIds(splitByStrategy(documents, strategy), baseMetadata);
         log.info("[ETL] 分片完成, strategy={}, chunkCount={}, fileExtension={}",
                 strategy, chunks.size(), fileExtension);
 
-        // 设置分片索引和 chunkId
-        for (int i = 0; i < chunks.size(); i++) {
-            Document chunk = chunks.get(i);
-            chunk.getMetadata().put("chunkIndex", i);
-            String chunkId = metadata.get("documentId") + "_" + i + "_" + UUID.randomUUID();
-            chunk.getMetadata().put("chunkId", chunkId);
+        Long documentId = parseLong(baseMetadata.get("documentId"));
+        Long knowledgeBaseId = parseLong(baseMetadata.get("knowledgeBaseId"));
+        try {
+            if (!chunks.isEmpty()) {
+                vectorStore.add(chunks);
+            }
+            batchSaveChunks(chunks, documentId, knowledgeBaseId);
+        } catch (Exception e) {
+            rollbackVectorStore(chunks, documentId, e);
+            throw e;
         }
-
-        // 写入向量存储
-        vectorStore.add(chunks);
-
-        // 批量持久化分片到数据库
-        Long documentId = parseLong(metadata.get("documentId"));
-        Long knowledgeBaseId = parseLong(metadata.get("knowledgeBaseId"));
-        batchSaveChunks(chunks, documentId, knowledgeBaseId);
 
         log.info("[ETL] 管道完成, documentId={}, chunks={}, cost={}ms",
                 documentId, chunks.size(), System.currentTimeMillis() - start);
         return chunks.size();
+    }
+
+    private List<Document> assignStableChunkIds(List<Document> chunks, Map<String, Object> baseMetadata) {
+        List<Document> normalizedChunks = new ArrayList<>(chunks.size());
+        Long documentId = parseLong(baseMetadata.get("documentId"));
+        for (int i = 0; i < chunks.size(); i++) {
+            Document chunk = chunks.get(i);
+            Map<String, Object> chunkMetadata = new LinkedHashMap<>(baseMetadata);
+            chunkMetadata.putAll(chunk.getMetadata());
+            chunkMetadata.put("chunkIndex", i);
+            String chunkId = buildChunkId(documentId, i);
+            chunkMetadata.put("chunkId", chunkId);
+            chunkMetadata.put("vectorId", chunkId);
+            normalizedChunks.add(new Document(chunkId, chunk.getText(), chunkMetadata));
+        }
+        return normalizedChunks;
     }
 
     /**
@@ -126,7 +145,7 @@ public class DocumentETLPipeline {
             int charCount = chunk.getText() == null ? 0 : chunk.getText().length();
             entity.setWordCount(charCount);
             entity.setTokenCount(estimateTokenCount(chunk.getText()));
-            entity.setVectorId(chunk.getId());
+            entity.setVectorId(ragDocumentHelper.resolveChunkId(chunk));
             chunkEntities.add(entity);
         }
         // 批量插入（MyBatis-Plus 的 insert 逐条，这里分批次减少事务压力）
@@ -134,9 +153,29 @@ public class DocumentETLPipeline {
         for (int i = 0; i < chunkEntities.size(); i += batchSize) {
             int end = Math.min(i + batchSize, chunkEntities.size());
             List<DocumentChunk> batch = chunkEntities.subList(i, end);
-            for (DocumentChunk entity : batch) {
-                documentChunkMapper.insert(entity);
-            }
+            documentChunkMapper.batchInsert(batch);
+        }
+    }
+
+    private void rollbackVectorStore(List<Document> chunks, Long documentId, Exception cause) {
+        if (chunks == null || chunks.isEmpty()) {
+            return;
+        }
+        List<String> chunkIds = chunks.stream()
+                .map(Document::getId)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.toList());
+        if (chunkIds.isEmpty()) {
+            return;
+        }
+        try {
+            vectorStore.delete(chunkIds);
+            log.warn("[ETL] 数据库存储失败，已回滚向量数据, documentId={}, chunkCount={}, error={}",
+                    documentId, chunkIds.size(), cause.getMessage());
+        } catch (Exception rollbackException) {
+            log.error("[ETL] 数据库存储失败且向量回滚失败, documentId={}, error={}",
+                    documentId, rollbackException.getMessage(), rollbackException);
         }
     }
 
@@ -175,5 +214,23 @@ public class DocumentETLPipeline {
             return null;
         }
         return Long.valueOf(String.valueOf(value));
+    }
+
+    private String buildChunkId(Long documentId, int chunkIndex) {
+        String docPart = documentId == null ? "unknown" : String.valueOf(documentId);
+        return docPart + "_" + chunkIndex;
+    }
+
+    private Map<String, Object> sanitizeMetadata(Map<String, Object> metadata) {
+        Map<String, Object> sanitized = new LinkedHashMap<>();
+        if (metadata == null || metadata.isEmpty()) {
+            return sanitized;
+        }
+        metadata.forEach((key, value) -> {
+            if (key != null && value != null) {
+                sanitized.put(key, value);
+            }
+        });
+        return sanitized;
     }
 }
