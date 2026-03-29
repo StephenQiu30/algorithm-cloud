@@ -11,6 +11,7 @@ import com.stephen.cloud.ai.config.RagRetrievalProperties;
 import com.stephen.cloud.ai.knowledge.retrieval.ElasticsearchFilterExpressionConverter;
 import com.stephen.cloud.ai.knowledge.retrieval.RagDocumentHelper;
 import com.stephen.cloud.ai.service.KeywordSearchService;
+import com.stephen.cloud.api.search.constant.EsIndexConstant;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/** chunk 索引 BM25，字段与索引名同 ChunkEsDTO / EsIndexConstant（与 search 写入一致）。 */
 @Service
 @Slf4j
 public class KeywordSearchServiceImpl implements KeywordSearchService {
@@ -48,13 +50,12 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
         int finalTopK = topK == null || topK <= 0 ? defaultTopK : topK;
 
         BoolQuery.Builder boolBuilder = new BoolQuery.Builder();
+        boolBuilder.filter(f -> f.term(t -> t.field("isDelete").value(0)));
         boolBuilder.must(m -> m.multiMatch(mm -> mm
-                .fields("content^3", "metadata.sectionTitle^2.5", "metadata.sectionPath^1.5", "metadata.documentName^2")
+                .fields("content")
                 .query(query)
                 .type(co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType.BestFields)
         ));
-
-        // 应用 Spring AI 表达式过滤
         if (filterExpression != null) {
             Query filterQuery = filterConverter.convert(filterExpression);
             if (filterQuery != null) {
@@ -63,7 +64,7 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
         }
 
         SearchRequest searchRequest = new SearchRequest.Builder()
-                .index(ragRetrievalProperties.getIndexName())
+                .index(EsIndexConstant.CHUNK_INDEX)
                 .query(boolBuilder.build()._toQuery())
                 .size(finalTopK)
                 .build();
