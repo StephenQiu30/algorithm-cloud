@@ -17,5 +17,5 @@ public class RagGenerationProperties {
     /**
      * 回答生成温度
      */
-    private Double temperature = 0.7D;
+    private Double temperature = 0.4D;
 }

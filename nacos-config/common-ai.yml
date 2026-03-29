@@ -35,7 +35,7 @@ rag:
     complex-query-top-k: 12            # 复杂问题最少召回片段数
   generation:
     max-context-length: 4000           # 最大上下文长度
-    temperature: 0.7                   # 生成温度
+    temperature: 0.4                   # 生成温度
 
 # Chat Memory 配置
 chat:

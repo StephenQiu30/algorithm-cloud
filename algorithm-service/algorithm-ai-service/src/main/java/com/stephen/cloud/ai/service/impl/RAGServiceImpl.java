@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.stephen.cloud.ai.advisor.ReReadingAdvisor;
 import com.stephen.cloud.ai.config.RagGenerationProperties;
 import com.stephen.cloud.ai.convert.RAGConvert;
 import com.stephen.cloud.ai.knowledge.retrieval.RagDocumentHelper;
@@ -34,6 +35,7 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
@@ -60,10 +62,23 @@ public class RAGServiceImpl implements RAGService {
 
     private static final String RAG_SYSTEM_PROMPT = """
             你是一个严谨的知识库问答助手。
-            请优先依据检索到的知识片段回答用户问题。
-            如果上下文不足，请明确说明“当前知识库中没有足够信息支持该结论”，不要编造。
-            回答时尽量简洁、准确，并在合适时结合引用片段给出结论。
+            请仅依据检索到的知识片段回答用户问题；不得编造片段中不存在的事实或数据。
+            如果上下文不足，请明确说明“当前知识库中没有足够信息支持该结论”。
+            引用依据时请使用片段序号或片段头中的 chunkId；回答尽量简洁、准确。
             """;
+
+    private static final PromptTemplate RAG_CONTEXTUAL_QUERY_AUGMENT_TEMPLATE = new PromptTemplate("""
+            以下是仅用于本题作答的检索片段：
+
+            ---------------------
+            {context}
+            ---------------------
+
+            用户问题（若含重复表述以辅助阅读，请抓住实质问题）：
+            {query}
+
+            请仅依据上述片段作答；引用时标明片段序号或 chunkId；信息不足时直接说明，不要臆测。
+            """);
 
     private static final String NO_CONTEXT_ANSWER = "当前知识库没有检索到足够相关的内容，暂时无法给出可靠回答。";
 
@@ -84,6 +99,9 @@ public class RAGServiceImpl implements RAGService {
 
     @Resource
     private RagDocumentHelper ragDocumentHelper;
+
+    @Resource
+    private ReReadingAdvisor reReadingAdvisor;
 
     @Override
     public Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK,
@@ -427,16 +445,18 @@ public class RAGServiceImpl implements RAGService {
         RetrievalAugmentationAdvisor ragAdvisor = RetrievalAugmentationAdvisor.builder()
                 .documentRetriever(query -> docs)
                 .queryAugmenter(ContextualQueryAugmenter.builder()
+                        .promptTemplate(RAG_CONTEXTUAL_QUERY_AUGMENT_TEMPLATE)
                         .allowEmptyContext(true)
                         .documentFormatter(this::formatDocumentsForPrompt)
                         .build())
+                .order(1)
                 .build();
 
         MessageChatMemoryAdvisor memoryAdvisor = MessageChatMemoryAdvisor.builder(chatMemory).build();
 
         return chatClient.prompt()
                 .options(buildGenerationOptions())
-                .advisors(memoryAdvisor, ragAdvisor)
+                .advisors(memoryAdvisor, reReadingAdvisor, ragAdvisor)
                 .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .system(RAG_SYSTEM_PROMPT)
                 .user(question);

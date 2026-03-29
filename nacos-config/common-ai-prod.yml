@@ -40,7 +40,7 @@ rag:
     complex-query-top-k: 15
   generation:
     max-context-length: 6000
-    temperature: 0.5
+    temperature: 0.4
 
 # Chat Memory 配置
 chat:
