@@ -125,6 +125,11 @@
             <groupId>com.algorithm.cloud</groupId>
             <artifactId>algorithm-common-core</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-elasticsearch</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

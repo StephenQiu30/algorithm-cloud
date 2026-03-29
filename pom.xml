@@ -411,6 +411,12 @@
                 <version>${algorithm-cloud.version}</version>
             </dependency>
 
+            <dependency>
+                <groupId>com.algorithm.cloud</groupId>
+                <artifactId>algorithm-common-elasticsearch</artifactId>
+                <version>${algorithm-cloud.version}</version>
+            </dependency>
+
             <!-- API 模块 -->
             <dependency>
                 <groupId>com.algorithm.cloud</groupId>

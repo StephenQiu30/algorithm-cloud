@@ -3,7 +3,7 @@ package com.stephen.cloud.search.manager;
 import cn.hutool.core.io.resource.ResourceUtil;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import com.stephen.cloud.api.search.constant.EsIndexConstant;
-import com.stephen.cloud.search.config.properties.ElasticsearchProperties;
+import com.stephen.cloud.common.elasticsearch.properties.ElasticsearchProperties;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;

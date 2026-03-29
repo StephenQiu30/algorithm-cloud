@@ -48,10 +48,9 @@
             <artifactId>algorithm-api-post</artifactId>
         </dependency>
 
-        <!-- Elasticsearch -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
+            <groupId>com.algorithm.cloud</groupId>
+            <artifactId>algorithm-common-elasticsearch</artifactId>
         </dependency>
 
         <!-- Apache Commons Lang3 -->

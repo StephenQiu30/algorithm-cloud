@@ -26,6 +26,7 @@
         <module>algorithm-common-rabbitmq</module>
         <module>algorithm-common-websocket</module>
         <module>algorithm-common-log</module>
+        <module>algorithm-common-elasticsearch</module>
     </modules>
 
 </project>

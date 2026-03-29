@@ -1,11 +1,11 @@
-package com.stephen.cloud.search.config;
+package com.stephen.cloud.common.elasticsearch.config;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.json.jackson.JacksonJsonpMapper;
 import co.elastic.clients.transport.rest_client.RestClientTransport;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.stephen.cloud.search.config.properties.ElasticsearchProperties;
+import com.stephen.cloud.common.elasticsearch.properties.ElasticsearchProperties;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -24,12 +24,6 @@ import org.springframework.context.annotation.Primary;
 
 import java.util.List;
 
-/**
- * Elasticsearch 配置
- * 手动配置 RestClient 以确保认证信息被正确应用，解决 Actuator 401 问题
- *
- * @author StephenQiu30
- */
 @Configuration
 @EnableConfigurationProperties(ElasticsearchProperties.class)
 @ConditionalOnProperty(prefix = "spring.elasticsearch", name = "enable", havingValue = "true", matchIfMissing = true)
@@ -47,7 +41,6 @@ public class ElasticsearchConfiguration {
             uris = List.of("http://localhost:9200");
         }
 
-        // 调试日志：验证 Nacos 属性是否正确注入
         log.info("[Elasticsearch] 正在初始化 RestClient. Hosts: {}, User: {}",
                 uris, elasticsearchProperties.getUsername());
 
@@ -57,12 +50,10 @@ public class ElasticsearchConfiguration {
 
         RestClientBuilder builder = RestClient.builder(hosts);
 
-        // 配置连接超时
         builder.setRequestConfigCallback(requestConfigBuilder -> requestConfigBuilder
                 .setConnectTimeout(10000)
                 .setSocketTimeout(60000));
 
-        // 核心修复：手动配置认证信息
         builder.setHttpClientConfigCallback(httpClientBuilder -> {
             if (StringUtils.isNotBlank(elasticsearchProperties.getUsername())) {
                 CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
