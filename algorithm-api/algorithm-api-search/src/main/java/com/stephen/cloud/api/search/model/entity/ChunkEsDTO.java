@@ -40,6 +40,9 @@ public class ChunkEsDTO extends BaseEsDTO {
     @Field(type = FieldType.Integer)
     private Integer chunkIndex;
 
+    @Field(type = FieldType.Keyword)
+    private String chunkId;
+
     /**
      * 分片内容
      * 支持中文分词搜索，用于检索分析

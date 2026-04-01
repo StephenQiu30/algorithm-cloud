@@ -12,6 +12,7 @@ import com.stephen.cloud.ai.model.entity.Document;
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.ai.mq.DocumentProcessProducer;
 import com.stephen.cloud.ai.mq.model.DocumentProcessMessage;
+import com.stephen.cloud.ai.service.ChunkService;
 import com.stephen.cloud.ai.service.DocumentService;
 import com.stephen.cloud.ai.service.VectorStoreService;
 import com.stephen.cloud.api.ai.model.dto.document.DocumentQueryRequest;
@@ -60,6 +61,9 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
 
     @Resource
     private DocumentChunkMapper documentChunkMapper;
+
+    @Resource
+    private ChunkService chunkService;
 
     @Override
     public Long uploadDocument(MultipartFile file, Long knowledgeBaseId, Long userId) {
@@ -188,7 +192,17 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         ThrowUtils.throwIf(oldDocument == null, ErrorCode.NOT_FOUND_ERROR);
         ThrowUtils.throwIf(!Objects.equals(oldDocument.getUserId(), loginUserId) && !isAdmin, ErrorCode.NO_AUTH_ERROR);
         vectorStoreService.deleteByDocumentId(id);
+        List<Long> chunkIds = documentChunkMapper.selectList(new LambdaQueryWrapper<DocumentChunk>()
+                        .select(DocumentChunk::getId)
+                        .eq(DocumentChunk::getDocumentId, id))
+                .stream()
+                .map(DocumentChunk::getId)
+                .filter(Objects::nonNull)
+                .toList();
         documentChunkMapper.delete(new LambdaQueryWrapper<DocumentChunk>().eq(DocumentChunk::getDocumentId, id));
+        for (Long chunkId : chunkIds) {
+            chunkService.syncToEs(chunkId);
+        }
         return this.removeById(id);
     }
 }

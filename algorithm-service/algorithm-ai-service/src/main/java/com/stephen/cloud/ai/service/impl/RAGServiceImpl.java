@@ -42,6 +42,9 @@ import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugment
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.*;
+
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -304,62 +307,11 @@ public class RAGServiceImpl implements RAGService {
     }
 
     private List<SourceVO> buildSources(List<Document> docs) {
-        List<SourceVO> sourceList = new ArrayList<>();
-        if (CollUtil.isEmpty(docs)) {
-            return sourceList;
-        }
-        for (Document doc : docs) {
-            SourceVO sourceVO = new SourceVO();
-            Object documentId = doc.getMetadata().get("documentId");
-            Object documentName = doc.getMetadata().get("documentName");
-            Object chunkIndex = doc.getMetadata().get("chunkIndex");
-            if (documentId != null) {
-                sourceVO.setDocumentId(Long.valueOf(String.valueOf(documentId)));
-            }
-            sourceVO.setDocumentName(documentName == null ? null : String.valueOf(documentName));
-            if (chunkIndex != null) {
-                sourceVO.setChunkIndex(Integer.valueOf(String.valueOf(chunkIndex)));
-            }
-            sourceVO.setChunkId(ragDocumentHelper.resolveChunkId(doc));
-            sourceVO.setSourceType(toStringValue(doc.getMetadata().get("sourceType")));
-            sourceVO.setVersion(toStringValue(doc.getMetadata().get("version")));
-            sourceVO.setBizTag(toStringValue(doc.getMetadata().get("bizTag")));
-            sourceVO.setSectionTitle(toStringValue(doc.getMetadata().get("sectionTitle")));
-            sourceVO.setSectionPath(toStringValue(doc.getMetadata().get("sectionPath")));
-            sourceVO.setMatchReason(toStringValue(doc.getMetadata().get("matchReason")));
-            sourceVO.setContent(doc.getText());
-            sourceVO.setScore(defaultScore(doc));
-            sourceVO.setVectorSimilarity(ragDocumentHelper.resolveVectorScore(doc));
-            sourceVO.setKeywordRelevance(ragDocumentHelper.resolveKeywordScore(doc));
-            sourceList.add(sourceVO);
-        }
-        return sourceList;
+        return ragDocumentHelper.toSourceVOs(docs);
     }
 
     private List<RetrievalHitVO> convertToHitVOs(List<Document> docs) {
-        if (CollUtil.isEmpty(docs)) {
-            return new ArrayList<>();
-        }
-        return docs.stream().map(doc -> {
-            RetrievalHitVO hit = new RetrievalHitVO();
-            String chunkId = ragDocumentHelper.resolveChunkId(doc);
-            hit.setId(chunkId);
-            hit.setChunkId(chunkId);
-            hit.setDocumentId(toLongValue(doc.getMetadata().get("documentId")));
-            hit.setContent(doc.getText());
-            hit.setDocumentName(toStringValue(doc.getMetadata().get("documentName")));
-            hit.setChunkIndex(toIntegerValue(doc.getMetadata().get("chunkIndex")));
-            hit.setSectionTitle(toStringValue(doc.getMetadata().get("sectionTitle")));
-            hit.setSectionPath(toStringValue(doc.getMetadata().get("sectionPath")));
-            hit.setVectorScore(ragDocumentHelper.resolveVectorScore(doc));
-            hit.setKeywordScore(ragDocumentHelper.resolveKeywordScore(doc));
-            hit.setFusionScore(ragDocumentHelper.resolveFusionScore(doc));
-            hit.setScore(defaultScore(doc));
-            hit.setSimilarityScore(ragDocumentHelper.resolveVectorScore(doc));
-            hit.setRerankScore(toDoubleValue(doc.getMetadata().get("rerankScore")));
-            hit.setMatchReason(toStringValue(doc.getMetadata().get("matchReason")));
-            return hit;
-        }).toList();
+        return ragDocumentHelper.toRetrievalHitVOs(docs);
     }
 
     private void computeSimilarityStats(List<RetrievalHitVO> hits, RecallAnalysisVO vo) {
@@ -404,38 +356,6 @@ public class RAGServiceImpl implements RAGService {
         return ragDocumentHelper.buildDocKey(doc);
     }
 
-    private Double toDoubleValue(Object value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return Double.valueOf(String.valueOf(value));
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private Integer toIntegerValue(Object value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return Integer.valueOf(String.valueOf(value));
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private Long toLongValue(Object value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return Long.valueOf(String.valueOf(value));
-        } catch (Exception e) {
-            return null;
-        }
-    }
 
     private String toStringValue(Object value) {
         return value == null ? null : String.valueOf(value);
@@ -482,10 +402,10 @@ public class RAGServiceImpl implements RAGService {
             StringBuilder headerBuilder = new StringBuilder("片段")
                     .append(i + 1)
                     .append(" [chunkId=").append(chunkId)
-                    .append(", documentId=").append(toStringValue(doc.getMetadata().get("documentId")))
-                    .append(", documentName=").append(toStringValue(doc.getMetadata().get("documentName")))
-                    .append(", chunkIndex=").append(toStringValue(doc.getMetadata().get("chunkIndex")));
-            String sectionPath = toStringValue(doc.getMetadata().get("sectionPath"));
+                    .append(", documentId=").append(toStringValue(doc.getMetadata().get(DOCUMENT_ID)))
+                    .append(", documentName=").append(toStringValue(doc.getMetadata().get(DOCUMENT_NAME)))
+                    .append(", chunkIndex=").append(toStringValue(doc.getMetadata().get(CHUNK_INDEX)));
+            String sectionPath = toStringValue(doc.getMetadata().get(SECTION_PATH));
             if (StringUtils.isNotBlank(sectionPath)) {
                 headerBuilder.append(", sectionPath=").append(sectionPath);
             }
@@ -552,15 +472,4 @@ public class RAGServiceImpl implements RAGService {
         return "rag:" + userPart + ":" + kbPart;
     }
 
-    private Double defaultScore(Document doc) {
-        Double fusionScore = ragDocumentHelper.resolveFusionScore(doc);
-        if (fusionScore != null) {
-            return fusionScore;
-        }
-        Double vectorScore = ragDocumentHelper.resolveVectorScore(doc);
-        if (vectorScore != null) {
-            return vectorScore;
-        }
-        return ragDocumentHelper.resolveKeywordScore(doc);
-    }
 }

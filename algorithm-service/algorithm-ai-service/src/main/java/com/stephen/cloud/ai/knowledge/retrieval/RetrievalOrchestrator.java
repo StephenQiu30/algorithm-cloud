@@ -18,15 +18,23 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.*;
+
+
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * 检索编排器
  * <p>
  * 统一编排 RAG 检索的完整链路：
- * Query改写 → Multi-Query向量检索 → 关键词BM25检索 → 加权RRF融合 → Rerank → 标记命中原因
+ * Query改写 → Multi-Query向量检索（并行） → 关键词BM25检索（并行） → 补召回 → 加权RRF融合 → Rerank → 标记命中原因
  * </p>
  * <p>
  * 消除原来 RAGServiceImpl 中流式问答与召回分析两处重复的检索逻辑。
@@ -37,12 +45,6 @@ import java.util.*;
 @Slf4j
 @Component
 public class RetrievalOrchestrator {
-
-    private static final List<String> COMPLEX_QUERY_MARKERS = List.of(
-            "列举", "总结", "汇总", "梳理", "比较", "对比", "区别", "差异",
-            "优点", "优势", "缺点", "原因", "为什么", "如何", "步骤", "流程",
-            "有哪些", "哪些", "全部", "完整", "详细", "全面"
-    );
 
     @Resource
     private VectorStoreService vectorStoreService;
@@ -65,15 +67,19 @@ public class RetrievalOrchestrator {
     @Resource
     private RagDocumentHelper ragDocumentHelper;
 
+    @Resource
+    @Qualifier("aiAsyncExecutor")
+    private Executor aiAsyncExecutor;
+
     /**
      * 执行完整的检索编排
      *
-     * @param question        用户原始问题
-     * @param knowledgeBaseId 知识库ID
-     * @param topK            最终返回数量（null 使用默认）
+     * @param question            用户原始问题
+     * @param knowledgeBaseId     知识库ID
+     * @param topK                最终返回数量（null 使用默认）
      * @param similarityThreshold 相似度阈值（null 使用默认）
-     * @param enableRerank    是否启用重排（null 使用配置）
-     * @param history         会话历史（用于多轮问题压缩检索）
+     * @param enableRerank        是否启用重排（null 使用配置）
+     * @param history             会话历史（用于多轮问题压缩检索）
      * @return 检索结果（包含各阶段中间数据）
      */
     public RetrievalResult retrieve(String question, Long knowledgeBaseId, Integer topK,
@@ -91,23 +97,56 @@ public class RetrievalOrchestrator {
         RewriteResult rewriteResult = buildRewriteResult(question, history);
         Filter.Expression filter = buildFilterExpression(knowledgeBaseId, rewriteResult.getMetadataFilters());
 
-        // 2. 向量检索（支持 Multi-Query 扩展）
-        List<Document> vectorDocs = executeVectorSearch(question, rewriteResult, filter, vectorTopK, threshold);
+        // 2. 向量检索 + 关键词 BM25 检索（并行执行 + 超时保护）
+        int timeoutSeconds = ragRetrievalProperties.getRetrievalTimeoutSeconds() <= 0
+                ? 3 : ragRetrievalProperties.getRetrievalTimeoutSeconds();
 
-        // 3. 关键词 BM25 检索
-        List<Document> keywordDocs = keywordSearchService.bm25Search(
-                rewriteResult.getKeywordQuery(), keywordTopK, filter);
+        CompletableFuture<List<Document>> vectorFuture = CompletableFuture
+                .supplyAsync(() -> executeVectorSearch(question, rewriteResult, filter, vectorTopK, threshold), aiAsyncExecutor)
+                .orTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                .exceptionally(ex -> {
+                    log.warn("[Retrieval] 向量检索超时或异常, 降级为空结果, error={}", ex.getMessage());
+                    return List.of();
+                });
+
+        CompletableFuture<List<Document>> keywordFuture = CompletableFuture
+                .supplyAsync(() -> executeKeywordSearch(question, rewriteResult, filter, keywordTopK), aiAsyncExecutor)
+                .orTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                .exceptionally(ex -> {
+                    log.warn("[Retrieval] 关键词检索超时或异常, 降级为空结果, error={}", ex.getMessage());
+                    return List.of();
+                });
+
+        List<Document> vectorDocs = vectorFuture.join();
+        List<Document> keywordDocs = keywordFuture.join();
+
+        // 3. 低召回补召回：当向量命中不足且配置开启时，放宽阈值二次召回
+        if (ragRetrievalProperties.isRecallFallbackEnabled()
+                && vectorDocs.size() < ragRetrievalProperties.getRecallFallbackMinHits()) {
+            Double fallbackThreshold = ragRetrievalProperties.getFallbackSimilarityThreshold();
+            List<Document> supplementDocs = vectorStoreService.similaritySearch(
+                    rewriteResult.getSemanticQuery(), filter, vectorTopK, fallbackThreshold);
+            vectorDocs = mergeWithDedup(vectorDocs, supplementDocs);
+            log.info("[Retrieval] 触发补召回, originalHits={}, supplementHits={}, mergedHits={}",
+                    vectorFuture.join().size(), supplementDocs.size(), vectorDocs.size());
+        }
 
         // 4. 加权 RRF 融合
-        List<Document> fusedDocs = rrfFusionService.fuse(vectorDocs, keywordDocs, finalTopK, rrfK,
+        boolean doRerank = enableRerank != null ? enableRerank && ragRetrievalProperties.isRerankEnabled()
+                : ragRetrievalProperties.isRerankEnabled();
+        int fuseTopK = finalTopK;
+        if (doRerank) {
+            int rerankTopN = Math.max(ragRetrievalProperties.getRerankTopN() <= 0 ? finalTopK
+                    : ragRetrievalProperties.getRerankTopN(), finalTopK);
+            fuseTopK = Math.max(finalTopK, rerankTopN);
+        }
+        List<Document> fusedDocs = rrfFusionService.fuse(vectorDocs, keywordDocs, fuseTopK, rrfK,
                 ragRetrievalProperties.getVectorWeight(), ragRetrievalProperties.getKeywordWeight());
 
         // 5. 重排（根据参数或配置决定）
-        boolean doRerank = enableRerank != null ? enableRerank && ragRetrievalProperties.isRerankEnabled()
-                : ragRetrievalProperties.isRerankEnabled();
         List<Document> finalDocs;
         if (doRerank) {
-            finalDocs = executeRerank(fusedDocs, rewriteResult, finalTopK);
+            finalDocs = executeRerank(fusedDocs, question, rewriteResult, finalTopK);
         } else {
             finalDocs = fusedDocs;
         }
@@ -157,87 +196,72 @@ public class RetrievalOrchestrator {
 
     // ==================== 内部方法 ====================
 
+    /**
+     * 向量检索：支持 Multi-Query 扩展召回
+     */
     private List<Document> executeVectorSearch(String originalQuestion, RewriteResult rewriteResult,
                                                Filter.Expression filterExpression, int vectorTopK, Double threshold) {
-        boolean multiQuery = ragRetrievalProperties.isMultiQueryEnabled();
-
-        Set<String> candidateQueries = new LinkedHashSet<>();
         String semanticQuery = StringUtils.trimToNull(rewriteResult.getSemanticQuery());
-        if (semanticQuery != null) {
-            candidateQueries.add(semanticQuery);
+        String primaryQuery = semanticQuery == null ? StringUtils.trimToNull(originalQuestion) : semanticQuery;
+        if (primaryQuery == null) {
+            return List.of();
         }
-        if (multiQuery) {
-            if (ragRetrievalProperties.isIncludeOriginalQuery()) {
-                String normalizedOriginalQuestion = StringUtils.trimToNull(originalQuestion);
-                if (normalizedOriginalQuestion != null) {
-                    candidateQueries.add(normalizedOriginalQuestion);
+
+        // 主查询
+        List<Document> results = new ArrayList<>(
+                vectorStoreService.similaritySearch(primaryQuery, filterExpression, vectorTopK, threshold));
+
+        // Multi-Query 扩展召回：对每个子查询执行向量检索，合并去重
+        if (ragRetrievalProperties.isMultiQueryEnabled()
+                && CollUtil.isNotEmpty(rewriteResult.getSubQueries())) {
+            Set<String> seenKeys = results.stream()
+                    .map(ragDocumentHelper::buildDocKey)
+                    .collect(Collectors.toCollection(HashSet::new));
+            for (String subQuery : rewriteResult.getSubQueries()) {
+                if (StringUtils.isBlank(subQuery)) {
+                    continue;
+                }
+                List<Document> subResults = vectorStoreService.similaritySearch(
+                        subQuery, filterExpression, vectorTopK, threshold);
+                for (Document doc : subResults) {
+                    if (seenKeys.add(ragDocumentHelper.buildDocKey(doc))) {
+                        results.add(doc);
+                    }
                 }
             }
-            if (CollUtil.isNotEmpty(rewriteResult.getSubQueries())) {
-                for (String subQuery : rewriteResult.getSubQueries()) {
-                    String normalizedSubQuery = StringUtils.trimToNull(subQuery);
-                    if (normalizedSubQuery != null) {
-                        candidateQueries.add(normalizedSubQuery);
-                    }
+            log.info("[Retrieval] Multi-Query 扩展完成, subQueryCount={}, totalVectorHits={}",
+                    rewriteResult.getSubQueries().size(), results.size());
+        }
+
+        // 是否同时保留原始问题的召回结果
+        if (ragRetrievalProperties.isMultiQueryEnabled()
+                && ragRetrievalProperties.isIncludeOriginalQuery()
+                && semanticQuery != null && !semanticQuery.equals(originalQuestion)) {
+            Set<String> seenKeys = results.stream()
+                    .map(ragDocumentHelper::buildDocKey)
+                    .collect(Collectors.toCollection(HashSet::new));
+            List<Document> originalResults = vectorStoreService.similaritySearch(
+                    originalQuestion, filterExpression, vectorTopK, threshold);
+            for (Document doc : originalResults) {
+                if (seenKeys.add(ragDocumentHelper.buildDocKey(doc))) {
+                    results.add(doc);
                 }
             }
         }
 
-        List<Document> merged = new ArrayList<>();
-        for (String candidateQuery : candidateQueries) {
-            List<Document> docs = vectorStoreService.similaritySearch(
-                    candidateQuery, filterExpression, vectorTopK, threshold);
-            merged = mergeVectorResults(merged, docs, vectorTopK);
-            if (!multiQuery) {
-                break;
-            }
-        }
-        if (shouldApplyRecallFallback(merged, threshold, vectorTopK)) {
-            Double fallbackThreshold = ragRetrievalProperties.getFallbackSimilarityThreshold();
-            if (fallbackThreshold != null && fallbackThreshold > 0 && threshold != null && fallbackThreshold >= threshold) {
-                fallbackThreshold = null;
-            }
-            if (fallbackThreshold != null) {
-                int i = 0;
-                for (String candidateQuery : candidateQueries) {
-                    if (i >= 2) {
-                        break;
-                    }
-                    List<Document> fallbackDocs = vectorStoreService.similaritySearch(
-                            candidateQuery, filterExpression, vectorTopK, fallbackThreshold);
-                    merged = mergeVectorResults(merged, fallbackDocs, vectorTopK);
-                    i++;
-                }
-            }
-        }
-        return merged;
+        return results;
     }
 
-    private List<Document> mergeVectorResults(List<Document> docs1, List<Document> docs2, int topK) {
-        Map<String, Document> merged = new LinkedHashMap<>();
-        for (Document doc : docs1) {
-            merged.put(ragDocumentHelper.buildDocKey(doc), doc);
+    private List<Document> executeKeywordSearch(String originalQuestion, RewriteResult rewriteResult,
+                                                Filter.Expression filterExpression, int keywordTopK) {
+        String keywordQuery = StringUtils.trimToNull(rewriteResult.getKeywordQuery());
+        if (keywordQuery == null) {
+            keywordQuery = StringUtils.trimToNull(originalQuestion);
         }
-        for (Document doc : docs2) {
-            String key = ragDocumentHelper.buildDocKey(doc);
-            Document existing = merged.get(key);
-            if (existing == null) {
-                merged.put(key, doc);
-                continue;
-            }
-            double existingScore = defaultScore(existing);
-            double currentScore = defaultScore(doc);
-            if (currentScore > existingScore) {
-                ragDocumentHelper.mergeMetadata(doc, existing, "vector");
-                merged.put(key, doc);
-            } else {
-                ragDocumentHelper.mergeMetadata(existing, doc, "vector");
-            }
+        if (keywordQuery == null) {
+            return List.of();
         }
-        return merged.values().stream()
-                .sorted(Comparator.comparingDouble(this::defaultScore).reversed())
-                .limit(topK)
-                .toList();
+        return keywordSearchService.bm25Search(keywordQuery, keywordTopK, filterExpression);
     }
 
     private RewriteResult buildRewriteResult(String question, List<Message> history) {
@@ -253,11 +277,13 @@ public class RetrievalOrchestrator {
         return queryRewriteService.rewrite(question, history);
     }
 
-    private List<Document> executeRerank(List<Document> fusedDocs, RewriteResult rewriteResult, int finalTopK) {
+    private List<Document> executeRerank(List<Document> fusedDocs, String originalQuestion,
+                                          RewriteResult rewriteResult, int finalTopK) {
         int rerankTopN = Math.max(ragRetrievalProperties.getRerankTopN() <= 0 ? finalTopK
                 : ragRetrievalProperties.getRerankTopN(), finalTopK);
         List<Document> candidates = fusedDocs.size() > rerankTopN ? fusedDocs.subList(0, rerankTopN) : fusedDocs;
-        return rerankService.rerank(candidates, rewriteResult.getMustTerms(), rewriteResult.getMetadataFilters(), finalTopK);
+        return rerankService.rerank(candidates, originalQuestion, rewriteResult.getMustTerms(),
+                rewriteResult.getMetadataFilters(), finalTopK);
     }
 
     private void markMatchReason(List<Document> docs, RewriteResult rewriteResult) {
@@ -265,15 +291,15 @@ public class RetrievalOrchestrator {
             return;
         }
         for (Document doc : docs) {
-            Object rerankScore = doc.getMetadata().get("rerankScore");
+            Object rerankScore = doc.getMetadata().get(RERANK_SCORE);
             if (rerankScore != null) {
-                doc.getMetadata().put("matchReason", MatchReasonEnum.RERANK.getValue());
+                doc.getMetadata().put(MATCH_REASON, MatchReasonEnum.RERANK.getValue());
                 continue;
             }
             if (CollUtil.isNotEmpty(rewriteResult.getMustTerms())) {
-                doc.getMetadata().put("matchReason", MatchReasonEnum.MUST_TERM.getValue());
+                doc.getMetadata().put(MATCH_REASON, MatchReasonEnum.MUST_TERM.getValue());
             } else {
-                doc.getMetadata().put("matchReason", MatchReasonEnum.HYBRID.getValue());
+                doc.getMetadata().put(MATCH_REASON, MatchReasonEnum.HYBRID.getValue());
             }
         }
     }
@@ -282,7 +308,7 @@ public class RetrievalOrchestrator {
         FilterExpressionBuilder b = new FilterExpressionBuilder();
         FilterExpressionBuilder.Op op = null;
         if (knowledgeBaseId != null && knowledgeBaseId > 0) {
-            op = b.eq("knowledgeBaseId", knowledgeBaseId);
+            op = b.eq(KNOWLEDGE_BASE_ID, knowledgeBaseId);
         }
         if (CollUtil.isNotEmpty(metadataFilters)) {
             for (Map.Entry<String, String> entry : metadataFilters.entrySet()) {
@@ -293,6 +319,25 @@ public class RetrievalOrchestrator {
             }
         }
         return op == null ? null : op.build();
+    }
+
+    /**
+     * 合并两个文档列表并去重
+     */
+    private List<Document> mergeWithDedup(List<Document> primary, List<Document> supplement) {
+        if (CollUtil.isEmpty(supplement)) {
+            return primary;
+        }
+        List<Document> merged = new ArrayList<>(primary);
+        Set<String> seenKeys = primary.stream()
+                .map(ragDocumentHelper::buildDocKey)
+                .collect(Collectors.toCollection(HashSet::new));
+        for (Document doc : supplement) {
+            if (seenKeys.add(ragDocumentHelper.buildDocKey(doc))) {
+                merged.add(doc);
+            }
+        }
+        return merged;
     }
 
     private Map<String, Object> buildRetrievalMeta(List<Document> vectorDocs, List<Document> keywordDocs,
@@ -306,11 +351,9 @@ public class RetrievalOrchestrator {
         meta.put("complexQuery", complexQuery);
         meta.put("multiQueryEnabled", ragRetrievalProperties.isMultiQueryEnabled());
         meta.put("includeOriginalQuery", ragRetrievalProperties.isIncludeOriginalQuery());
-        meta.put("recallFallbackEnabled", ragRetrievalProperties.isRecallFallbackEnabled());
-        meta.put("recallFallbackMinHits", ragRetrievalProperties.getRecallFallbackMinHits());
-        meta.put("fallbackSimilarityThreshold", ragRetrievalProperties.getFallbackSimilarityThreshold());
         meta.put("vectorWeight", ragRetrievalProperties.getVectorWeight());
         meta.put("keywordWeight", ragRetrievalProperties.getKeywordWeight());
+        meta.put("recallFallbackEnabled", ragRetrievalProperties.isRecallFallbackEnabled());
         // 去重统计：向量和关键词的交叉命中数
         Set<String> vectorKeys = new HashSet<>();
         for (Document doc : vectorDocs) {
@@ -335,32 +378,23 @@ public class RetrievalOrchestrator {
         return Math.max(configuredTopK, ragRetrievalProperties.getComplexQueryTopK());
     }
 
-    private boolean shouldApplyRecallFallback(List<Document> docs, Double threshold, int vectorTopK) {
-        if (!ragRetrievalProperties.isRecallFallbackEnabled()) {
-            return false;
-        }
-        if (threshold == null || threshold <= 0) {
-            return false;
-        }
-        Double fallbackThreshold = ragRetrievalProperties.getFallbackSimilarityThreshold();
-        if (fallbackThreshold == null || fallbackThreshold <= 0 || fallbackThreshold >= threshold) {
-            return false;
-        }
-        int minHits = Math.max(1, Math.min(vectorTopK, ragRetrievalProperties.getRecallFallbackMinHits()));
-        return docs.size() < minHits;
-    }
-
-    private double defaultScore(Document doc) {
-        Double score = ragDocumentHelper.resolveVectorScore(doc);
-        return score == null ? 0D : score;
-    }
-
+    /**
+     * 复杂查询判断（阈值和关键词均从配置读取）
+     */
     private boolean isComplexQuery(String question) {
         if (StringUtils.isBlank(question)) {
             return false;
         }
         String normalizedQuestion = question.trim();
-        return normalizedQuestion.length() >= 18
-                || COMPLEX_QUERY_MARKERS.stream().anyMatch(normalizedQuestion::contains);
+        int minLength = ragRetrievalProperties.getComplexQueryMinLength() <= 0
+                ? 18 : ragRetrievalProperties.getComplexQueryMinLength();
+        if (normalizedQuestion.length() >= minLength) {
+            return true;
+        }
+        List<String> markers = ragRetrievalProperties.getComplexQueryMarkers();
+        if (CollUtil.isEmpty(markers)) {
+            return false;
+        }
+        return markers.stream().anyMatch(normalizedQuestion::contains);
     }
 }

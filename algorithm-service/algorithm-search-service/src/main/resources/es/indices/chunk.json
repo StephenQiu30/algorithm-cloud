@@ -1,0 +1,28 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  },
+  "mappings": {
+    "properties": {
+      "documentId": { "type": "keyword" },
+      "knowledgeBaseId": { "type": "keyword" },
+      "chunkIndex": { "type": "integer" },
+      "chunkId": { "type": "keyword" },
+      "content": {
+        "type": "text",
+        "analyzer": "ik_max_word",
+        "search_analyzer": "ik_smart",
+        "fields": {
+          "keyword": { "type": "keyword" }
+        }
+      },
+      "wordCount": { "type": "integer" },
+      "vectorId": { "type": "keyword" },
+      "isDelete": { "type": "integer" },
+      "createTime": { "type": "date" },
+      "updateTime": { "type": "date" }
+    }
+  }
+}
+

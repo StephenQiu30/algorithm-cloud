@@ -23,7 +23,8 @@ rag:
     keyword-top-k: 15
     rrf-k: 60
     similarity-threshold: 0.65
-    index-name: document_chunks
+    vector-index-name: document_chunks_vector
+    keyword-index-name: document_chunks_search
     rewrite-enabled: true
     llm-rewrite-enabled: true
     rerank-enabled: true
@@ -32,11 +33,9 @@ rag:
     metadata-match-boost: 0.1
     vector-weight: 1.0
     keyword-weight: 0.8
-    multi-query-enabled: true
-    include-original-query: true
-    recall-fallback-enabled: true
-    recall-fallback-min-hits: 4
-    fallback-similarity-threshold: 0.5
+    multi-query-enabled: false
+    include-original-query: false
+    recall-fallback-enabled: false
     complex-query-top-k: 15
   generation:
     max-context-length: 6000

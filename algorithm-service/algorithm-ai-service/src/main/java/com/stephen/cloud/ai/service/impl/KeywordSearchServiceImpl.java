@@ -19,13 +19,24 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.stereotype.Service;
 
+import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.*;
+
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** chunk 索引 BM25，字段与索引名同 ChunkEsDTO / EsIndexConstant（与 search 写入一致）。 */
+/**
+ * chunk 索引 BM25 关键词检索服务
+ * <p>
+ * 搜索字段包含 content（主内容）、documentName（文档名加权）、sectionTitle（章节标题加权），
+ * 提升标题级别的关键词召回能力。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Service
 @Slf4j
 public class KeywordSearchServiceImpl implements KeywordSearchService {
@@ -51,8 +62,9 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
 
         BoolQuery.Builder boolBuilder = new BoolQuery.Builder();
         boolBuilder.filter(f -> f.term(t -> t.field("isDelete").value(0)));
+        // 多字段搜索：content 为主、documentName 权重 2x、sectionTitle 权重 1.5x
         boolBuilder.must(m -> m.multiMatch(mm -> mm
-                .fields("content")
+                .fields("content", DOCUMENT_NAME + "^2", SECTION_TITLE + "^1.5")
                 .query(query)
                 .type(co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType.BestFields)
         ));
@@ -63,8 +75,12 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
             }
         }
 
+        String indexName = StringUtils.defaultIfBlank(
+                ragRetrievalProperties.getKeywordIndexName(),
+                StringUtils.defaultIfBlank(ragRetrievalProperties.getIndexName(), EsIndexConstant.CHUNK_INDEX)
+        );
         SearchRequest searchRequest = new SearchRequest.Builder()
-                .index(EsIndexConstant.CHUNK_INDEX)
+                .index(indexName)
                 .query(boolBuilder.build()._toQuery())
                 .size(finalTopK)
                 .build();
@@ -87,18 +103,20 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
                         sourceMetadata.forEach((k, v) -> metadata.put(String.valueOf(k), v));
                     }
                     // 补充一级字段到 metadata（兼容性）
-                    addMetadataIfPresent(source, metadata, "documentId");
-                    addMetadataIfPresent(source, metadata, "documentName");
-                    addMetadataIfPresent(source, metadata, "chunkIndex");
-                    addMetadataIfPresent(source, metadata, "knowledgeBaseId");
+                    addMetadataIfPresent(source, metadata, DOCUMENT_ID);
+                    addMetadataIfPresent(source, metadata, DOCUMENT_NAME);
+                    addMetadataIfPresent(source, metadata, CHUNK_INDEX);
+                    addMetadataIfPresent(source, metadata, KNOWLEDGE_BASE_ID);
+                    addMetadataIfPresent(source, metadata, SECTION_TITLE);
+                    addMetadataIfPresent(source, metadata, SECTION_PATH);
 
                     String chunkId = resolveStableChunkId(metadata, hit.id());
-                    metadata.put("chunkId", chunkId);
-                    metadata.putIfAbsent("vectorId", chunkId);
-                    metadata.put("keywordScore", hit.score());
-                    metadata.put("keywordRank", rank++);
-                    metadata.put("sourceType", "keyword");
-                    metadata.put("esId", hit.id());
+                    metadata.put(CHUNK_ID, chunkId);
+                    metadata.putIfAbsent(VECTOR_ID, chunkId);
+                    metadata.put(KEYWORD_SCORE, hit.score());
+                    metadata.put(KEYWORD_RANK, rank++);
+                    metadata.put(SOURCE_TYPE, "keyword");
+                    metadata.put(ES_ID, hit.id());
                     results.add(new Document(chunkId, text, metadata));
                 }
             }
@@ -116,11 +134,11 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
     }
 
     private String resolveStableChunkId(Map<String, Object> metadata, String fallbackId) {
-        Object chunkId = metadata.get("chunkId");
+        Object chunkId = metadata.get(CHUNK_ID);
         if (chunkId != null && StringUtils.isNotBlank(String.valueOf(chunkId))) {
             return String.valueOf(chunkId);
         }
-        Object vectorId = metadata.get("vectorId");
+        Object vectorId = metadata.get(VECTOR_ID);
         if (vectorId != null && StringUtils.isNotBlank(String.valueOf(vectorId))) {
             return String.valueOf(vectorId);
         }

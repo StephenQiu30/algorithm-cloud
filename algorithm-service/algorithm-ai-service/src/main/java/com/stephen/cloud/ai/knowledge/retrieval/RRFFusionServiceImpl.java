@@ -12,6 +12,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.*;
+
+
 @Service
 public class RRFFusionServiceImpl implements RRFFusionService {
 
@@ -42,8 +45,8 @@ public class RRFFusionServiceImpl implements RRFFusionService {
             if (doc == null) {
                 continue;
             }
-            doc.getMetadata().put("score", entry.getValue());
-            doc.getMetadata().put("fusionScore", entry.getValue());
+            doc.getMetadata().put(SCORE, entry.getValue());
+            doc.getMetadata().put(FUSION_SCORE, entry.getValue());
             result.add(doc);
         }
         // Min-Max 归一化: fusionScore → [0, 1]
@@ -63,10 +66,10 @@ public class RRFFusionServiceImpl implements RRFFusionService {
             String key = buildKey(doc, i);
             Document existing = docMap.get(key);
             if (existing == null) {
-                doc.getMetadata().putIfAbsent("sourceType", sourceType);
+                doc.getMetadata().putIfAbsent(SOURCE_TYPE, sourceType);
                 docMap.put(key, doc);
             } else {
-                String existingSource = String.valueOf(existing.getMetadata().get("sourceType"));
+                String existingSource = String.valueOf(existing.getMetadata().get(SOURCE_TYPE));
                 String mergedSourceType = StringUtils.equals(existingSource, sourceType) ? existingSource : "hybrid";
                 ragDocumentHelper.mergeMetadata(existing, doc, mergedSourceType);
             }
@@ -80,7 +83,7 @@ public class RRFFusionServiceImpl implements RRFFusionService {
         if (StringUtils.isNotBlank(key)) {
             return key;
         }
-        Object esId = doc.getMetadata().get("esId");
+        Object esId = doc.getMetadata().get(ES_ID);
         if (esId != null && StringUtils.isNotBlank(String.valueOf(esId))) {
             return String.valueOf(esId);
         }
@@ -98,9 +101,9 @@ public class RRFFusionServiceImpl implements RRFFusionService {
             return;
         }
         double min = Double.MAX_VALUE;
-        double max = Double.MIN_VALUE;
+        double max = -Double.MAX_VALUE;
         for (Document doc : docs) {
-            Object score = doc.getMetadata().get("fusionScore");
+            Object score = doc.getMetadata().get(FUSION_SCORE);
             if (score != null) {
                 double val = Double.parseDouble(String.valueOf(score));
                 min = Math.min(min, val);
@@ -111,12 +114,12 @@ public class RRFFusionServiceImpl implements RRFFusionService {
             return;
         }
         for (Document doc : docs) {
-            Object score = doc.getMetadata().get("fusionScore");
+            Object score = doc.getMetadata().get(FUSION_SCORE);
             if (score != null) {
                 double val = Double.parseDouble(String.valueOf(score));
                 double normalized = (val - min) / (max - min);
-                doc.getMetadata().put("fusionScore", normalized);
-                doc.getMetadata().put("score", normalized);
+                doc.getMetadata().put(FUSION_SCORE, normalized);
+                doc.getMetadata().put(SCORE, normalized);
             }
         }
     }

@@ -16,18 +16,23 @@ import org.springframework.ai.rag.preretrieval.query.transformation.RewriteQuery
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.BIZ_TAG;
+import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.VERSION;
 
 /**
  * 查询改写服务
  * <p>
  * 支持两种模式：
  * <ul>
- *   <li>规则改写（默认）：基于正则和硬编码同义词进行改写</li>
+ *   <li>规则改写（默认）：基于正则和可配置同义词表进行改写</li>
  *   <li>LLM 改写（可配置开启）：使用大模型进行语义改写、关键词抽取和多查询拆分</li>
  * </ul>
  * </p>
@@ -180,17 +185,33 @@ public class QueryRewriteServiceImpl implements QueryRewriteService {
         return question.replaceAll("\\s+", " ").trim();
     }
 
+    /**
+     * 同义词扩展（从配置读取同义词表，支持 Nacos 动态更新）
+     */
     private String expandSynonyms(String query) {
         if (StringUtils.isBlank(query)) {
             return "";
         }
-        String output = query;
-        output = output.replace("异常", "异常 错误");
-        output = output.replace("报错", "报错 错误");
-        output = output.replace("失败", "失败 错误");
-        output = output.replace("优化", "优化 提升 性能");
-        output = output.replace("配置", "配置 参数 设置");
-        return output;
+        Map<String, List<String>> synonymMap = ragRetrievalProperties.getSynonymMap();
+        if (synonymMap == null || synonymMap.isEmpty()) {
+            return query;
+        }
+        // 收集所有需要追加的同义词（去重）
+        Set<String> expansions = new HashSet<>();
+        String normalizedQuery = query.toLowerCase();
+        for (Map.Entry<String, List<String>> entry : synonymMap.entrySet()) {
+            if (normalizedQuery.contains(entry.getKey().toLowerCase())) {
+                for (String synonym : entry.getValue()) {
+                    if (!normalizedQuery.contains(synonym.toLowerCase())) {
+                        expansions.add(synonym);
+                    }
+                }
+            }
+        }
+        if (expansions.isEmpty()) {
+            return query;
+        }
+        return query + " " + String.join(" ", expansions);
     }
 
     private List<String> extractMustTerms(String query) {
@@ -216,14 +237,14 @@ public class QueryRewriteServiceImpl implements QueryRewriteService {
         }
         Matcher versionMatcher = VERSION_PATTERN.matcher(query);
         if (versionMatcher.find()) {
-            filters.put("version", versionMatcher.group());
+            filters.put(VERSION, versionMatcher.group());
         }
         if (query.contains("接口") || query.contains("api") || query.contains("调用")) {
-            filters.put("bizTag", "api");
+            filters.put(BIZ_TAG, "api");
         } else if (query.contains("部署") || query.contains("发布") || query.contains("配置")) {
-            filters.put("bizTag", "deploy");
+            filters.put(BIZ_TAG, "deploy");
         } else if (query.contains("性能") || query.contains("压力") || query.contains("耗时")) {
-            filters.put("bizTag", "perf");
+            filters.put(BIZ_TAG, "perf");
         }
         return filters;
     }

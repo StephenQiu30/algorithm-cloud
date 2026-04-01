@@ -4,6 +4,10 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 @Data
 @Component
 @ConfigurationProperties(prefix = "rag.retrieval")
@@ -30,6 +34,10 @@ public class RagRetrievalProperties {
     private Double metadataMatchBoost = 0.1D;
 
     private String indexName = "document_chunks";
+
+    private String vectorIndexName = "document_chunks_vector";
+
+    private String keywordIndexName = "document_chunks_search";
 
     /**
      * 向量检索在 RRF 融合中的权重
@@ -75,4 +83,34 @@ public class RagRetrievalProperties {
      * 复杂问题最少召回片段数。
      */
     private int complexQueryTopK = 12;
+
+    /**
+     * 检索超时时间（秒），超时后降级为空结果
+     */
+    private int retrievalTimeoutSeconds = 3;
+
+    /**
+     * 复杂查询判断的最小长度阈值
+     */
+    private int complexQueryMinLength = 18;
+
+    /**
+     * 复杂查询标记关键词列表（通过 Nacos 动态配置）
+     */
+    private List<String> complexQueryMarkers = List.of(
+            "列举", "总结", "汇总", "梳理", "比较", "对比", "区别", "差异",
+            "优点", "优势", "缺点", "原因", "为什么", "如何", "步骤", "流程",
+            "有哪些", "哪些", "全部", "完整", "详细", "全面"
+    );
+
+    /**
+     * 同义词映射表（通过 Nacos 动态配置，key=原词, value=扩展同义词列表）
+     */
+    private Map<String, List<String>> synonymMap = new LinkedHashMap<>(Map.of(
+            "异常", List.of("错误", "故障"),
+            "报错", List.of("错误", "异常"),
+            "失败", List.of("错误", "故障"),
+            "优化", List.of("提升", "性能"),
+            "配置", List.of("参数", "设置")
+    ));
 }

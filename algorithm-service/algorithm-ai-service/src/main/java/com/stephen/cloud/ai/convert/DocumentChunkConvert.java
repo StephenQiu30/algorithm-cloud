@@ -32,6 +32,7 @@ public class DocumentChunkConvert {
         }
         ChunkEsDTO chunkEsDTO = new ChunkEsDTO();
         BeanUtils.copyProperties(chunk, chunkEsDTO);
+        chunkEsDTO.setChunkId(chunk.getVectorId());
         return chunkEsDTO;
     }
 

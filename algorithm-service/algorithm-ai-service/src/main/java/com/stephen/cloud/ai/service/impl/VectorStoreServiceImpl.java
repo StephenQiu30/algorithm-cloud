@@ -11,6 +11,9 @@ import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Service;
 
+import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.*;
+
+
 import java.util.List;
 
 @Service
@@ -48,7 +51,7 @@ public class VectorStoreServiceImpl implements VectorStoreService {
         if (knowledgeBaseId == null || knowledgeBaseId <= 0) {
             return;
         }
-        vectorStore.delete(new FilterExpressionBuilder().eq("knowledgeBaseId", knowledgeBaseId).build());
+        vectorStore.delete(new FilterExpressionBuilder().eq(KNOWLEDGE_BASE_ID, knowledgeBaseId).build());
         log.info("[VectorStore] deleteByKnowledgeBaseId success, knowledgeBaseId={}", knowledgeBaseId);
     }
 
@@ -57,7 +60,7 @@ public class VectorStoreServiceImpl implements VectorStoreService {
         if (documentId == null || documentId <= 0) {
             return;
         }
-        vectorStore.delete(new FilterExpressionBuilder().eq("documentId", documentId).build());
+        vectorStore.delete(new FilterExpressionBuilder().eq(DOCUMENT_ID, documentId).build());
         log.info("[VectorStore] deleteByDocumentId success, documentId={}", documentId);
     }
 
@@ -66,7 +69,7 @@ public class VectorStoreServiceImpl implements VectorStoreService {
             Double similarityThreshold) {
         Filter.Expression filterExpression = null;
         if (documentId != null && documentId > 0) {
-            filterExpression = new FilterExpressionBuilder().eq("documentId", documentId).build();
+            filterExpression = new FilterExpressionBuilder().eq(DOCUMENT_ID, documentId).build();
         }
         return similaritySearch(query, filterExpression, topK, similarityThreshold);
     }

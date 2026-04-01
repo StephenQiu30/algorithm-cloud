@@ -47,7 +47,7 @@ spring:
         model: text-embedding-v2
     vectorstore:
       elasticsearch:
-        index-name: document_chunks
+        index-name: document_chunks_vector
         dimensions: 1024
         similarity: cosine
         initialize-schema: true
@@ -55,4 +55,9 @@ spring:
 # MyBatis-Plus 业务配置
 mybatis-plus:
   type-aliases-package: com.stephen.cloud.ai.model.entity
+
+rag:
+  retrieval:
+    vector-index-name: document_chunks_vector
+    keyword-index-name: document_chunks_search
 

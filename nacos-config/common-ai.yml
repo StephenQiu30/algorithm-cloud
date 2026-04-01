@@ -18,7 +18,8 @@ rag:
     keyword-top-k: 10                  # 关键词检索 TopK
     rrf-k: 60                          # RRF 融合常数
     similarity-threshold: 0.7          # 向量相似度阈值
-    index-name: document_chunks        # ES 索引名称
+    vector-index-name: document_chunks_vector
+    keyword-index-name: document_chunks_search
     rewrite-enabled: true              # 是否启用 Query 改写
     llm-rewrite-enabled: true          # 启用 Spring AI 官方 LLM 改写 / 多轮问题压缩
     rerank-enabled: true               # 是否启用 Rerank
@@ -27,11 +28,9 @@ rag:
     metadata-match-boost: 0.1          # 元数据匹配加权
     vector-weight: 1.0                 # 向量检索 RRF 权重
     keyword-weight: 1.0                # 关键词检索 RRF 权重
-    multi-query-enabled: true          # 是否启用 Multi-Query 扩展召回
-    include-original-query: true       # Multi-Query 时保留原问题兜底召回
-    recall-fallback-enabled: true      # 向量命中过少时自动降低阈值补召回
-    recall-fallback-min-hits: 3        # 低于该命中数触发补召回
-    fallback-similarity-threshold: 0.55 # 补召回使用的阈值下限
+    multi-query-enabled: false         # 收敛：关闭 Multi-Query
+    include-original-query: false      # 收敛：关闭原问题兜底（Multi-Query 已关）
+    recall-fallback-enabled: false     # 收敛：关闭阈值补召回
     complex-query-top-k: 12            # 复杂问题最少召回片段数
   generation:
     max-context-length: 4000           # 最大上下文长度

@@ -20,6 +20,6 @@ public interface EsIndexConstant {
     /**
      * 文档分片索引
      */
-    String CHUNK_INDEX = "document_chunks";
+    String CHUNK_INDEX = "document_chunks_search";
 
 }

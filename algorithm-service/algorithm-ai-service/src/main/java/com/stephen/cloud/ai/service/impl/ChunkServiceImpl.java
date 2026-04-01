@@ -33,7 +33,9 @@ import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
+import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.*;
+
+
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -109,10 +111,10 @@ public class ChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, DocumentC
         FilterExpressionBuilder b = new FilterExpressionBuilder();
         FilterExpressionBuilder.Op op = null;
         if (request.getKnowledgeBaseId() != null && request.getKnowledgeBaseId() > 0) {
-            op = b.eq("knowledgeBaseId", request.getKnowledgeBaseId());
+            op = b.eq(KNOWLEDGE_BASE_ID, request.getKnowledgeBaseId());
         }
         if (request.getDocumentId() != null && request.getDocumentId() > 0) {
-            FilterExpressionBuilder.Op docFilter = b.eq("documentId", request.getDocumentId());
+            FilterExpressionBuilder.Op docFilter = b.eq(DOCUMENT_ID, request.getDocumentId());
             op = (op == null) ? docFilter : b.and(op, docFilter);
         }
         Filter.Expression filterExpression = (op == null) ? null : op.build();
@@ -135,42 +137,7 @@ public class ChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, DocumentC
                 query, vectorDocs.size(), keywordDocs.size(), fusedDocs.size());
 
         // 转换为 ChunkVO
-        List<ChunkVO> result = new ArrayList<>();
-        for (Document doc : fusedDocs) {
-            ChunkVO vo = new ChunkVO();
-            Object documentId = doc.getMetadata().get("documentId");
-            Object documentName = doc.getMetadata().get("documentName");
-            Object chunkIndex = doc.getMetadata().get("chunkIndex");
-            Object score = doc.getMetadata().get("fusionScore");
-            Object knowledgeBaseId = doc.getMetadata().get("knowledgeBaseId");
-            String chunkId = ragDocumentHelper.resolveChunkId(doc);
-
-            vo.setId(StringUtils.defaultIfBlank(doc.getId(), chunkId));
-            vo.setChunkId(chunkId);
-            if (documentId != null) {
-                vo.setDocumentId(Long.valueOf(String.valueOf(documentId)));
-            }
-            vo.setDocumentName(documentName == null ? null : String.valueOf(documentName));
-            if (chunkIndex != null) {
-                vo.setChunkIndex(Integer.valueOf(String.valueOf(chunkIndex)));
-            }
-            if (knowledgeBaseId != null) {
-                vo.setKnowledgeBaseId(Long.valueOf(String.valueOf(knowledgeBaseId)));
-            }
-            vo.setSectionTitle(doc.getMetadata().get("sectionTitle") == null
-                    ? null : String.valueOf(doc.getMetadata().get("sectionTitle")));
-            vo.setSectionPath(doc.getMetadata().get("sectionPath") == null
-                    ? null : String.valueOf(doc.getMetadata().get("sectionPath")));
-            vo.setContent(doc.getText());
-            vo.setWordCount(doc.getText() == null ? 0 : doc.getText().length());
-            if (score != null) {
-                vo.setScore(Double.valueOf(String.valueOf(score)));
-            }
-            vo.setSourceType(doc.getMetadata().get("sourceType") == null ? null : String.valueOf(doc.getMetadata().get("sourceType")));
-            vo.setMatchReason(doc.getMetadata().get("matchReason") == null ? null : String.valueOf(doc.getMetadata().get("matchReason")));
-            result.add(vo);
-        }
-        return result;
+        return ragDocumentHelper.toChunkVOs(fusedDocs);
     }
 
     /**

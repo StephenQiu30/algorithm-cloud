@@ -39,6 +39,7 @@ public class EsIndexManager {
     static {
         INDEX_RESOURCE_MAP.put(EsIndexConstant.POST_INDEX, "es/indices/post.json");
         INDEX_RESOURCE_MAP.put(EsIndexConstant.USER_INDEX, "es/indices/user.json");
+        INDEX_RESOURCE_MAP.put(EsIndexConstant.CHUNK_INDEX, "es/indices/chunk.json");
     }
 
     /**

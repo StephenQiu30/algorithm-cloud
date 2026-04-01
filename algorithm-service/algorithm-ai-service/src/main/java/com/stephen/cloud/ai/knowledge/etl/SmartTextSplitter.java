@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.SECTION_PATH;
+import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.SECTION_TITLE;
+
 /**
  * 智能文本分片器
  * <p>
@@ -31,8 +34,9 @@ public class SmartTextSplitter {
 
     /**
      * 句子分隔正则（中英文句号、问号、感叹号）
+     * 中文标点后直接断句；英文标点后必须跟空格或换行才视为句子结束，避免误切 "e.g."、"v1.0"、"3.14" 等
      */
-    private static final Pattern SENTENCE_PATTERN = Pattern.compile("(?<=[。！？.!?])\\s*");
+    private static final Pattern SENTENCE_PATTERN = Pattern.compile("(?<=[。！？])\\s*|(?<=[.!?])(?=\\s)");
 
     private final int chunkSize;
     private final int overlapSize;
@@ -65,31 +69,36 @@ public class SmartTextSplitter {
      * 1. 按 Markdown 标题分段
      * 2. 段内按段落（双换行）拆分
      * 3. 超长段落按句拆分
-     * 4. 相邻分片添加 overlap
+     * 4. 相邻分片在 Section 内部添加 overlap（不跨 Section，避免语义噪声）
      */
     private List<Document> splitDocument(String text, Map<String, Object> metadata) {
         List<SectionBlock> sections = splitByHeadings(text);
-        List<Document> chunks = new ArrayList<>();
+        List<Document> allChunks = new ArrayList<>();
+
         for (SectionBlock section : sections) {
-            List<String> sectionChunks = splitSectionToChunks(section.content());
-            for (String sectionChunk : sectionChunks) {
+            List<String> sectionChunkTexts = splitSectionToChunks(section.content());
+            List<Document> sectionChunks = new ArrayList<>();
+            for (String sectionChunk : sectionChunkTexts) {
                 if (sectionChunk.isBlank()) {
                     continue;
                 }
                 Map<String, Object> chunkMetadata = new LinkedHashMap<>(metadata);
                 if (section.sectionTitle() != null && !section.sectionTitle().isBlank()) {
-                    chunkMetadata.put("sectionTitle", section.sectionTitle());
+                    chunkMetadata.put(SECTION_TITLE, section.sectionTitle());
                 }
                 if (section.sectionPath() != null && !section.sectionPath().isBlank()) {
-                    chunkMetadata.put("sectionPath", section.sectionPath());
+                    chunkMetadata.put(SECTION_PATH, section.sectionPath());
                 }
-                chunks.add(new Document(sectionChunk.strip(), Map.copyOf(chunkMetadata)));
+                sectionChunks.add(new Document(sectionChunk.strip(), Map.copyOf(chunkMetadata)));
             }
+
+            // Overlap 在 Section 内部添加，不跨 Section
+            if (overlapSize > 0 && sectionChunks.size() > 1) {
+                sectionChunks = addOverlap(sectionChunks);
+            }
+            allChunks.addAll(sectionChunks);
         }
-        if (overlapSize > 0 && chunks.size() > 1) {
-            return addOverlap(chunks);
-        }
-        return chunks;
+        return allChunks;
     }
 
     /**
@@ -235,7 +244,7 @@ public class SmartTextSplitter {
     }
 
     /**
-     * 添加 overlap：每个分片的开头包含上一个分片的尾部文本
+     * 添加 overlap：每个分片的开头包含上一个分片的尾部文本（仅在同一 Section 内部）
      */
     private List<Document> addOverlap(List<Document> chunks) {
         List<Document> overlappedChunks = new ArrayList<>();
