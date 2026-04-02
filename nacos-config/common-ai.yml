@@ -1,44 +1,40 @@
-# 公共 AI/RAG 配置文件 (Default)
-# 包含：文档处理、RAG 检索、Chat Memory 配置
+# 公共 AI/RAG 配置文件
+# 覆盖：ETL 文档处理 → 向量/关键词检索 → RRF 融合 → Rerank → 生成
 
-# 文档处理配置
+# ETL 文档处理
 document:
   processing:
-    chunk-strategy: smart              # 分片策略：smart（智能）/ fixed_length（固定长度）/ by_title（按标题）
-    chunk-size: 400                    # 分片目标大小（字符数）
-    overlap-size: 80                   # 分片重叠大小（字符数）
-    max-chunk-size: 800                # 最大分片长度
-    max-file-size: 10485760            # 最大文件大小（10MB）
+    chunk-strategy: smart
+    chunk-size: 400
+    overlap-size: 80
+    max-chunk-size: 800
+    max-file-size: 10485760
 
-# RAG 检索配置
+# RAG 检索 & 生成
 rag:
   retrieval:
-    top-k: 5                           # 最终返回分片数
-    vector-top-k: 10                   # 向量检索 TopK
-    keyword-top-k: 10                  # 关键词检索 TopK
-    rrf-k: 60                          # RRF 融合常数
-    similarity-threshold: 0.7          # 向量相似度阈值
-    vector-index-name: document_chunks_vector
-    keyword-index-name: document_chunks_search
-    rewrite-enabled: true              # 是否启用 Query 改写
-    llm-rewrite-enabled: true          # 启用 Spring AI 官方 LLM 改写 / 多轮问题压缩
-    rerank-enabled: true               # 是否启用 Rerank
-    rerank-top-n: 10                   # Rerank 候选数
-    must-term-boost: 0.2               # 必要术语加权
-    metadata-match-boost: 0.1          # 元数据匹配加权
-    vector-weight: 1.0                 # 向量检索 RRF 权重
-    keyword-weight: 1.0                # 关键词检索 RRF 权重
-    multi-query-enabled: false         # 收敛：关闭 Multi-Query
-    include-original-query: false      # 收敛：关闭原问题兜底（Multi-Query 已关）
-    recall-fallback-enabled: false     # 收敛：关闭阈值补召回
-    complex-query-top-k: 12            # 复杂问题最少召回片段数
+    top-k: 5
+    vector-top-k: 10
+    keyword-top-k: 10
+    rrf-k: 60
+    similarity-threshold: 0.7
+    vector-weight: 1.0
+    keyword-weight: 1.0
+    rewrite-enabled: true
+    llm-rewrite-enabled: true
+    rerank-enabled: true
+    rerank-top-n: 10
+    must-term-boost: 0.2
+    metadata-match-boost: 0.1
+    complex-query-top-k: 12
+    retrieval-timeout-seconds: 3
   generation:
-    max-context-length: 4000           # 最大上下文长度
-    temperature: 0.4                   # 生成温度
+    max-context-length: 8000
+    temperature: 0.4
 
-# Chat Memory 配置
+# Chat Memory
 chat:
   memory:
-    redis-ttl-minutes: 30              # Redis 缓存过期时间（分钟）
-    max-messages: 16                   # 最大记忆消息数
-    keep-system-messages: true         # 是否保留系统消息
+    redis-ttl-minutes: 30
+    max-messages: 16
+    keep-system-messages: true

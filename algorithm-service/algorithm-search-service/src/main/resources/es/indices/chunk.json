@@ -17,6 +17,23 @@
           "keyword": { "type": "keyword" }
         }
       },
+      "documentName": {
+        "type": "text",
+        "analyzer": "ik_max_word",
+        "search_analyzer": "ik_smart",
+        "fields": {
+          "keyword": { "type": "keyword" }
+        }
+      },
+      "sectionTitle": {
+        "type": "text",
+        "analyzer": "ik_max_word",
+        "search_analyzer": "ik_smart",
+        "fields": {
+          "keyword": { "type": "keyword" }
+        }
+      },
+      "sectionPath": { "type": "keyword" },
       "wordCount": { "type": "integer" },
       "vectorId": { "type": "keyword" },
       "isDelete": { "type": "integer" },
@@ -25,4 +42,3 @@
     }
   }
 }
-

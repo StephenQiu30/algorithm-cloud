@@ -15,6 +15,17 @@ import java.util.Map;
 import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.*;
 
 
+/**
+ * RRF（Reciprocal Rank Fusion）融合服务
+ * <p>
+ * 将向量检索和关键词检索的结果按 RRF 公式进行加权融合：
+ * score(doc) = sum( weight / (k + rank_i + 1) )，其中 rank_i 为文档在各路结果中的排名。
+ * 融合后通过 Min-Max 归一化将分数映射到 [0, 1] 区间。
+ * </p>
+ *
+ * @author StephenQiu30
+ * @see <a href="https://learn.microsoft.com/en-us/azure/search/hybrid-search-ranking">RRF 原理</a>
+ */
 @Service
 public class RRFFusionServiceImpl implements RRFFusionService {
 
@@ -26,6 +37,14 @@ public class RRFFusionServiceImpl implements RRFFusionService {
         return fuse(vectorDocs, keywordDocs, finalTopK, rrfK, 1.0D, 1.0D);
     }
 
+    /**
+     * 加权 RRF 融合：合并向量和关键词两路检索结果
+     * <p>
+     * 1. 按排名累加 RRF 分数（支持不同权重）<br/>
+     * 2. 同一文档被两路同时命中时，sourceType 标记为 "hybrid"<br/>
+     * 3. 按 fusionScore 降序截取 topK 后做 Min-Max 归一化
+     * </p>
+     */
     @Override
     public List<Document> fuse(List<Document> vectorDocs, List<Document> keywordDocs, int finalTopK, int rrfK,
                                double vectorWeight, double keywordWeight) {
@@ -49,11 +68,14 @@ public class RRFFusionServiceImpl implements RRFFusionService {
             doc.getMetadata().put(FUSION_SCORE, entry.getValue());
             result.add(doc);
         }
-        // Min-Max 归一化: fusionScore → [0, 1]
         normalizeFusionScores(result);
         return result;
     }
 
+    /**
+     * 按 RRF 公式累加分数：weight / (k + rank + 1)
+     * 同一文档被多路命中时，合并 metadata 并将 sourceType 标记为 "hybrid"
+     */
     private void accumulate(List<Document> docs, String sourceType, Map<String, Document> docMap,
                             Map<String, Double> scoreMap, int rrfK, double weight) {
         if (CollUtil.isEmpty(docs)) {
@@ -78,6 +100,9 @@ public class RRFFusionServiceImpl implements RRFFusionService {
         }
     }
 
+    /**
+     * 构建文档去重键：优先使用 chunkId，兜底使用 content hash
+     */
     private String buildKey(Document doc, int index) {
         String key = ragDocumentHelper.buildDocKey(doc);
         if (StringUtils.isNotBlank(key)) {
@@ -97,7 +122,13 @@ public class RRFFusionServiceImpl implements RRFFusionService {
      * Min-Max 归一化：将 fusionScore 映射到 [0, 1] 区间
      */
     private void normalizeFusionScores(List<Document> docs) {
-        if (docs == null || docs.size() <= 1) {
+        if (docs == null || docs.isEmpty()) {
+            return;
+        }
+        // 单结果场景：固定为满分 1.0，保证与多结果归一化行为一致
+        if (docs.size() == 1) {
+            docs.getFirst().getMetadata().put(FUSION_SCORE, 1.0D);
+            docs.getFirst().getMetadata().put(SCORE, 1.0D);
             return;
         }
         double min = Double.MAX_VALUE;

@@ -230,17 +230,48 @@ public class SmartTextSplitter {
     }
 
     /**
-     * 硬切分：按 maxChunkSize 直接截断
+     * 硬切分（智能回退）：优先在句号/换行符等自然边界处切分，
+     * 仅在找不到自然边界时才按 maxChunkSize 硬截断，避免在词语中间断裂。
      */
     private List<String> hardSplit(String text) {
         List<String> chunks = new ArrayList<>();
         int start = 0;
         while (start < text.length()) {
-            int end = Math.min(start + maxChunkSize, text.length());
-            chunks.add(text.substring(start, end));
-            start = end;
+            if (start + maxChunkSize >= text.length()) {
+                chunks.add(text.substring(start));
+                break;
+            }
+            int end = start + maxChunkSize;
+            // 在 [start, end] 范围内从后往前搜索自然断句点
+            int splitAt = findNaturalBreakpoint(text, start, end);
+            chunks.add(text.substring(start, splitAt));
+            start = splitAt;
         }
         return chunks;
+    }
+
+    /**
+     * 从 end 位置向前搜索自然断句点（句号、换行、分号等），
+     * 搜索范围限制在 [start + maxChunkSize/2, end] 之间，
+     * 避免回退过多导致分片过小。
+     */
+    private int findNaturalBreakpoint(String text, int start, int end) {
+        // 自然断句字符优先级：换行 > 句号 > 分号 > 逗号
+        char[] breakChars = {'\n', '。', '！', '？', '；', '.', '!', '?', ';', '，', ','};
+        int minPos = start + (maxChunkSize / 2); // 至少保留一半内容
+        for (char breakChar : breakChars) {
+            int pos = text.lastIndexOf(breakChar, end - 1);
+            if (pos >= minPos) {
+                return pos + 1; // 包含断句符号
+            }
+        }
+        // 未找到自然边界，按空格切分（适用于英文内容）
+        int spacePos = text.lastIndexOf(' ', end - 1);
+        if (spacePos >= minPos) {
+            return spacePos + 1;
+        }
+        // 兜底：硬切
+        return end;
     }
 
     /**

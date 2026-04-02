@@ -8,6 +8,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * RAG 检索配置属性
+ * <p>
+ * 通过 Nacos 动态注入（prefix = rag.retrieval），支持多环境覆盖。
+ * 所有默认值为 MVP 基线，生产环境通过 common-ai-prod.yml 覆盖差异项。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Component
 @ConfigurationProperties(prefix = "rag.retrieval")
@@ -50,14 +59,14 @@ public class RagRetrievalProperties {
     private double keywordWeight = 1.0D;
 
     /**
-     * 是否开启 Multi-Query 扩展召回
+     * 是否开启 Multi-Query 扩展召回（默认关闭，需通过 Nacos 显式开启）
      */
-    private boolean multiQueryEnabled = true;
+    private boolean multiQueryEnabled = false;
 
     /**
-     * Multi-Query 时是否保留原始问题作为召回候选，降低改写偏移导致的漏召回。
+     * Multi-Query 时是否保留原始问题作为召回候选（默认关闭，跟随 multiQueryEnabled）
      */
-    private boolean includeOriginalQuery = true;
+    private boolean includeOriginalQuery = false;
 
     /**
      * 是否开启 LLM 语义改写（默认关闭，确保向下兼容）
@@ -65,9 +74,9 @@ public class RagRetrievalProperties {
     private boolean llmRewriteEnabled = false;
 
     /**
-     * 低召回时是否自动放宽向量阈值进行二次补召回。
+     * 低召回时是否自动放宽向量阈值进行二次补召回（默认关闭，需通过 Nacos 显式开启）
      */
-    private boolean recallFallbackEnabled = true;
+    private boolean recallFallbackEnabled = false;
 
     /**
      * 触发补召回的最小命中数阈值。

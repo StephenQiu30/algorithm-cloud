@@ -53,6 +53,28 @@ public class ChunkEsDTO extends BaseEsDTO {
     private String content;
 
     /**
+     * 文档名称（支持中文分词搜索，BM25 加权 2x）
+     */
+    @MultiField(mainField = @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart"), otherFields = {
+            @InnerField(suffix = "keyword", type = FieldType.Keyword)
+    })
+    private String documentName;
+
+    /**
+     * 章节标题（支持中文分词搜索，BM25 加权 1.5x）
+     */
+    @MultiField(mainField = @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart"), otherFields = {
+            @InnerField(suffix = "keyword", type = FieldType.Keyword)
+    })
+    private String sectionTitle;
+
+    /**
+     * 章节路径（标题层级路径，仅用于精确过滤）
+     */
+    @Field(type = FieldType.Keyword)
+    private String sectionPath;
+
+    /**
      * 字符数
      */
     @Field(type = FieldType.Integer)

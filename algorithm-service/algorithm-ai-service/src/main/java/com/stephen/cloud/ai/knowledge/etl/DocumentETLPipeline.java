@@ -76,9 +76,21 @@ public class DocumentETLPipeline {
 
     @Resource
     private RagDocumentHelper ragDocumentHelper;
-
+    /**
+     * 文档 ETL 全流程（幂等）
+     * <p>
+     * 阶段 1: 读取文档 → 阶段 2: 分片 → 阶段 3: Embedding 向量化（分批 + 重试） →
+     * 阶段 4: DB 持久化 → 阶段 5: ES 关键词索引同步。
+     * 处理前会清理该文档的旧数据，保证重复调用的幂等性。
+     * </p>
+     *
+     * @param filePath      文件路径（支持 http/https/file/classpath 协议）
+     * @param fileExtension 文件扩展名
+     * @param metadata      基础元数据（需包含 documentId、knowledgeBaseId）
+     * @return 生成的分片数量
+     */
     public int process(String filePath, String fileExtension, Map<String, Object> metadata) {
-        long start = System.currentTimeMillis();
+        long pipelineStart = System.currentTimeMillis();
         Map<String, Object> baseMetadata = sanitizeMetadata(metadata);
         Long documentId = parseLong(baseMetadata.get(DOCUMENT_ID));
         Long knowledgeBaseId = parseLong(baseMetadata.get(KNOWLEDGE_BASE_ID));
@@ -86,36 +98,106 @@ public class DocumentETLPipeline {
         // 幂等性保证：清理旧的向量 + DB chunk 数据，防止分片 ID 碰撞
         cleanupExistingChunks(documentId);
 
+        // ---- 阶段 1: 文档读取 ----
+        long readStart = System.currentTimeMillis();
         String location = resolveLocation(filePath);
         org.springframework.core.io.Resource springResource = resourceLoader.getResource(location);
         DocumentReader reader = documentReaderFactory.getReader(fileExtension, springResource);
         List<Document> documents = reader.get();
+        long readCostMs = System.currentTimeMillis() - readStart;
 
         // 注入元数据
         for (Document document : documents) {
             document.getMetadata().putAll(baseMetadata);
         }
 
-        // 根据策略选择分片器
+        // ---- 阶段 2: 分片 ----
+        long splitStart = System.currentTimeMillis();
         String strategy = documentProcessingProperties.getChunkStrategy();
         List<Document> chunks = assignStableChunkIds(splitByStrategy(documents, strategy), baseMetadata);
+        long splitCostMs = System.currentTimeMillis() - splitStart;
         log.info("[ETL] 分片完成, strategy={}, chunkCount={}, fileExtension={}",
                 strategy, chunks.size(), fileExtension);
 
         try {
+            // ---- 阶段 3: Embedding + 向量存储 ----
+            long embeddingStart = System.currentTimeMillis();
             if (!chunks.isEmpty()) {
-                vectorStore.add(chunks);
+                batchAddToVectorStore(chunks);
             }
+            long embeddingCostMs = System.currentTimeMillis() - embeddingStart;
+
+            // ---- 阶段 4: DB 持久化 ----
+            long dbStart = System.currentTimeMillis();
             batchSaveChunks(chunks, documentId, knowledgeBaseId);
+            long dbCostMs = System.currentTimeMillis() - dbStart;
+
+            // ---- 阶段 5: ES 关键词索引同步 ----
+            long esStart = System.currentTimeMillis();
             batchSyncChunksToKeywordIndex(documentId, knowledgeBaseId);
+            long esCostMs = System.currentTimeMillis() - esStart;
+
+            long totalCostMs = System.currentTimeMillis() - pipelineStart;
+            log.info("[ETL] 管道完成, documentId={}, chunks={}, totalCost={}ms | read={}ms, split={}ms, embedding={}ms, db={}ms, es={}ms",
+                    documentId, chunks.size(), totalCostMs,
+                    readCostMs, splitCostMs, embeddingCostMs, dbCostMs, esCostMs);
         } catch (Exception e) {
             rollbackVectorStore(chunks, documentId, e);
             throw e;
         }
 
-        log.info("[ETL] 管道完成, documentId={}, chunks={}, cost={}ms",
-                documentId, chunks.size(), System.currentTimeMillis() - start);
         return chunks.size();
+    }
+
+    /**
+     * 分批写入向量存储，避免大文档一次性 Embedding 超时或触发 Token 限制。
+     * <p>
+     * 每批 {@code EMBEDDING_BATCH_SIZE} 个 chunks，失败则重试一次；
+     * 单批持续失败仅记录错误，不中断已成功的批次。
+     * </p>
+     */
+    private static final int EMBEDDING_BATCH_SIZE = 20;
+    private static final int EMBEDDING_RETRY_COUNT = 2;
+
+    private void batchAddToVectorStore(List<Document> chunks) {
+        int totalBatches = (int) Math.ceil((double) chunks.size() / EMBEDDING_BATCH_SIZE);
+        int failedChunks = 0;
+
+        for (int i = 0; i < chunks.size(); i += EMBEDDING_BATCH_SIZE) {
+            int end = Math.min(i + EMBEDDING_BATCH_SIZE, chunks.size());
+            List<Document> batch = chunks.subList(i, end);
+            int batchIndex = (i / EMBEDDING_BATCH_SIZE) + 1;
+
+            boolean success = false;
+            for (int attempt = 1; attempt <= EMBEDDING_RETRY_COUNT; attempt++) {
+                try {
+                    vectorStore.add(batch);
+                    success = true;
+                    log.debug("[ETL] Embedding batch {}/{} completed, chunkCount={}",
+                            batchIndex, totalBatches, batch.size());
+                    break;
+                } catch (Exception e) {
+                    log.warn("[ETL] Embedding batch {}/{} attempt {}/{} failed: {}",
+                            batchIndex, totalBatches, attempt, EMBEDDING_RETRY_COUNT, e.getMessage());
+                    if (attempt < EMBEDDING_RETRY_COUNT) {
+                        try {
+                            Thread.sleep(1000L * attempt);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            throw new RuntimeException("Embedding interrupted", ie);
+                        }
+                    }
+                }
+            }
+            if (!success) {
+                failedChunks += batch.size();
+                log.error("[ETL] Embedding batch {}/{} permanently failed after {} retries, skipping {} chunks",
+                        batchIndex, totalBatches, EMBEDDING_RETRY_COUNT, batch.size());
+            }
+        }
+        if (failedChunks > 0) {
+            log.warn("[ETL] Embedding completed with {} failed chunks out of {}", failedChunks, chunks.size());
+        }
     }
 
     /**
@@ -181,6 +263,7 @@ public class DocumentETLPipeline {
         List<DocumentChunk> chunkEntities = new ArrayList<>(chunks.size());
         for (int i = 0; i < chunks.size(); i++) {
             Document chunk = chunks.get(i);
+            Map<String, Object> meta = chunk.getMetadata();
             DocumentChunk entity = new DocumentChunk();
             entity.setDocumentId(documentId);
             entity.setKnowledgeBaseId(knowledgeBaseId);
@@ -190,6 +273,10 @@ public class DocumentETLPipeline {
             entity.setWordCount(charCount);
             entity.setTokenCount(estimateTokenCount(chunk.getText()));
             entity.setVectorId(ragDocumentHelper.resolveChunkId(chunk));
+            // 从 metadata 提取章节元数据，写入 DB 实体以便 ES 同步时携带
+            entity.setDocumentName(toStr(meta.get(DOCUMENT_NAME)));
+            entity.setSectionTitle(toStr(meta.get(SECTION_TITLE)));
+            entity.setSectionPath(toStr(meta.get(SECTION_PATH)));
             chunkEntities.add(entity);
         }
         // 批量插入（MyBatis-Plus 的 insert 逐条，这里分批次减少事务压力）
@@ -199,6 +286,10 @@ public class DocumentETLPipeline {
             List<DocumentChunk> batch = chunkEntities.subList(i, end);
             documentChunkMapper.batchInsert(batch);
         }
+    }
+
+    private String toStr(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     /**

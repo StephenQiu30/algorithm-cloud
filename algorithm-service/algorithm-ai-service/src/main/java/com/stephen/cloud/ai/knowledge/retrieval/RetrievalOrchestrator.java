@@ -72,7 +72,12 @@ public class RetrievalOrchestrator {
     private Executor aiAsyncExecutor;
 
     /**
-     * 执行完整的检索编排
+     * 执行完整的检索编排（6 阶段流水线）
+     * <p>
+     * 1. Query 改写（规则/LLM） → 2. 向量 + 关键词并行检索（超时降级） →
+     * 3. 低召回补召回 → 4. 加权 RRF 融合 → 5. Rerank 重排 → 6. 构造 RetrievalResult。
+     * 各阶段耗时写入 retrievalMeta，供召回分析使用。
+     * </p>
      *
      * @param question            用户原始问题
      * @param knowledgeBaseId     知识库ID
@@ -80,7 +85,7 @@ public class RetrievalOrchestrator {
      * @param similarityThreshold 相似度阈值（null 使用默认）
      * @param enableRerank        是否启用重排（null 使用配置）
      * @param history             会话历史（用于多轮问题压缩检索）
-     * @return 检索结果（包含各阶段中间数据）
+     * @return 检索结果（包含各阶段中间数据 + 耗时统计）
      */
     public RetrievalResult retrieve(String question, Long knowledgeBaseId, Integer topK,
                                      Double similarityThreshold, Boolean enableRerank, List<Message> history) {
@@ -94,13 +99,16 @@ public class RetrievalOrchestrator {
         Double threshold = similarityThreshold != null ? similarityThreshold : ragRetrievalProperties.getSimilarityThreshold();
 
         // 1. Query 改写
+        long rewriteStart = System.currentTimeMillis();
         RewriteResult rewriteResult = buildRewriteResult(question, history);
         Filter.Expression filter = buildFilterExpression(knowledgeBaseId, rewriteResult.getMetadataFilters());
+        long rewriteCostMs = System.currentTimeMillis() - rewriteStart;
 
         // 2. 向量检索 + 关键词 BM25 检索（并行执行 + 超时保护）
         int timeoutSeconds = ragRetrievalProperties.getRetrievalTimeoutSeconds() <= 0
                 ? 3 : ragRetrievalProperties.getRetrievalTimeoutSeconds();
 
+        long searchStart = System.currentTimeMillis();
         CompletableFuture<List<Document>> vectorFuture = CompletableFuture
                 .supplyAsync(() -> executeVectorSearch(question, rewriteResult, filter, vectorTopK, threshold), aiAsyncExecutor)
                 .orTimeout(timeoutSeconds, TimeUnit.SECONDS)
@@ -119,8 +127,10 @@ public class RetrievalOrchestrator {
 
         List<Document> vectorDocs = vectorFuture.join();
         List<Document> keywordDocs = keywordFuture.join();
+        long searchCostMs = System.currentTimeMillis() - searchStart;
 
         // 3. 低召回补召回：当向量命中不足且配置开启时，放宽阈值二次召回
+        int originalVectorHits = vectorDocs.size();
         if (ragRetrievalProperties.isRecallFallbackEnabled()
                 && vectorDocs.size() < ragRetrievalProperties.getRecallFallbackMinHits()) {
             Double fallbackThreshold = ragRetrievalProperties.getFallbackSimilarityThreshold();
@@ -128,10 +138,11 @@ public class RetrievalOrchestrator {
                     rewriteResult.getSemanticQuery(), filter, vectorTopK, fallbackThreshold);
             vectorDocs = mergeWithDedup(vectorDocs, supplementDocs);
             log.info("[Retrieval] 触发补召回, originalHits={}, supplementHits={}, mergedHits={}",
-                    vectorFuture.join().size(), supplementDocs.size(), vectorDocs.size());
+                    originalVectorHits, supplementDocs.size(), vectorDocs.size());
         }
 
         // 4. 加权 RRF 融合
+        long fusionStart = System.currentTimeMillis();
         boolean doRerank = enableRerank != null ? enableRerank && ragRetrievalProperties.isRerankEnabled()
                 : ragRetrievalProperties.isRerankEnabled();
         int fuseTopK = finalTopK;
@@ -142,8 +153,10 @@ public class RetrievalOrchestrator {
         }
         List<Document> fusedDocs = rrfFusionService.fuse(vectorDocs, keywordDocs, fuseTopK, rrfK,
                 ragRetrievalProperties.getVectorWeight(), ragRetrievalProperties.getKeywordWeight());
+        long fusionCostMs = System.currentTimeMillis() - fusionStart;
 
         // 5. 重排（根据参数或配置决定）
+        long rerankStart = System.currentTimeMillis();
         List<Document> finalDocs;
         if (doRerank) {
             finalDocs = executeRerank(fusedDocs, question, rewriteResult, finalTopK);
@@ -151,12 +164,16 @@ public class RetrievalOrchestrator {
             finalDocs = fusedDocs;
         }
         markMatchReason(finalDocs, rewriteResult);
+        long rerankCostMs = System.currentTimeMillis() - rerankStart;
 
         // 6. 构造结果（包含各阶段中间数据，供召回分析使用）
-        Map<String, Object> retrievalMeta = buildRetrievalMeta(vectorDocs, keywordDocs, fusedDocs, finalDocs, complexQuery);
-        log.info("[Retrieval] recall stats, vectorHits={}, keywordHits={}, fusedTopK={}, finalTopK={}, multiQuery={}, complexQuery={}",
+        Map<String, Object> retrievalMeta = buildRetrievalMeta(vectorDocs, keywordDocs, fusedDocs, finalDocs,
+                complexQuery, rewriteCostMs, searchCostMs, fusionCostMs, rerankCostMs);
+        log.info("[Retrieval] recall stats, vectorHits={}, keywordHits={}, fusedTopK={}, finalTopK={}, " +
+                        "multiQuery={}, complexQuery={} | rewrite={}ms, search={}ms, fusion={}ms, rerank={}ms",
                 vectorDocs.size(), keywordDocs.size(), fusedDocs.size(), finalDocs.size(),
-                ragRetrievalProperties.isMultiQueryEnabled(), complexQuery);
+                ragRetrievalProperties.isMultiQueryEnabled(), complexQuery,
+                rewriteCostMs, searchCostMs, fusionCostMs, rerankCostMs);
 
         RetrievalResult result = new RetrievalResult();
         result.setDocs(finalDocs);
@@ -291,14 +308,23 @@ public class RetrievalOrchestrator {
             return;
         }
         for (Document doc : docs) {
+            // 优先级：rerank > 基于 sourceType 的精确标记
             Object rerankScore = doc.getMetadata().get(RERANK_SCORE);
             if (rerankScore != null) {
                 doc.getMetadata().put(MATCH_REASON, MatchReasonEnum.RERANK.getValue());
                 continue;
             }
-            if (CollUtil.isNotEmpty(rewriteResult.getMustTerms())) {
+            // 基于 sourceType metadata 精确标记来源
+            String sourceType = doc.getMetadata().get(SOURCE_TYPE) != null
+                    ? String.valueOf(doc.getMetadata().get(SOURCE_TYPE)) : null;
+            if ("hybrid".equals(sourceType)) {
+                doc.getMetadata().put(MATCH_REASON, MatchReasonEnum.HYBRID.getValue());
+            } else if ("keyword".equals(sourceType)) {
                 doc.getMetadata().put(MATCH_REASON, MatchReasonEnum.MUST_TERM.getValue());
+            } else if ("vector".equals(sourceType)) {
+                doc.getMetadata().put(MATCH_REASON, MatchReasonEnum.HYBRID.getValue());
             } else {
+                // 兜底策略
                 doc.getMetadata().put(MATCH_REASON, MatchReasonEnum.HYBRID.getValue());
             }
         }
@@ -342,7 +368,9 @@ public class RetrievalOrchestrator {
 
     private Map<String, Object> buildRetrievalMeta(List<Document> vectorDocs, List<Document> keywordDocs,
                                                      List<Document> fusedDocs, List<Document> finalDocs,
-                                                     boolean complexQuery) {
+                                                     boolean complexQuery,
+                                                     long rewriteCostMs, long searchCostMs,
+                                                     long fusionCostMs, long rerankCostMs) {
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("vectorHitCount", vectorDocs.size());
         meta.put("keywordHitCount", keywordDocs.size());
@@ -354,6 +382,12 @@ public class RetrievalOrchestrator {
         meta.put("vectorWeight", ragRetrievalProperties.getVectorWeight());
         meta.put("keywordWeight", ragRetrievalProperties.getKeywordWeight());
         meta.put("recallFallbackEnabled", ragRetrievalProperties.isRecallFallbackEnabled());
+        // 各阶段耗时（毫秒）
+        meta.put("rewriteCostMs", rewriteCostMs);
+        meta.put("searchCostMs", searchCostMs);
+        meta.put("fusionCostMs", fusionCostMs);
+        meta.put("rerankCostMs", rerankCostMs);
+        meta.put("totalCostMs", rewriteCostMs + searchCostMs + fusionCostMs + rerankCostMs);
         // 去重统计：向量和关键词的交叉命中数
         Set<String> vectorKeys = new HashSet<>();
         for (Document doc : vectorDocs) {

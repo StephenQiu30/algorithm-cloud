@@ -39,6 +39,12 @@ public class DocumentChunk implements Serializable {
     private Long knowledgeBaseId;
 
     /**
+     * 文档名称（冗余字段，加速 ES 同步避免关联查询）
+     */
+    @Schema(description = "文档名称")
+    private String documentName;
+
+    /**
      * 分片索引（从0开始）
      */
     @Schema(description = "分片索引")
@@ -49,6 +55,18 @@ public class DocumentChunk implements Serializable {
      */
     @Schema(description = "分片内容")
     private String content;
+
+    /**
+     * 章节标题（SmartTextSplitter 切分时的当前标题）
+     */
+    @Schema(description = "章节标题")
+    private String sectionTitle;
+
+    /**
+     * 章节路径（标题层级路径，如 "介绍 > 安装 > Docker"）
+     */
+    @Schema(description = "章节路径")
+    private String sectionPath;
 
     /**
      * 字符数

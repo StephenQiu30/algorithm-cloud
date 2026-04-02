@@ -20,11 +20,12 @@ public interface DocumentChunkMapper extends BaseMapper<DocumentChunk> {
     @Insert("""
             <script>
             INSERT INTO document_chunk
-            (document_id, knowledge_base_id, chunk_index, content, word_count, token_count, vector_id)
+            (document_id, knowledge_base_id, document_name, chunk_index, content,
+             section_title, section_path, word_count, token_count, vector_id)
             VALUES
             <foreach collection="chunks" item="item" separator=",">
-                (#{item.documentId}, #{item.knowledgeBaseId}, #{item.chunkIndex}, #{item.content},
-                 #{item.wordCount}, #{item.tokenCount}, #{item.vectorId})
+                (#{item.documentId}, #{item.knowledgeBaseId}, #{item.documentName}, #{item.chunkIndex}, #{item.content},
+                 #{item.sectionTitle}, #{item.sectionPath}, #{item.wordCount}, #{item.tokenCount}, #{item.vectorId})
             </foreach>
             </script>
             """)

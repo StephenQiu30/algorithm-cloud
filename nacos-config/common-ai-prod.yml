@@ -1,21 +1,21 @@
 # 公共 AI/RAG 配置文件 (Production)
-# 生产环境覆盖配置
+# 生产环境覆盖配置：与 common-ai.yml 结构保持一致，仅覆盖差异值
 
 spring:
   config:
     activate:
       on-profile: prod
 
-# 文档处理配置（生产环境调整）
+# ETL 文档处理（生产环境：更大分片 + 更大文件限制）
 document:
   processing:
     chunk-strategy: smart
     chunk-size: 500
     overlap-size: 100
     max-chunk-size: 1000
-    max-file-size: 20971520            # 20MB
+    max-file-size: 20971520
 
-# RAG 检索配置（生产环境调整）
+# RAG 检索 & 生成（生产环境：更多召回 + 稍低阈值 + 更大上下文）
 rag:
   retrieval:
     top-k: 5
@@ -23,25 +23,21 @@ rag:
     keyword-top-k: 15
     rrf-k: 60
     similarity-threshold: 0.65
-    vector-index-name: document_chunks_vector
-    keyword-index-name: document_chunks_search
+    vector-weight: 1.0
+    keyword-weight: 0.8
     rewrite-enabled: true
     llm-rewrite-enabled: true
     rerank-enabled: true
     rerank-top-n: 15
     must-term-boost: 0.2
     metadata-match-boost: 0.1
-    vector-weight: 1.0
-    keyword-weight: 0.8
-    multi-query-enabled: false
-    include-original-query: false
-    recall-fallback-enabled: false
     complex-query-top-k: 15
+    retrieval-timeout-seconds: 5
   generation:
-    max-context-length: 6000
+    max-context-length: 8000
     temperature: 0.4
 
-# Chat Memory 配置
+# Chat Memory（生产环境：更长 TTL + 更多消息）
 chat:
   memory:
     redis-ttl-minutes: 60
