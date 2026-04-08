@@ -17,6 +17,15 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Elasticsearch 索引同步服务
+ * <p>
+ * 提供 ES 索引的单条和批量同步能力，支持创建、更新、删除操作。
+ * 自动处理逻辑删除标记的同步为物理删除。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Slf4j
 @Service
 @ConditionalOnBean(ElasticsearchClient.class)

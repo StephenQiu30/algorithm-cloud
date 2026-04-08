@@ -16,8 +16,11 @@ import java.util.Optional;
 
 /**
  * 搜索门面
+ * <p>
+ * 提供统一的搜索入口，根据搜索类型分发到不同的数据源执行查询
+ * </p>
  *
- * @author stephen
+ * @author StephenQiu30
  */
 @Component
 @Slf4j

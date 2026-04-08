@@ -6,8 +6,11 @@ import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * 数据源接口（需要接入的数据源必须实现）
+ * <p>
+ * 定义数据源的统一搜索接口，支持多种搜索类型
+ * </p>
  *
- * @author stephen
+ * @author StephenQiu30
  */
 public interface DataSource<T> {
 

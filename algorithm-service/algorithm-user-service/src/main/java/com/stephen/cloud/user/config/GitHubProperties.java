@@ -6,8 +6,11 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * GitHub OAuth2 配置
+ * <p>
+ * 配置 GitHub 第三方登录所需的 Client ID、Secret 和回调地址
+ * </p>
  *
- * @author stephen
+ * @author StephenQiu30
  */
 @Data
 @Configuration

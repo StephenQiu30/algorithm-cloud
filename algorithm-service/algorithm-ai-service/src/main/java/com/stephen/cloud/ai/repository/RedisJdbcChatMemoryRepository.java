@@ -6,6 +6,15 @@ import org.springframework.ai.chat.messages.Message;
 
 import java.util.List;
 
+/**
+ * Redis + JDBC 双写对话记忆仓库
+ * <p>
+ * 采用缓存-数据库双写策略，Redis 用于热点数据加速，JDBC 用于持久化。
+ * 读取时优先使用 Redis，失败时回退到 JDBC 并进行回填。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Slf4j
 public class RedisJdbcChatMemoryRepository implements ChatMemoryRepository {
 

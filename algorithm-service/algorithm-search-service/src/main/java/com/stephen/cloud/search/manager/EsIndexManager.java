@@ -16,9 +16,11 @@ import java.util.Map;
 
 /**
  * ES 索引管理器
- * 负责自动创建和同步 ES 索引结构
+ * <p>
+ * 负责自动创建和同步 ES 索引结构，如果索引已存在则跳过
+ * </p>
  *
- * @author stephen
+ * @author StephenQiu30
  */
 @Slf4j
 @Component

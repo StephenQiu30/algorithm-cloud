@@ -11,6 +11,15 @@ import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
+/**
+ * 文档读取器工厂
+ * <p>
+ * 根据文件扩展名创建对应的 DocumentReader 实例。
+ * 支持 PDF、Markdown、TXT、Office 文档、HTML 等格式。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Component
 public class DocumentReaderFactory {
 

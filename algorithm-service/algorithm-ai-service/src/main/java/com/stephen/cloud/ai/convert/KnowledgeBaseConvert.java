@@ -7,6 +7,14 @@ import com.stephen.cloud.api.ai.model.dto.knowledgebase.KnowledgeBaseUpdateReque
 import com.stephen.cloud.api.ai.model.vo.KnowledgeBaseVO;
 import org.springframework.beans.BeanUtils;
 
+/**
+ * 知识库转换器
+ * <p>
+ * 提供 KnowledgeBase、KnowledgeBaseVO 及各类请求对象之间的相互转换
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 public class KnowledgeBaseConvert {
 
     public static final KnowledgeBaseConvert INSTANCE = new KnowledgeBaseConvert();

@@ -4,6 +4,14 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+/**
+ * 日志清理配置属性
+ * <p>
+ * 控制各类日志的保留天数，支持定时清理任务
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Data
 @Component
 @ConfigurationProperties(prefix = "log.cleanup")

@@ -13,8 +13,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 数据源注册器
+ * <p>
+ * 扫描并注册所有数据源实现，根据类型分发搜索请求
+ * </p>
  *
- * @author stephen
+ * @author StephenQiu30
  */
 @Component
 @Slf4j
