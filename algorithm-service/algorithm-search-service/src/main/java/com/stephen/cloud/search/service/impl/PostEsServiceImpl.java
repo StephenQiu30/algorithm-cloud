@@ -31,8 +31,12 @@ import java.util.stream.Collectors;
 
 /**
  * 帖子 ES 搜索服务实现
+ * <p>
+ * 提供帖子数据的 Elasticsearch 索引管理和全文检索能力，
+ * 支持多条件组合查询、关键词搜索、标签过滤等功能。
+ * </p>
  *
- * @author stephen
+ * @author StephenQiu30
  */
 @Slf4j
 @Service

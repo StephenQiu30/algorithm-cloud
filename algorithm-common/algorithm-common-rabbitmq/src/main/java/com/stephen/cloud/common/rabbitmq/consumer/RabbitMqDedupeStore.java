@@ -13,8 +13,10 @@ import java.time.Duration;
 /**
  * RabbitMQ 消费去重存储（SETNX）
  * <p>
- * MVP：仅提供消费幂等所需的 “不存在则写入” 能力，避免把中间件特性下沉到 cache 通用模块。
+ * MVP：仅提供消费幂等所需的 "不存在则写入" 能力，避免把中间件特性下沉到 cache 通用模块。
  * </p>
+ *
+ * @author StephenQiu30
  */
 @Component
 public class RabbitMqDedupeStore {

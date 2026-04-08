@@ -5,6 +5,14 @@ import org.springframework.ai.document.Document;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 重排服务
+ * <p>
+ * 对融合后的候选文档进行二次排序，提升最终结果的相关性
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 public interface RerankService {
 
     /**

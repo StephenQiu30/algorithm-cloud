@@ -8,6 +8,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * 通知关联类型枚举
+ * <p>
+ * 定义通知消息关联的业务对象类型，如帖子、用户、评论等。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Getter
 @AllArgsConstructor
 public enum NotificationRelatedTypeEnum {

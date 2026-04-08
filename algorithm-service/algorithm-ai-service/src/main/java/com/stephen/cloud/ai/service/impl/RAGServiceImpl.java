@@ -25,6 +25,7 @@ import com.stephen.cloud.api.ai.model.dto.rag.RecallAnalysisRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RecallTestItem;
 import com.stephen.cloud.api.ai.model.vo.BatchRecallVO;
 import com.stephen.cloud.api.ai.model.vo.RAGHistoryVO;
+import com.stephen.cloud.api.ai.model.vo.RAGStreamEventVO;
 import com.stephen.cloud.api.ai.model.vo.RecallAnalysisVO;
 import com.stephen.cloud.api.ai.model.vo.RecallItemResultVO;
 import com.stephen.cloud.api.ai.model.vo.RetrievalHitVO;
@@ -45,8 +46,10 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
 import org.springframework.beans.BeanWrapperImpl;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.*;
 
@@ -55,6 +58,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * RAG 服务实现
@@ -102,6 +106,20 @@ public class RAGServiceImpl implements RAGService {
 
     private static final String WEB_SEARCH_SOURCE_NAME = "DashScope 联网搜索";
 
+    private static final String EVENT_START = "start";
+
+    private static final String EVENT_RETRIEVAL = "retrieval";
+
+    private static final String EVENT_FALLBACK = "fallback";
+
+    private static final String EVENT_GENERATION = "generation";
+
+    private static final String EVENT_ANSWER = "answer";
+
+    private static final String EVENT_ERROR = "error";
+
+    private static final String EVENT_DONE = "done";
+
     @Resource
     private ChatClient chatClient;
 
@@ -136,70 +154,195 @@ public class RAGServiceImpl implements RAGService {
             long start = System.currentTimeMillis();
             boolean requestAllowsWebSearchFallback = !Boolean.FALSE.equals(enableWebSearchFallback);
             String resolvedConversationId = resolveConversationId(conversationId, knowledgeBaseId, userId);
-            List<Message> history = loadConversationHistory(resolvedConversationId);
-            RetrievalResult result = retrievalOrchestrator.retrieve(question, knowledgeBaseId, topK, history);
-            WebSearchFallbackDecision fallbackDecision = ragWebSearchFallbackDecider
-                    .decide(result, requestAllowsWebSearchFallback);
-            String retrievalMeta = buildHistoryRetrievalMeta(result, fallbackDecision, false,
-                    requestAllowsWebSearchFallback);
-            List<Document> docs = result.getDocs();
-            if (fallbackDecision.shouldFallback()) {
-                List<SourceVO> webSearchSources = buildWebSearchSources(fallbackDecision);
-                String webSearchRetrievalMeta = buildHistoryRetrievalMeta(result, fallbackDecision, true,
-                        requestAllowsWebSearchFallback);
-                StringBuilder answerBuilder = new StringBuilder();
-                return buildWebSearchRequest(question, resolvedConversationId)
-                        .stream()
-                        .content()
-                        .doOnNext(answerBuilder::append)
-                        .doOnComplete(() -> {
-                            long responseTime = System.currentTimeMillis() - start;
-                            saveHistory(question, answerBuilder.toString(), knowledgeBaseId, userId,
-                                    JSONUtil.toJsonStr(webSearchSources), responseTime,
-                                    result.getRewriteQuery(), webSearchRetrievalMeta,
-                                    RetrievalStrategyEnum.WEB_SEARCH_FALLBACK.getValue());
-                        })
-                        .onErrorResume(ex -> {
-                            log.error("[RAG] 联网搜索兜底失败, question={}, error={}", question, ex.getMessage(), ex);
-                            appendConversationMemory(resolvedConversationId, question, NO_CONTEXT_ANSWER);
-                            long responseTime = System.currentTimeMillis() - start;
-                            saveHistory(question, NO_CONTEXT_ANSWER, knowledgeBaseId, userId,
-                                    JSONUtil.toJsonStr(webSearchSources), responseTime,
-                                    result.getRewriteQuery(), webSearchRetrievalMeta,
-                                    RetrievalStrategyEnum.WEB_SEARCH_FALLBACK.getValue());
-                            return Flux.just(NO_CONTEXT_ANSWER);
-                        });
-            }
-            List<SourceVO> sources = buildSources(docs);
-            if (CollUtil.isEmpty(docs)) {
-                appendConversationMemory(resolvedConversationId, question, NO_CONTEXT_ANSWER);
-                long responseTime = System.currentTimeMillis() - start;
-                saveHistory(question, NO_CONTEXT_ANSWER, knowledgeBaseId, userId,
-                        JSONUtil.toJsonStr(sources), responseTime,
-                        result.getRewriteQuery(), retrievalMeta, result.getRetrievalStrategy());
-                return Flux.just(NO_CONTEXT_ANSWER);
-            }
-            StringBuilder answerBuilder = new StringBuilder();
-            return buildRagRequest(question, resolvedConversationId, docs)
-                    .stream()
-                    .content()
-                    .doOnNext(answerBuilder::append)
-                    .doOnComplete(() -> {
-                        long responseTime = System.currentTimeMillis() - start;
-                        saveHistory(question, answerBuilder.toString(), knowledgeBaseId, userId,
-                                JSONUtil.toJsonStr(sources), responseTime,
-                                result.getRewriteQuery(), retrievalMeta, result.getRetrievalStrategy());
-                    })
-                    .onErrorResume(ex -> {
-                        log.error("[RAG] 知识库问答失败, question={}, error={}", question, ex.getMessage(), ex);
-                        appendConversationMemory(resolvedConversationId, question, NO_CONTEXT_ANSWER);
-                        long responseTime = System.currentTimeMillis() - start;
-                        saveHistory(question, NO_CONTEXT_ANSWER, knowledgeBaseId, userId,
-                                JSONUtil.toJsonStr(sources), responseTime,
-                                result.getRewriteQuery(), retrievalMeta, result.getRetrievalStrategy());
-                        return Flux.just(NO_CONTEXT_ANSWER);
-                    });
+            PreparedAnswerContext context = prepareAnswerContext(question, knowledgeBaseId, userId, topK,
+                    resolvedConversationId, requestAllowsWebSearchFallback, start);
+            return buildTextAnswerStream(context);
         });
+    }
+
+    @Override
+    public Flux<ServerSentEvent<RAGStreamEventVO>> askEventStream(String question, Long knowledgeBaseId, Long userId,
+            Integer topK, String conversationId, Boolean enableWebSearchFallback) {
+        long start = System.currentTimeMillis();
+        boolean requestAllowsWebSearchFallback = !Boolean.FALSE.equals(enableWebSearchFallback);
+        String resolvedConversationId = resolveConversationId(conversationId, knowledgeBaseId, userId);
+        return Flux.concat(
+                Flux.just(buildEvent(EVENT_START, event -> {
+                    event.setPhase("start");
+                    event.setMessage("请求已接收，正在准备检索知识库");
+                    event.setConversationId(resolvedConversationId);
+                    event.setSuccess(Boolean.TRUE);
+                })),
+                Flux.defer(() -> {
+                    PreparedAnswerContext context = prepareAnswerContext(question, knowledgeBaseId, userId, topK,
+                            resolvedConversationId, requestAllowsWebSearchFallback, start);
+                    Flux<ServerSentEvent<RAGStreamEventVO>> prelude = Flux.just(buildRetrievalEvent(context));
+                    if (context.fallbackDecision().shouldFallback()) {
+                        prelude = Flux.concat(prelude,
+                                Flux.just(buildFallbackEvent(context), buildGenerationEvent(context,
+                                        "知识库上下文不足，正在切换联网搜索生成答案")));
+                        return Flux.concat(prelude, buildStructuredGenerationStream(context, true));
+                    }
+                    if (CollUtil.isEmpty(context.docs())) {
+                        return Flux.concat(prelude,
+                                Flux.just(buildGenerationEvent(context, "知识库未命中，直接返回兜底回答")),
+                                buildNoContextEventStream(context));
+                    }
+                    return Flux.concat(prelude,
+                            Flux.just(buildGenerationEvent(context, "知识库召回完成，开始生成答案")),
+                            buildStructuredGenerationStream(context, false));
+                }));
+    }
+
+    private PreparedAnswerContext prepareAnswerContext(String question, Long knowledgeBaseId, Long userId, Integer topK,
+            String resolvedConversationId, boolean requestAllowsWebSearchFallback, long startTime) {
+        List<Message> history = loadConversationHistory(resolvedConversationId);
+        RetrievalResult result = retrievalOrchestrator.retrieve(question, knowledgeBaseId, topK, history);
+        WebSearchFallbackDecision fallbackDecision = ragWebSearchFallbackDecider
+                .decide(result, requestAllowsWebSearchFallback);
+        List<Document> docs = result.getDocs() == null ? List.of() : result.getDocs();
+        String retrievalMeta = buildHistoryRetrievalMeta(result, fallbackDecision, false, requestAllowsWebSearchFallback);
+        List<SourceVO> sources = buildSources(docs);
+        List<SourceVO> webSearchSources = fallbackDecision.shouldFallback()
+                ? buildWebSearchSources(fallbackDecision) : List.of();
+        String webSearchRetrievalMeta = fallbackDecision.shouldFallback()
+                ? buildHistoryRetrievalMeta(result, fallbackDecision, true, requestAllowsWebSearchFallback)
+                : retrievalMeta;
+        return new PreparedAnswerContext(startTime, question, knowledgeBaseId, userId, resolvedConversationId,
+                result, fallbackDecision, retrievalMeta, webSearchRetrievalMeta, docs, sources, webSearchSources);
+    }
+
+    private Flux<String> buildTextAnswerStream(PreparedAnswerContext context) {
+        if (context.fallbackDecision().shouldFallback()) {
+            return buildTextGenerationStream(context, true);
+        }
+        if (CollUtil.isEmpty(context.docs())) {
+            appendConversationMemory(context.resolvedConversationId(), context.question(), NO_CONTEXT_ANSWER);
+            long responseTime = System.currentTimeMillis() - context.startTime();
+            saveHistory(context.question(), NO_CONTEXT_ANSWER, context.knowledgeBaseId(), context.userId(),
+                    JSONUtil.toJsonStr(context.sources()), responseTime,
+                    context.result().getRewriteQuery(), context.retrievalMeta(),
+                    context.result().getRetrievalStrategy());
+            return Flux.just(NO_CONTEXT_ANSWER);
+        }
+        return buildTextGenerationStream(context, false);
+    }
+
+    private Flux<String> buildTextGenerationStream(PreparedAnswerContext context, boolean webSearchMode) {
+        ChatClient.ChatClientRequestSpec requestSpec = buildGenerationRequest(context, webSearchMode);
+        StringBuilder answerBuilder = new StringBuilder();
+        List<SourceVO> finalSources = resolveResponseSources(context, webSearchMode);
+        String finalRetrievalMeta = resolveResponseRetrievalMeta(context, webSearchMode);
+        String finalRetrievalStrategy = resolveResponseRetrievalStrategy(context, webSearchMode);
+
+        return requestSpec.stream()
+                .content()
+                .doOnNext(answerBuilder::append)
+                .doOnComplete(() -> {
+                    long responseTime = System.currentTimeMillis() - context.startTime();
+                    saveHistory(context.question(), answerBuilder.toString(), context.knowledgeBaseId(), context.userId(),
+                            JSONUtil.toJsonStr(finalSources), responseTime, context.result().getRewriteQuery(),
+                            finalRetrievalMeta, finalRetrievalStrategy);
+                })
+                .onErrorResume(ex -> handleTextGenerationError(context, webSearchMode, answerBuilder, finalSources,
+                        finalRetrievalMeta, finalRetrievalStrategy, ex));
+    }
+
+    private Flux<String> handleTextGenerationError(PreparedAnswerContext context, boolean webSearchMode,
+            StringBuilder answerBuilder, List<SourceVO> finalSources, String finalRetrievalMeta,
+            String finalRetrievalStrategy, Throwable ex) {
+        log.error("[RAG] {}问答失败, question={}, error={}",
+                webSearchMode ? "联网搜索" : "知识库", context.question(), ex.getMessage(), ex);
+        String fallbackAnswer = answerBuilder.isEmpty() ? NO_CONTEXT_ANSWER : answerBuilder.toString();
+        if (answerBuilder.isEmpty()) {
+            appendConversationMemory(context.resolvedConversationId(), context.question(), fallbackAnswer);
+        }
+        long responseTime = System.currentTimeMillis() - context.startTime();
+        saveHistory(context.question(), fallbackAnswer, context.knowledgeBaseId(), context.userId(),
+                JSONUtil.toJsonStr(finalSources), responseTime, context.result().getRewriteQuery(),
+                finalRetrievalMeta, finalRetrievalStrategy);
+        return Flux.just(fallbackAnswer);
+    }
+
+    private Flux<ServerSentEvent<RAGStreamEventVO>> buildNoContextEventStream(PreparedAnswerContext context) {
+        appendConversationMemory(context.resolvedConversationId(), context.question(), NO_CONTEXT_ANSWER);
+        long responseTime = System.currentTimeMillis() - context.startTime();
+        saveHistory(context.question(), NO_CONTEXT_ANSWER, context.knowledgeBaseId(), context.userId(),
+                JSONUtil.toJsonStr(context.sources()), responseTime, context.result().getRewriteQuery(),
+                context.retrievalMeta(), context.result().getRetrievalStrategy());
+        return Flux.just(
+                buildAnswerChunkEvent(context, NO_CONTEXT_ANSWER),
+                buildDoneEvent(context, true, responseTime, context.sources(), context.result().getRetrievalStrategy())
+        );
+    }
+
+    private Flux<ServerSentEvent<RAGStreamEventVO>> buildStructuredGenerationStream(PreparedAnswerContext context,
+            boolean webSearchMode) {
+        ChatClient.ChatClientRequestSpec requestSpec = buildGenerationRequest(context, webSearchMode);
+        StringBuilder answerBuilder = new StringBuilder();
+        List<SourceVO> finalSources = resolveResponseSources(context, webSearchMode);
+        String finalRetrievalMeta = resolveResponseRetrievalMeta(context, webSearchMode);
+        String finalRetrievalStrategy = resolveResponseRetrievalStrategy(context, webSearchMode);
+
+        return requestSpec.stream()
+                .content()
+                .map(delta -> {
+                    answerBuilder.append(delta);
+                    return buildAnswerChunkEvent(context, delta);
+                })
+                .concatWith(Mono.fromSupplier(() -> {
+                    long responseTime = System.currentTimeMillis() - context.startTime();
+                    saveHistory(context.question(), answerBuilder.toString(), context.knowledgeBaseId(),
+                            context.userId(), JSONUtil.toJsonStr(finalSources), responseTime,
+                            context.result().getRewriteQuery(), finalRetrievalMeta, finalRetrievalStrategy);
+                    return buildDoneEvent(context, true, responseTime, finalSources, finalRetrievalStrategy);
+                }).flux())
+                .onErrorResume(ex -> handleStructuredGenerationError(context, webSearchMode, answerBuilder, finalSources,
+                        finalRetrievalMeta, finalRetrievalStrategy, ex));
+    }
+
+    private Flux<ServerSentEvent<RAGStreamEventVO>> handleStructuredGenerationError(PreparedAnswerContext context,
+            boolean webSearchMode, StringBuilder answerBuilder, List<SourceVO> finalSources, String finalRetrievalMeta,
+            String finalRetrievalStrategy, Throwable ex) {
+        log.error("[RAG] {}结构化流式问答失败, question={}, error={}",
+                webSearchMode ? "联网搜索" : "知识库", context.question(), ex.getMessage(), ex);
+        String persistedAnswer = answerBuilder.isEmpty() ? NO_CONTEXT_ANSWER : answerBuilder.toString();
+        if (answerBuilder.isEmpty()) {
+            appendConversationMemory(context.resolvedConversationId(), context.question(), persistedAnswer);
+        }
+        long responseTime = System.currentTimeMillis() - context.startTime();
+        saveHistory(context.question(), persistedAnswer, context.knowledgeBaseId(), context.userId(),
+                JSONUtil.toJsonStr(finalSources), responseTime, context.result().getRewriteQuery(),
+                finalRetrievalMeta, finalRetrievalStrategy);
+
+        Flux<ServerSentEvent<RAGStreamEventVO>> errorFlux = Flux.just(buildErrorEvent(context, "生成过程中发生异常，请稍后重试"));
+        if (answerBuilder.isEmpty()) {
+            return Flux.concat(errorFlux,
+                    Flux.just(buildAnswerChunkEvent(context, persistedAnswer),
+                            buildDoneEvent(context, false, responseTime, finalSources, finalRetrievalStrategy)));
+        }
+        return Flux.concat(errorFlux,
+                Flux.just(buildDoneEvent(context, false, responseTime, finalSources, finalRetrievalStrategy)));
+    }
+
+    private ChatClient.ChatClientRequestSpec buildGenerationRequest(PreparedAnswerContext context, boolean webSearchMode) {
+        if (webSearchMode) {
+            return buildWebSearchRequest(context.question(), context.resolvedConversationId());
+        }
+        return buildRagRequest(context.question(), context.resolvedConversationId(), context.docs());
+    }
+
+    private List<SourceVO> resolveResponseSources(PreparedAnswerContext context, boolean webSearchMode) {
+        return webSearchMode ? context.webSearchSources() : context.sources();
+    }
+
+    private String resolveResponseRetrievalMeta(PreparedAnswerContext context, boolean webSearchMode) {
+        return webSearchMode ? context.webSearchRetrievalMeta() : context.retrievalMeta();
+    }
+
+    private String resolveResponseRetrievalStrategy(PreparedAnswerContext context, boolean webSearchMode) {
+        return webSearchMode ? RetrievalStrategyEnum.WEB_SEARCH_FALLBACK.getValue()
+                : context.result().getRetrievalStrategy();
     }
 
     @Override
@@ -586,6 +729,113 @@ public class RAGServiceImpl implements RAGService {
         source.setContent("知识库召回不足，本次回答已切换为 DashScope 联网搜索。");
         source.setVectorSimilarity(fallbackDecision.topVectorSimilarity());
         return List.of(source);
+    }
+
+    private ServerSentEvent<RAGStreamEventVO> buildRetrievalEvent(PreparedAnswerContext context) {
+        return buildEvent(EVENT_RETRIEVAL, event -> {
+            event.setPhase("retrieval");
+            event.setMessage(context.fallbackDecision().shouldFallback()
+                    ? "知识库召回完成，但上下文不足，准备切换联网搜索"
+                    : "知识库召回完成");
+            event.setConversationId(context.resolvedConversationId());
+            event.setRetrievalStrategy(context.result().getRetrievalStrategy());
+            event.setKnowledgeHitCount(context.docs().size());
+            event.setTopVectorSimilarity(context.fallbackDecision().topVectorSimilarity());
+            event.setAverageVectorSimilarity(context.fallbackDecision().averageVectorSimilarity());
+            event.setWebSearchTriggered(context.fallbackDecision().shouldFallback());
+            event.setSuccess(Boolean.TRUE);
+        });
+    }
+
+    private ServerSentEvent<RAGStreamEventVO> buildFallbackEvent(PreparedAnswerContext context) {
+        return buildEvent(EVENT_FALLBACK, event -> {
+            event.setPhase("fallback");
+            event.setMessage("知识库信息不足，已触发联网搜索兜底");
+            event.setConversationId(context.resolvedConversationId());
+            event.setRetrievalStrategy(RetrievalStrategyEnum.WEB_SEARCH_FALLBACK.getValue());
+            event.setKnowledgeHitCount(context.docs().size());
+            event.setTopVectorSimilarity(context.fallbackDecision().topVectorSimilarity());
+            event.setAverageVectorSimilarity(context.fallbackDecision().averageVectorSimilarity());
+            event.setWebSearchTriggered(Boolean.TRUE);
+            event.setSuccess(Boolean.TRUE);
+        });
+    }
+
+    private ServerSentEvent<RAGStreamEventVO> buildGenerationEvent(PreparedAnswerContext context, String message) {
+        return buildEvent(EVENT_GENERATION, event -> {
+            event.setPhase("generation");
+            event.setMessage(message);
+            event.setConversationId(context.resolvedConversationId());
+            event.setRetrievalStrategy(resolveResponseRetrievalStrategy(context,
+                    context.fallbackDecision().shouldFallback()));
+            event.setKnowledgeHitCount(context.docs().size());
+            event.setTopVectorSimilarity(context.fallbackDecision().topVectorSimilarity());
+            event.setAverageVectorSimilarity(context.fallbackDecision().averageVectorSimilarity());
+            event.setWebSearchTriggered(context.fallbackDecision().shouldFallback());
+            event.setSuccess(Boolean.TRUE);
+        });
+    }
+
+    private ServerSentEvent<RAGStreamEventVO> buildAnswerChunkEvent(PreparedAnswerContext context, String delta) {
+        return buildEvent(EVENT_ANSWER, event -> {
+            event.setPhase("generation");
+            event.setConversationId(context.resolvedConversationId());
+            event.setContent(delta);
+            event.setWebSearchTriggered(context.fallbackDecision().shouldFallback());
+            event.setSuccess(Boolean.TRUE);
+        });
+    }
+
+    private ServerSentEvent<RAGStreamEventVO> buildErrorEvent(PreparedAnswerContext context, String message) {
+        return buildEvent(EVENT_ERROR, event -> {
+            event.setPhase("error");
+            event.setMessage(message);
+            event.setConversationId(context.resolvedConversationId());
+            event.setWebSearchTriggered(context.fallbackDecision().shouldFallback());
+            event.setSuccess(Boolean.FALSE);
+        });
+    }
+
+    private ServerSentEvent<RAGStreamEventVO> buildDoneEvent(PreparedAnswerContext context, boolean success,
+            long responseTime, List<SourceVO> sources, String retrievalStrategy) {
+        return buildEvent(EVENT_DONE, event -> {
+            event.setPhase("done");
+            event.setMessage(success ? "问答完成" : "问答异常结束");
+            event.setConversationId(context.resolvedConversationId());
+            event.setRetrievalStrategy(retrievalStrategy);
+            event.setKnowledgeHitCount(context.docs().size());
+            event.setTopVectorSimilarity(context.fallbackDecision().topVectorSimilarity());
+            event.setAverageVectorSimilarity(context.fallbackDecision().averageVectorSimilarity());
+            event.setWebSearchTriggered(context.fallbackDecision().shouldFallback());
+            event.setSuccess(success);
+            event.setResponseTime(responseTime);
+            event.setSources(sources);
+        });
+    }
+
+    private ServerSentEvent<RAGStreamEventVO> buildEvent(String eventType, Consumer<RAGStreamEventVO> customizer) {
+        RAGStreamEventVO event = new RAGStreamEventVO();
+        event.setType(eventType);
+        customizer.accept(event);
+        return ServerSentEvent.<RAGStreamEventVO>builder(event)
+                .event(eventType)
+                .build();
+    }
+
+    private record PreparedAnswerContext(
+            long startTime,
+            String question,
+            Long knowledgeBaseId,
+            Long userId,
+            String resolvedConversationId,
+            RetrievalResult result,
+            WebSearchFallbackDecision fallbackDecision,
+            String retrievalMeta,
+            String webSearchRetrievalMeta,
+            List<Document> docs,
+            List<SourceVO> sources,
+            List<SourceVO> webSearchSources
+    ) {
     }
 
 }

@@ -30,6 +30,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 知识库管理服务实现
+ * <p>
+ * 提供知识库的增删改查、数据校验、视图转换等能力
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Service
 public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, KnowledgeBase> implements KnowledgeBaseService {
 

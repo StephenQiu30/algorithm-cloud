@@ -15,6 +15,8 @@ import java.util.UUID;
  * <p>
  * 发送端 MVP：统一封装 {@link RabbitMessage} 元数据，并支持直接发送与事务提交后发送。
  * </p>
+ *
+ * @author StephenQiu30
  */
 @Slf4j
 @Component

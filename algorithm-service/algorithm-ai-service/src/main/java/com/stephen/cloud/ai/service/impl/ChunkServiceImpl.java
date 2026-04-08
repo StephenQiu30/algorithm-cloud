@@ -40,6 +40,14 @@ import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * 文档分片服务实现
+ * <p>
+ * 提供分片的查询、混合检索、ES 同步等能力
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Service
 @Slf4j
 public class ChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, DocumentChunk> implements ChunkService {

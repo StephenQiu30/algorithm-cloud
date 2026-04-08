@@ -39,6 +39,14 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 文档管理服务实现
+ * <p>
+ * 提供文档的上传、删除、查询等功能，并触发异步 ETL 处理流程
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Service
 public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> implements DocumentService {
 

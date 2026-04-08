@@ -24,6 +24,14 @@ import org.springframework.context.annotation.Primary;
 
 import java.util.List;
 
+/**
+ * Elasticsearch 配置类
+ * <p>
+ * 配置 Elasticsearch 客户端连接，支持基本认证和连接池优化。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Configuration
 @EnableConfigurationProperties(ElasticsearchProperties.class)
 @ConditionalOnProperty(prefix = "spring.elasticsearch", name = "enable", havingValue = "true", matchIfMissing = true)

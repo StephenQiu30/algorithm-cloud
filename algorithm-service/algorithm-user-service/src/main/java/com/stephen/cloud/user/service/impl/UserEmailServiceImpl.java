@@ -22,6 +22,15 @@ import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
 
+/**
+ * 用户邮箱服务实现
+ * <p>
+ * 提供邮箱验证码的发送、校验、限流等功能。
+ * 支持基于 IP 和邮箱的发送频率限制，防止恶意刷验证码。
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Service
 @Slf4j
 public class UserEmailServiceImpl implements UserEmailService {

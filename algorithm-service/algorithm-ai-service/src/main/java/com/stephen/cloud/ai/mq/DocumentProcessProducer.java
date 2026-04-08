@@ -7,6 +7,14 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+/**
+ * 文档处理消息生产者
+ * <p>
+ * 负责将文档处理任务发送到 MQ 队列，触发异步 ETL 流程
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Slf4j
 @Component
 public class DocumentProcessProducer {

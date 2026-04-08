@@ -2,6 +2,11 @@ package com.stephen.cloud.api.ai.model.enums;
 
 import lombok.Getter;
 
+/**
+ * 文档解析状态枚举
+ *
+ * @author StephenQiu30
+ */
 @Getter
 public enum DocumentParseStatusEnum {
 

@@ -30,8 +30,12 @@ import java.util.stream.Collectors;
 
 /**
  * 用户 ES 搜索服务实现
+ * <p>
+ * 提供用户数据的 Elasticsearch 索引管理和全文检索能力，
+ * 支持用户名搜索、角色过滤等功能。
+ * </p>
  *
- * @author stephen
+ * @author StephenQiu30
  */
 @Slf4j
 @Service

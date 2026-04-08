@@ -16,6 +16,14 @@ import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.*;
 
 import java.util.List;
 
+/**
+ * 向量存储服务实现
+ * <p>
+ * 基于 Spring AI VectorStore 提供向量检索和数据管理能力
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Service
 @Slf4j
 public class VectorStoreServiceImpl implements VectorStoreService {

@@ -6,8 +6,10 @@ import com.stephen.cloud.api.ai.model.dto.rag.RAGHistoryQueryRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RecallAnalysisRequest;
 import com.stephen.cloud.api.ai.model.vo.BatchRecallVO;
 import com.stephen.cloud.api.ai.model.vo.RAGHistoryVO;
+import com.stephen.cloud.api.ai.model.vo.RAGStreamEventVO;
 import com.stephen.cloud.api.ai.model.vo.RecallAnalysisVO;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Flux;
 
 /**
@@ -34,6 +36,16 @@ public interface RAGService {
      */
     Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK,
                            String conversationId, Boolean enableWebSearchFallback);
+
+    /**
+     * 结构化 SSE 流式问答
+     * <p>
+     * 相比纯文本流，额外返回阶段事件，便于前端更早展示“正在检索/正在生成”等状态。
+     * </p>
+     */
+    Flux<ServerSentEvent<RAGStreamEventVO>> askEventStream(String question, Long knowledgeBaseId, Long userId,
+                                                           Integer topK, String conversationId,
+                                                           Boolean enableWebSearchFallback);
 
     /**
      * 保存问答历史

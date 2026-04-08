@@ -8,6 +8,7 @@ import com.stephen.cloud.api.ai.model.dto.rag.RAGHistoryQueryRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RecallAnalysisRequest;
 import com.stephen.cloud.api.ai.model.vo.BatchRecallVO;
 import com.stephen.cloud.api.ai.model.vo.RAGHistoryVO;
+import com.stephen.cloud.api.ai.model.vo.RAGStreamEventVO;
 import com.stephen.cloud.api.ai.model.vo.RecallAnalysisVO;
 import com.stephen.cloud.common.auth.utils.SecurityUtils;
 import com.stephen.cloud.common.common.BaseResponse;
@@ -18,6 +19,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
@@ -53,6 +55,24 @@ public class RAGController {
     public Flux<String> askStream(@RequestBody RAGAskRequest askRequest) {
         Long userId = SecurityUtils.getLoginUserId();
         return ragService.askStream(askRequest.getQuestion(), askRequest.getKnowledgeBaseId(), userId,
+                askRequest.getTopK(), askRequest.getConversationId(), askRequest.getEnableWebSearchFallback());
+    }
+
+    /**
+     * RAG结构化流式问答
+     * <p>
+     * 在答案 token 之外，额外推送检索、兜底、完成等阶段事件，帮助前端更早渲染状态。
+     * </p>
+     *
+     * @param askRequest 问答请求
+     * @return 结构化 SSE 事件流
+     */
+    @PostMapping(value = "/ask/stream/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "RAG结构化流式问答", description = "基于知识库进行问答，返回带阶段信息的 SSE 事件流")
+    @OperationLog(module = "RAG问答", action = "RAG结构化流式问答")
+    public Flux<ServerSentEvent<RAGStreamEventVO>> askEventStream(@RequestBody RAGAskRequest askRequest) {
+        Long userId = SecurityUtils.getLoginUserId();
+        return ragService.askEventStream(askRequest.getQuestion(), askRequest.getKnowledgeBaseId(), userId,
                 askRequest.getTopK(), askRequest.getConversationId(), askRequest.getEnableWebSearchFallback());
     }
 

@@ -12,6 +12,14 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
+/**
+ * 文档处理消息消费者
+ * <p>
+ * 监听文档处理队列，将消息分发给具体的业务处理器执行 ETL 流程
+ * </p>
+ *
+ * @author StephenQiu30
+ */
 @Slf4j
 @Component
 public class DocumentProcessMqConsumer {
