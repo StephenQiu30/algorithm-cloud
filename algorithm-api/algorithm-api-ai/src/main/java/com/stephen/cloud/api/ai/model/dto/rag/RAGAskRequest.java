@@ -29,4 +29,7 @@ public class RAGAskRequest implements Serializable {
 
     @Schema(description = "会话ID（用于多轮对话记忆）")
     private String conversationId;
+
+    @Schema(description = "知识库不足时是否允许联网搜索兜底")
+    private Boolean enableWebSearchFallback = Boolean.TRUE;
 }

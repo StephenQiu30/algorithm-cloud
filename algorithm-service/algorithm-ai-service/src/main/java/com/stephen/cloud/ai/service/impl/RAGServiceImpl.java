@@ -2,18 +2,23 @@ package com.stephen.cloud.ai.service.impl;
 
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.stephen.cloud.ai.advisor.ReReadingAdvisor;
 import com.stephen.cloud.ai.config.RagGenerationProperties;
+import com.stephen.cloud.ai.config.RagWebSearchProperties;
 import com.stephen.cloud.ai.convert.RAGConvert;
 import com.stephen.cloud.ai.knowledge.retrieval.RagDocumentHelper;
+import com.stephen.cloud.ai.knowledge.retrieval.RagWebSearchFallbackDecider;
 import com.stephen.cloud.ai.knowledge.retrieval.RetrievalOrchestrator;
 import com.stephen.cloud.ai.knowledge.retrieval.model.RetrievalResult;
+import com.stephen.cloud.ai.knowledge.retrieval.model.WebSearchFallbackDecision;
 import com.stephen.cloud.ai.mapper.RAGHistoryMapper;
 import com.stephen.cloud.ai.model.entity.RAGHistory;
 import com.stephen.cloud.ai.service.RAGService;
+import com.stephen.cloud.api.ai.model.enums.RetrievalStrategyEnum;
 import com.stephen.cloud.api.ai.model.dto.rag.BatchRecallRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RAGHistoryQueryRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RecallAnalysisRequest;
@@ -39,6 +44,7 @@ import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
+import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -85,6 +91,17 @@ public class RAGServiceImpl implements RAGService {
 
     private static final String NO_CONTEXT_ANSWER = "当前知识库没有检索到足够相关的内容，暂时无法给出可靠回答。";
 
+    private static final String WEB_SEARCH_SYSTEM_PROMPT = """
+            你是一个严谨的联网搜索问答助手。
+            当前本地知识库不足以回答用户问题，请基于联网搜索到的最新资料作答。
+            如果问题涉及时间敏感信息，请明确写出具体日期或时间；如果搜索后仍然无法确认，请直接说明。
+            不要编造搜索结果，也不要把未经检索确认的信息当作事实给出。
+            """;
+
+    private static final String WEB_SEARCH_SOURCE_TYPE = "web_search";
+
+    private static final String WEB_SEARCH_SOURCE_NAME = "DashScope 联网搜索";
+
     @Resource
     private ChatClient chatClient;
 
@@ -101,27 +118,65 @@ public class RAGServiceImpl implements RAGService {
     private RagGenerationProperties ragGenerationProperties;
 
     @Resource
+    private RagWebSearchProperties ragWebSearchProperties;
+
+    @Resource
     private RagDocumentHelper ragDocumentHelper;
 
     @Resource
     private ReReadingAdvisor reReadingAdvisor;
 
+    @Resource
+    private RagWebSearchFallbackDecider ragWebSearchFallbackDecider;
+
     @Override
     public Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK,
-            String conversationId) {
+            String conversationId, Boolean enableWebSearchFallback) {
         return Flux.defer(() -> {
             long start = System.currentTimeMillis();
+            boolean requestAllowsWebSearchFallback = !Boolean.FALSE.equals(enableWebSearchFallback);
             String resolvedConversationId = resolveConversationId(conversationId, knowledgeBaseId, userId);
             List<Message> history = loadConversationHistory(resolvedConversationId);
             RetrievalResult result = retrievalOrchestrator.retrieve(question, knowledgeBaseId, topK, history);
+            WebSearchFallbackDecision fallbackDecision = ragWebSearchFallbackDecider
+                    .decide(result, requestAllowsWebSearchFallback);
+            String retrievalMeta = buildHistoryRetrievalMeta(result, fallbackDecision, false,
+                    requestAllowsWebSearchFallback);
             List<Document> docs = result.getDocs();
+            if (fallbackDecision.shouldFallback()) {
+                List<SourceVO> webSearchSources = buildWebSearchSources(fallbackDecision);
+                String webSearchRetrievalMeta = buildHistoryRetrievalMeta(result, fallbackDecision, true,
+                        requestAllowsWebSearchFallback);
+                StringBuilder answerBuilder = new StringBuilder();
+                return buildWebSearchRequest(question, resolvedConversationId)
+                        .stream()
+                        .content()
+                        .doOnNext(answerBuilder::append)
+                        .doOnComplete(() -> {
+                            long responseTime = System.currentTimeMillis() - start;
+                            saveHistory(question, answerBuilder.toString(), knowledgeBaseId, userId,
+                                    JSONUtil.toJsonStr(webSearchSources), responseTime,
+                                    result.getRewriteQuery(), webSearchRetrievalMeta,
+                                    RetrievalStrategyEnum.WEB_SEARCH_FALLBACK.getValue());
+                        })
+                        .onErrorResume(ex -> {
+                            log.error("[RAG] 联网搜索兜底失败, question={}, error={}", question, ex.getMessage(), ex);
+                            appendConversationMemory(resolvedConversationId, question, NO_CONTEXT_ANSWER);
+                            long responseTime = System.currentTimeMillis() - start;
+                            saveHistory(question, NO_CONTEXT_ANSWER, knowledgeBaseId, userId,
+                                    JSONUtil.toJsonStr(webSearchSources), responseTime,
+                                    result.getRewriteQuery(), webSearchRetrievalMeta,
+                                    RetrievalStrategyEnum.WEB_SEARCH_FALLBACK.getValue());
+                            return Flux.just(NO_CONTEXT_ANSWER);
+                        });
+            }
             List<SourceVO> sources = buildSources(docs);
             if (CollUtil.isEmpty(docs)) {
                 appendConversationMemory(resolvedConversationId, question, NO_CONTEXT_ANSWER);
                 long responseTime = System.currentTimeMillis() - start;
                 saveHistory(question, NO_CONTEXT_ANSWER, knowledgeBaseId, userId,
                         JSONUtil.toJsonStr(sources), responseTime,
-                        result.getRewriteQuery(), result.getRetrievalMeta(), result.getRetrievalStrategy());
+                        result.getRewriteQuery(), retrievalMeta, result.getRetrievalStrategy());
                 return Flux.just(NO_CONTEXT_ANSWER);
             }
             StringBuilder answerBuilder = new StringBuilder();
@@ -133,7 +188,16 @@ public class RAGServiceImpl implements RAGService {
                         long responseTime = System.currentTimeMillis() - start;
                         saveHistory(question, answerBuilder.toString(), knowledgeBaseId, userId,
                                 JSONUtil.toJsonStr(sources), responseTime,
-                                result.getRewriteQuery(), result.getRetrievalMeta(), result.getRetrievalStrategy());
+                                result.getRewriteQuery(), retrievalMeta, result.getRetrievalStrategy());
+                    })
+                    .onErrorResume(ex -> {
+                        log.error("[RAG] 知识库问答失败, question={}, error={}", question, ex.getMessage(), ex);
+                        appendConversationMemory(resolvedConversationId, question, NO_CONTEXT_ANSWER);
+                        long responseTime = System.currentTimeMillis() - start;
+                        saveHistory(question, NO_CONTEXT_ANSWER, knowledgeBaseId, userId,
+                                JSONUtil.toJsonStr(sources), responseTime,
+                                result.getRewriteQuery(), retrievalMeta, result.getRetrievalStrategy());
+                        return Flux.just(NO_CONTEXT_ANSWER);
                     });
         });
     }
@@ -382,12 +446,32 @@ public class RAGServiceImpl implements RAGService {
                 .user(question);
     }
 
+    private ChatClient.ChatClientRequestSpec buildWebSearchRequest(String question, String conversationId) {
+        MessageChatMemoryAdvisor memoryAdvisor = MessageChatMemoryAdvisor.builder(chatMemory).build();
+        return chatClient.prompt()
+                .options(buildWebSearchGenerationOptions())
+                .advisors(memoryAdvisor, reReadingAdvisor)
+                .advisors(advisorSpec -> advisorSpec.param(ChatMemory.CONVERSATION_ID, conversationId))
+                .system(WEB_SEARCH_SYSTEM_PROMPT)
+                .user(question);
+    }
+
     private DashScopeChatOptions buildGenerationOptions() {
         DashScopeChatOptions.DashScopeChatOptionsBuilder builder = DashScopeChatOptions.builder();
         if (ragGenerationProperties.getTemperature() != null) {
             builder.temperature(ragGenerationProperties.getTemperature());
         }
         return builder.build();
+    }
+
+    private DashScopeChatOptions buildWebSearchGenerationOptions() {
+        DashScopeChatOptions options = buildGenerationOptions();
+        BeanWrapperImpl beanWrapper = new BeanWrapperImpl(options);
+        if (!beanWrapper.isWritableProperty("enableSearch")) {
+            throw new IllegalStateException("当前 DashScopeChatOptions 版本不支持 enableSearch 配置");
+        }
+        beanWrapper.setPropertyValue("enableSearch", true);
+        return options;
     }
 
     private String formatDocumentsForPrompt(List<Document> docs) {
@@ -470,6 +554,38 @@ public class RAGServiceImpl implements RAGService {
         String userPart = userId == null ? "anonymous" : String.valueOf(userId);
         String kbPart = knowledgeBaseId == null ? "0" : String.valueOf(knowledgeBaseId);
         return "rag:" + userPart + ":" + kbPart;
+    }
+
+    private String buildHistoryRetrievalMeta(RetrievalResult result, WebSearchFallbackDecision fallbackDecision,
+            boolean webSearchTriggered, boolean requestAllowsWebSearchFallback) {
+        JSONObject meta = StringUtils.isNotBlank(result.getRetrievalMeta())
+                ? JSONUtil.parseObj(result.getRetrievalMeta())
+                : JSONUtil.createObj();
+        meta.set("knowledgeRetrievalStrategy", result.getRetrievalStrategy());
+        meta.set("webSearchConfiguredEnabled", ragWebSearchProperties.isEnabled());
+        meta.set("webSearchRequestEnabled", requestAllowsWebSearchFallback);
+        meta.set("webSearchTriggered", webSearchTriggered);
+        meta.set("webSearchDecisionReason", fallbackDecision.reason());
+        meta.set("webSearchKnowledgeHitCount", fallbackDecision.knowledgeHitCount());
+        if (fallbackDecision.topVectorSimilarity() != null) {
+            meta.set("webSearchTopVectorSimilarity", fallbackDecision.topVectorSimilarity());
+        }
+        if (fallbackDecision.averageVectorSimilarity() != null) {
+            meta.set("webSearchAverageVectorSimilarity", fallbackDecision.averageVectorSimilarity());
+        }
+        return meta.toString();
+    }
+
+    private List<SourceVO> buildWebSearchSources(WebSearchFallbackDecision fallbackDecision) {
+        SourceVO source = new SourceVO();
+        source.setDocumentName(WEB_SEARCH_SOURCE_NAME);
+        source.setSourceType(WEB_SEARCH_SOURCE_TYPE);
+        source.setSectionTitle("联网搜索兜底");
+        source.setBizTag("web-search-fallback");
+        source.setMatchReason(fallbackDecision.reason());
+        source.setContent("知识库召回不足，本次回答已切换为 DashScope 联网搜索。");
+        source.setVectorSimilarity(fallbackDecision.topVectorSimilarity());
+        return List.of(source);
     }
 
 }

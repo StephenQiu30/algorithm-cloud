@@ -32,7 +32,8 @@ public interface RAGService {
      * @param topK            召回片段数量
      * @return 答案片段的流
      */
-    Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK, String conversationId);
+    Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK,
+                           String conversationId, Boolean enableWebSearchFallback);
 
     /**
      * 保存问答历史

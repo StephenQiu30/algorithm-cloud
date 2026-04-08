@@ -53,7 +53,7 @@ public class RAGController {
     public Flux<String> askStream(@RequestBody RAGAskRequest askRequest) {
         Long userId = SecurityUtils.getLoginUserId();
         return ragService.askStream(askRequest.getQuestion(), askRequest.getKnowledgeBaseId(), userId,
-                askRequest.getTopK(), askRequest.getConversationId());
+                askRequest.getTopK(), askRequest.getConversationId(), askRequest.getEnableWebSearchFallback());
     }
 
     /**

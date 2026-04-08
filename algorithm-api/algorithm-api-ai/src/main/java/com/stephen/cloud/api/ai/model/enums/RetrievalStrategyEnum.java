@@ -19,7 +19,12 @@ public enum RetrievalStrategyEnum {
     /**
      * 双路召回 + RRF + 重排
      */
-    HYBRID_RRF_RERANK("HYBRID_RRF_RERANK", "双路召回+RRF+重排");
+    HYBRID_RRF_RERANK("HYBRID_RRF_RERANK", "双路召回+RRF+重排"),
+
+    /**
+     * 知识库不足时触发联网搜索兜底
+     */
+    WEB_SEARCH_FALLBACK("WEB_SEARCH_FALLBACK", "联网搜索兜底");
 
     /**
      * 枚举值

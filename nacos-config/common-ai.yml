@@ -31,6 +31,13 @@ rag:
   generation:
     max-context-length: 8000
     temperature: 0.4
+  web-search:
+    enabled: true
+    fallback-on-empty: true
+    fallback-on-low-confidence: true
+    min-knowledge-hits: 2
+    min-top-similarity: 0.72
+    min-average-similarity: 0.65
 
 # Chat Memory
 chat:
