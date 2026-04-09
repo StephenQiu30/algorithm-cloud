@@ -23,6 +23,7 @@ import com.stephen.cloud.post.model.entity.PostComment;
 import com.stephen.cloud.post.service.PostCommentService;
 import com.stephen.cloud.post.service.PostService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +41,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/post/comment")
 @Slf4j
-@io.swagger.v3.oas.annotations.tags.Tag(name = "PostCommentController", description = "帖子评论管理")
+@Tag(name = "PostCommentController", description = "帖子评论管理")
 public class PostCommentController {
 
     @Resource

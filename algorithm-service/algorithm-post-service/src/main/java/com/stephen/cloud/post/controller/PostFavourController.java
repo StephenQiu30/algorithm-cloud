@@ -15,6 +15,7 @@ import com.stephen.cloud.post.model.entity.Post;
 import com.stephen.cloud.post.service.PostFavourService;
 import com.stephen.cloud.post.service.PostService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/post/favour")
 @Slf4j
-@io.swagger.v3.oas.annotations.tags.Tag(name = "PostFavourController", description = "帖子收藏管理")
+@Tag(name = "PostFavourController", description = "帖子收藏管理")
 public class PostFavourController {
 
     @Resource
@@ -73,6 +74,7 @@ public class PostFavourController {
      * @return BaseResponse<Page<PostVO>>
      */
     @PostMapping("/my/list/page")
+    @Operation(summary = "获取我收藏的帖子列表", description = "分页获取当前登录用户收藏的帖子列表")
     public BaseResponse<Page<PostVO>> listMyFavourPostByPage(@RequestBody PostQueryRequest postQueryRequest,
                                                              HttpServletRequest request) {
         if (postQueryRequest == null) {

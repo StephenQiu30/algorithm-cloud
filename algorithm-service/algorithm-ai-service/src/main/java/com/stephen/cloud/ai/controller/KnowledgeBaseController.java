@@ -39,7 +39,7 @@ public class KnowledgeBaseController {
     private KnowledgeBaseService knowledgeBaseService;
 
     @PostMapping("/add")
-    @Operation(summary = "创建知识库")
+    @Operation(summary = "创建知识库", description = "创建新的知识库，用于组织和管理文档")
     @OperationLog(module = "知识库管理", action = "创建知识库")
     public BaseResponse<Long> addKnowledgeBase(@RequestBody KnowledgeBaseAddRequest addRequest,
                                               HttpServletRequest request) {
@@ -104,7 +104,7 @@ public class KnowledgeBaseController {
     }
 
     @GetMapping("/get/vo")
-    @Operation(summary = "获取知识库详情")
+    @Operation(summary = "获取知识库详情", description = "根据ID获取知识库的详细信息")
     public BaseResponse<KnowledgeBaseVO> getKnowledgeBaseVOById(@RequestParam("id") long id, HttpServletRequest request) {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
         KnowledgeBase knowledgeBase = knowledgeBaseService.getById(id);

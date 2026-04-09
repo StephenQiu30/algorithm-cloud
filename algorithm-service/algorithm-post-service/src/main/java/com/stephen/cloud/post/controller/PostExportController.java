@@ -9,6 +9,7 @@ import com.stephen.cloud.common.utils.DocumentUtils;
 import com.stephen.cloud.post.model.entity.Post;
 import com.stephen.cloud.post.service.PostService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +35,7 @@ import java.nio.charset.StandardCharsets;
 @RequestMapping("/post/export")
 @SaCheckRole(UserConstant.ADMIN_ROLE)
 @Slf4j
-@io.swagger.v3.oas.annotations.tags.Tag(name = "PostExportController", description = "帖子导出管理")
+@Tag(name = "PostExportController", description = "帖子导出管理")
 public class PostExportController {
 
     @Resource

@@ -15,6 +15,7 @@ import com.stephen.cloud.post.model.entity.Post;
 import com.stephen.cloud.post.service.PostService;
 import com.stephen.cloud.post.service.PostThumbService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/post/thumb")
 @Slf4j
-@io.swagger.v3.oas.annotations.tags.Tag(name = "PostThumbController", description = "帖子点赞管理")
+@Tag(name = "PostThumbController", description = "帖子点赞管理")
 public class PostThumbController {
 
     @Resource
@@ -99,6 +100,7 @@ public class PostThumbController {
      * @return BaseResponse<Page<PostVO>>
      */
     @PostMapping("/list/page")
+    @Operation(summary = "获取用户点赞的帖子列表", description = "分页获取指定用户点赞的帖子列表")
     public BaseResponse<Page<PostVO>> listThumbPostByPage(@RequestBody PostFavourQueryRequest postFavourQueryRequest,
                                                           HttpServletRequest request) {
         if (postFavourQueryRequest == null) {
