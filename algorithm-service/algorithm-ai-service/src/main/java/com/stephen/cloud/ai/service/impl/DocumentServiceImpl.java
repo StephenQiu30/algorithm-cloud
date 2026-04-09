@@ -4,12 +4,15 @@ import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.stephen.cloud.ai.config.DocumentProcessingProperties;
 import com.stephen.cloud.ai.convert.DocumentConvert;
 import com.stephen.cloud.ai.mapper.DocumentChunkMapper;
 import com.stephen.cloud.ai.mapper.DocumentMapper;
+import com.stephen.cloud.ai.mapper.KnowledgeBaseMapper;
 import com.stephen.cloud.ai.model.entity.Document;
 import com.stephen.cloud.ai.model.entity.DocumentChunk;
+import com.stephen.cloud.ai.model.entity.KnowledgeBase;
 import com.stephen.cloud.ai.mq.DocumentProcessProducer;
 import com.stephen.cloud.ai.mq.model.DocumentProcessMessage;
 import com.stephen.cloud.ai.service.ChunkService;
@@ -73,6 +76,9 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
     @Resource
     private ChunkService chunkService;
 
+    @Resource
+    private KnowledgeBaseMapper knowledgeBaseMapper;
+
     @Override
     public Long uploadDocument(MultipartFile file, Long knowledgeBaseId, Long userId) {
         ThrowUtils.throwIf(file == null || file.isEmpty(), ErrorCode.PARAMS_ERROR, "文件不能为空");
@@ -100,6 +106,12 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         document.setUploadTime(new Date());
         boolean result = this.save(document);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+
+        // 更新知识库文档数量
+        knowledgeBaseMapper.update(null, new UpdateWrapper<KnowledgeBase>()
+                .setSql("document_count = document_count + 1")
+                .eq("id", knowledgeBaseId));
+
         sendDocumentProcessMessage(document.getId());
         return document.getId();
     }
@@ -211,6 +223,13 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         for (Long chunkId : chunkIds) {
             chunkService.syncToEs(chunkId);
         }
-        return this.removeById(id);
+        boolean result = this.removeById(id);
+        if (result) {
+            // 更新知识库文档数量
+            knowledgeBaseMapper.update(null, new UpdateWrapper<KnowledgeBase>()
+                    .setSql("document_count = CASE WHEN document_count > 0 THEN document_count - 1 ELSE 0 END")
+                    .eq("id", oldDocument.getKnowledgeBaseId()));
+        }
+        return result;
     }
 }

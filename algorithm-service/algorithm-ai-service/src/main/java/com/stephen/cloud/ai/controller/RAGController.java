@@ -87,8 +87,11 @@ public class RAGController {
     @Operation(summary = "分页获取RAG历史", description = "分页获取当前用户的RAG问答历史记录")
     public BaseResponse<Page<RAGHistoryVO>> listRAGHistoryVOByPage(@RequestBody RAGHistoryQueryRequest queryRequest,
                                                                   HttpServletRequest request) {
-        Long userId = SecurityUtils.getLoginUserId();
-        queryRequest.setUserId(userId);
+        // 如果不是管理员，强制只能查看自己的记录
+        if (!SecurityUtils.isAdmin()) {
+            Long userId = SecurityUtils.getLoginUserId();
+            queryRequest.setUserId(userId);
+        }
         Page<RAGHistoryVO> page = ragService.listRAGHistoryVOByPage(queryRequest, request);
         return ResultUtils.success(page);
     }

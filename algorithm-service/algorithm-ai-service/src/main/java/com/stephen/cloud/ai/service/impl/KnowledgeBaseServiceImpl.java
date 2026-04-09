@@ -2,6 +2,7 @@ package com.stephen.cloud.ai.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.stephen.cloud.ai.convert.KnowledgeBaseConvert;
@@ -98,6 +99,9 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
             return null;
         }
         KnowledgeBaseVO knowledgeBaseVO = KnowledgeBaseConvert.INSTANCE.objToVo(knowledgeBase);
+        // 确保文档数量准确，直接从文档表查询
+        long documentCount = documentService.count(new LambdaQueryWrapper<Document>().eq(Document::getKnowledgeBaseId, knowledgeBase.getId()));
+        knowledgeBaseVO.setDocumentCount((int) documentCount);
         Long userId = knowledgeBase.getUserId();
         if (userId != null && userId > 0) {
             UserVO userVO = userFeignClient.getUserVOById(userId).getData();
@@ -122,9 +126,30 @@ public class KnowledgeBaseServiceImpl extends ServiceImpl<KnowledgeBaseMapper, K
             }
         }
         Map<Long, UserVO> finalUserMap = userMap;
+
+        // 批量获取文档数量以提高性能
+        List<Long> kbIds = records.stream().map(KnowledgeBase::getId).collect(Collectors.toList());
+        Map<Long, Long> kbDocumentCountMap = new HashMap<>();
+        if (CollUtil.isNotEmpty(kbIds)) {
+            // 使用分组查询获取每个知识库的文档数量，提高查询效率
+            List<Map<String, Object>> countMaps = documentService.listMaps(new QueryWrapper<Document>()
+                    .select("knowledge_base_id", "COUNT(*) AS doc_count")
+                    .lambda()
+                    .in(Document::getKnowledgeBaseId, kbIds)
+                    .groupBy(Document::getKnowledgeBaseId));
+
+            kbDocumentCountMap = countMaps.stream().collect(Collectors.toMap(
+                    map -> (Long) map.get("knowledge_base_id"),
+                    map -> (Long) map.get("doc_count")
+            ));
+        }
+        Map<Long, Long> finalKbDocumentCountMap = kbDocumentCountMap;
+
         List<KnowledgeBaseVO> voList = records.stream().map(record -> {
             KnowledgeBaseVO vo = KnowledgeBaseConvert.INSTANCE.objToVo(record);
             vo.setUserVO(finalUserMap.get(record.getUserId()));
+            // 设置实时查询的文档数量
+            vo.setDocumentCount(finalKbDocumentCountMap.getOrDefault(record.getId(), 0L).intValue());
             return vo;
         }).collect(Collectors.toList());
         voPage.setRecords(voList);
