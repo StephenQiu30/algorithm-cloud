@@ -214,7 +214,7 @@ services:
     container_name: algorithm-ai-service
     restart: always
     ports:
-      - "${AI_SERVICE_PORT_EXTERNAL}:8089"
+      - "${AI_SERVICE_PORT_EXTERNAL}:8088"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=${NACOS_HOST}:${NACOS_PORT}

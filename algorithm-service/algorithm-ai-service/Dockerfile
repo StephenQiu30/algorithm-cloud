@@ -8,6 +8,6 @@ RUN apk add --no-cache tzdata && \
 COPY algorithm-service/algorithm-ai-service/target/algorithm-ai-service-*.jar app.jar
 
 ENV SPRING_PROFILES_ACTIVE="prod"
-EXPOSE 8089
+EXPOSE 8088
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -122,7 +122,7 @@ graph TD
 | `algorithm-file-service`         | 文件服务：腾讯云对象存储 (COS) | 8085 |
 | `algorithm-log-service`          | 日志服务：全链路日志采集与审计存储  | 8086 |
 | `algorithm-mail-service`         | 邮件服务：验证码、告警发送      | 8087 |
-| `algorithm-ai-service`           | AI 枢纽：RAG流水线与大模型集成 | 8089 |
+| `algorithm-ai-service`           | AI 枢纽：RAG流水线与大模型集成 | 8088 |
 
 ## 🎯 核心技术栈
 

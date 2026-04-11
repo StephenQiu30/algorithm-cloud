@@ -343,7 +343,6 @@ public class UserController {
      * 批量根据 id 获取用户包装类（Feign 调用）
      *
      * @param ids     用户id列表
-     * @param request request
      * @return 查询得到的用户包装类列表
      */
     @GetMapping("/get/vo/batch")
