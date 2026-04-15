@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -48,7 +49,12 @@ public class KnowledgeBaseController {
         ThrowUtils.throwIf(!knowledgeBaseService.isNameUnique(knowledgeBase.getName(), null), ErrorCode.OPERATION_ERROR, "知识库名称已存在");
         knowledgeBase.setUserId(SecurityUtils.getLoginUserId());
         knowledgeBase.setDocumentCount(0);
-        boolean result = knowledgeBaseService.save(knowledgeBase);
+        boolean result;
+        try {
+            result = knowledgeBaseService.save(knowledgeBase);
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "知识库名称已存在");
+        }
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(knowledgeBase.getId());
     }

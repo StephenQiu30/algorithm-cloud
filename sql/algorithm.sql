@@ -159,7 +159,7 @@ CREATE TABLE `knowledge_base`
     `update_time`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_delete`      tinyint      NOT NULL DEFAULT 0 COMMENT '是否删除',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_name` (`name`) COMMENT '知识库名称唯一索引',
+    UNIQUE KEY `uk_name_is_delete` (`name`, `is_delete`) COMMENT '知识库名称+删除状态唯一索引',
     KEY `idx_user_id` (`user_id`) COMMENT '创建用户ID索引'
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
