@@ -1,6 +1,8 @@
 package com.stephen.cloud.post.service.impl;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.stephen.cloud.api.post.model.dto.post.PostQueryRequest;
 import com.stephen.cloud.api.post.model.dto.review.PostReviewRequest;
 import com.stephen.cloud.api.post.model.enums.PostReviewStatusEnum;
@@ -12,10 +14,14 @@ import com.stephen.cloud.post.model.entity.Post;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,8 +37,17 @@ class PostServiceImplTest {
     @Mock
     private RabbitMqSender mqSender;
 
+    @Spy
     @InjectMocks
     private PostServiceImpl postService;
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(postService, "baseMapper", postMapper);
+        if (TableInfoHelper.getTableInfo(Post.class) == null) {
+            TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Post.class);
+        }
+    }
 
     @Nested
     @DisplayName("帖子校验逻辑测试 (validPost)")
@@ -97,7 +112,7 @@ class PostServiceImplTest {
             request.setId(1L);
             request.setReviewStatus(PostReviewStatusEnum.PASS.getValue());
 
-            when(postMapper.selectById(1L)).thenReturn(null);
+            doReturn(null).when(postService).getById(1L);
 
             BusinessException exception = assertThrows(BusinessException.class, () -> postService.doPostReview(request));
             assertEquals(ErrorCode.NOT_FOUND_ERROR.getCode(), exception.getCode());

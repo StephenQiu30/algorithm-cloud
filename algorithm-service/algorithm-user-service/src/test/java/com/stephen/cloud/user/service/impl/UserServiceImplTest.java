@@ -1,6 +1,11 @@
 package com.stephen.cloud.user.service.impl;
 
+import cn.dev33.satoken.session.SaSession;
+import cn.dev33.satoken.stp.SaTokenInfo;
+import cn.dev33.satoken.stp.StpUtil;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.stephen.cloud.api.user.model.dto.UserEmailLoginRequest;
 import com.stephen.cloud.api.user.model.dto.UserQueryRequest;
 import com.stephen.cloud.user.model.entity.User;
@@ -14,10 +19,15 @@ import com.stephen.cloud.user.service.UserEmailService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.function.Supplier;
 
@@ -42,8 +52,17 @@ class UserServiceImplTest {
     @Mock
     private RabbitMqSender mqSender;
 
+    @Spy
     @InjectMocks
     private UserServiceImpl userService;
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(userService, "baseMapper", userMapper);
+        if (TableInfoHelper.getTableInfo(User.class) == null) {
+            TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), User.class);
+        }
+    }
 
     @Nested
     @DisplayName("用户校验逻辑测试 (validUser)")
@@ -83,10 +102,9 @@ class UserServiceImplTest {
             User user = new User();
             user.setUserName("testUser");
             user.setUserEmail("test@edu.cn");
-            
-            // 模拟数据库查重 (count = 0)
+
             when(userMapper.selectCount(any())).thenReturn(0L);
-            
+
             assertDoesNotThrow(() -> userService.validUser(user, true));
         }
     }
@@ -116,19 +134,37 @@ class UserServiceImplTest {
             request.setCode("123456");
 
             when(userEmailService.verifyEmailCode(anyString(), anyString())).thenReturn(true);
-            when(userMapper.selectOne(any())).thenReturn(null);
-            
-            // 模拟锁逻辑
+            doReturn(null).when(userService).getOne(any(LambdaQueryWrapper.class));
+            doAnswer(invocation -> {
+                User user = invocation.getArgument(0);
+                user.setId(1L);
+                return true;
+            }).when(userService).save(any(User.class));
+            doReturn(true).when(userService).updateById(any(User.class));
+            doNothing().when(userService).recordLoginLogAsync(any());
+
             when(lockUtils.lockEvent(anyString(), any(), any(), any())).thenAnswer(invocation -> {
                 Supplier<LoginUserVO> supplier = invocation.getArgument(2);
                 return supplier.get();
             });
 
-            // 模拟保存成功
-            when(userMapper.insert(any(User.class))).thenReturn(1);
+            SaTokenInfo tokenInfo = new SaTokenInfo();
+            tokenInfo.setTokenValue("mock-token");
+            SaSession saSession = new SaSession("mock-session");
 
-            // Mock Sa-Token 登录 (需处理 StpUtil 静态类，或者通过 Mockito 模拟静态，这里简化处理)
-            // 注意：单元测试中通常避免 Mock 静态类，除非必要，这里可能需要集成测试配合
+            LoginUserVO loginUserVO;
+            try (MockedStatic<StpUtil> stpUtil = mockStatic(StpUtil.class)) {
+                stpUtil.when(() -> StpUtil.login(1L)).thenAnswer(invocation -> null);
+                stpUtil.when(StpUtil::getTokenInfo).thenReturn(tokenInfo);
+                stpUtil.when(StpUtil::getSession).thenReturn(saSession);
+                loginUserVO = userService.userLoginByEmail(request, null);
+                stpUtil.verify(() -> StpUtil.login(1L));
+            }
+
+            assertNotNull(loginUserVO);
+            assertEquals("new", loginUserVO.getUserName());
+            assertEquals("mock-token", loginUserVO.getToken());
+            verify(userEmailService).deleteEmailCode("new@edu.cn");
         }
     }
 
@@ -144,7 +180,6 @@ class UserServiceImplTest {
 
             LambdaQueryWrapper<User> wrapper = userService.getQueryWrapper(request);
             assertNotNull(wrapper);
-            // 验证生成的 SQL 条件
             String sqlSegment = wrapper.getSqlSegment();
             assertTrue(sqlSegment.contains("user_name") || sqlSegment.contains("user_profile"));
         }
