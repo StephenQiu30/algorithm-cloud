@@ -40,6 +40,9 @@ public class RAGStreamEventVO implements Serializable {
     @Schema(description = "是否触发了联网搜索兜底")
     private Boolean webSearchTriggered;
 
+    @Schema(description = "联网搜索兜底判定原因")
+    private String fallbackReason;
+
     @Schema(description = "知识库命中数量")
     private Integer knowledgeHitCount;
 

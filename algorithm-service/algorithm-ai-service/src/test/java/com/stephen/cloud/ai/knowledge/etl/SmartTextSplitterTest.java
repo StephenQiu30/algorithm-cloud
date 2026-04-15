@@ -42,11 +42,11 @@ class SmartTextSplitterTest {
     void testLongParagraphSplit() {
         // 构造一个长度超过 800 的单段落，包含多句
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 40; i++) {
             sb.append("这是第 ").append(i).append(" 个测试句子，用于填充段落长度。");
         }
         String longText = sb.toString();
-        assertTrue(longText.length() > 400);
+        assertTrue(longText.length() > 800);
 
         List<Document> result = splitter.split(List.of(new Document(longText)));
 

@@ -16,7 +16,7 @@ import java.util.List;
  * 当前采用保守策略：
  * 1. 空召回时直接触发；
  * 2. 命中数不足且向量相关性显著偏低时触发；
- * 3. 对仅有关键词命中的情况保持保守，不轻易切到联网搜索。
+ * 3. 对命中数不足且仅有关键词弱召回的情况，触发联网搜索补强。
  * </p>
  *
  * @author StephenQiu30
@@ -61,7 +61,7 @@ public class RagWebSearchFallbackDecider {
                     hitCount, topVectorSimilarity, averageVectorSimilarity);
         }
         if (topVectorSimilarity == null) {
-            return new WebSearchFallbackDecision(false, WebSearchFallbackDecision.NO_VECTOR_SIGNAL,
+            return new WebSearchFallbackDecision(true, WebSearchFallbackDecision.KEYWORD_ONLY_LOW_COVERAGE,
                     hitCount, null, averageVectorSimilarity);
         }
 

@@ -57,20 +57,32 @@ class RagWebSearchFallbackDeciderTest {
     }
 
     @Test
-    void shouldNotFallbackWhenOnlyKeywordSignalExists() {
+    void shouldFallbackWhenOnlyKeywordSignalExistsAndHitsAreInsufficient() {
         RetrievalResult result = new RetrievalResult();
         result.setDocs(List.of(keywordDoc("chunk-1", 9.8D)));
 
         WebSearchFallbackDecision decision = decider.decide(result, true);
 
-        assertThat(decision.shouldFallback()).isFalse();
-        assertThat(decision.reason()).isEqualTo(WebSearchFallbackDecision.NO_VECTOR_SIGNAL);
+        assertThat(decision.shouldFallback()).isTrue();
+        assertThat(decision.reason()).isEqualTo(WebSearchFallbackDecision.KEYWORD_ONLY_LOW_COVERAGE);
     }
 
     @Test
     void shouldNotFallbackWhenEnoughKnowledgeHitsExist() {
         RetrievalResult result = new RetrievalResult();
         result.setDocs(List.of(vectorDoc("chunk-1", 0.58D), vectorDoc("chunk-2", 0.57D)));
+
+        WebSearchFallbackDecision decision = decider.decide(result, true);
+
+        assertThat(decision.shouldFallback()).isFalse();
+        assertThat(decision.reason()).isEqualTo(WebSearchFallbackDecision.ENOUGH_CONTEXT);
+        assertThat(decision.knowledgeHitCount()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldNotFallbackWhenEnoughKeywordHitsExist() {
+        RetrievalResult result = new RetrievalResult();
+        result.setDocs(List.of(keywordDoc("chunk-1", 9.8D), keywordDoc("chunk-2", 8.7D)));
 
         WebSearchFallbackDecision decision = decider.decide(result, true);
 

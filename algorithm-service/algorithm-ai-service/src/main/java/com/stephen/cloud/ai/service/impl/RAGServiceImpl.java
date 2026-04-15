@@ -743,6 +743,7 @@ public class RAGServiceImpl implements RAGService {
             event.setTopVectorSimilarity(context.fallbackDecision().topVectorSimilarity());
             event.setAverageVectorSimilarity(context.fallbackDecision().averageVectorSimilarity());
             event.setWebSearchTriggered(context.fallbackDecision().shouldFallback());
+            event.setFallbackReason(context.fallbackDecision().reason());
             event.setSuccess(Boolean.TRUE);
         });
     }
@@ -757,6 +758,7 @@ public class RAGServiceImpl implements RAGService {
             event.setTopVectorSimilarity(context.fallbackDecision().topVectorSimilarity());
             event.setAverageVectorSimilarity(context.fallbackDecision().averageVectorSimilarity());
             event.setWebSearchTriggered(Boolean.TRUE);
+            event.setFallbackReason(context.fallbackDecision().reason());
             event.setSuccess(Boolean.TRUE);
         });
     }
@@ -772,6 +774,7 @@ public class RAGServiceImpl implements RAGService {
             event.setTopVectorSimilarity(context.fallbackDecision().topVectorSimilarity());
             event.setAverageVectorSimilarity(context.fallbackDecision().averageVectorSimilarity());
             event.setWebSearchTriggered(context.fallbackDecision().shouldFallback());
+            event.setFallbackReason(context.fallbackDecision().reason());
             event.setSuccess(Boolean.TRUE);
         });
     }
@@ -782,6 +785,7 @@ public class RAGServiceImpl implements RAGService {
             event.setConversationId(context.resolvedConversationId());
             event.setContent(delta);
             event.setWebSearchTriggered(context.fallbackDecision().shouldFallback());
+            event.setFallbackReason(context.fallbackDecision().reason());
             event.setSuccess(Boolean.TRUE);
         });
     }
@@ -792,6 +796,7 @@ public class RAGServiceImpl implements RAGService {
             event.setMessage(message);
             event.setConversationId(context.resolvedConversationId());
             event.setWebSearchTriggered(context.fallbackDecision().shouldFallback());
+            event.setFallbackReason(context.fallbackDecision().reason());
             event.setSuccess(Boolean.FALSE);
         });
     }
@@ -807,6 +812,7 @@ public class RAGServiceImpl implements RAGService {
             event.setTopVectorSimilarity(context.fallbackDecision().topVectorSimilarity());
             event.setAverageVectorSimilarity(context.fallbackDecision().averageVectorSimilarity());
             event.setWebSearchTriggered(context.fallbackDecision().shouldFallback());
+            event.setFallbackReason(context.fallbackDecision().reason());
             event.setSuccess(success);
             event.setResponseTime(responseTime);
             event.setSources(sources);

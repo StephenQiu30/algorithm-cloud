@@ -17,6 +17,6 @@ public record WebSearchFallbackDecision(
     public static final String GLOBAL_DISABLED = "GLOBAL_DISABLED";
     public static final String EMPTY_RECALL = "EMPTY_RECALL";
     public static final String LOW_CONFIDENCE_RECALL = "LOW_CONFIDENCE_RECALL";
-    public static final String NO_VECTOR_SIGNAL = "NO_VECTOR_SIGNAL";
+    public static final String KEYWORD_ONLY_LOW_COVERAGE = "KEYWORD_ONLY_LOW_COVERAGE";
     public static final String ENOUGH_CONTEXT = "ENOUGH_CONTEXT";
 }

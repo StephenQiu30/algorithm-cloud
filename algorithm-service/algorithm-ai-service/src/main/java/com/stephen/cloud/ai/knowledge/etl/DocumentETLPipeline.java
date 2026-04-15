@@ -161,8 +161,6 @@ public class DocumentETLPipeline {
 
     private void batchAddToVectorStore(List<Document> chunks) {
         int totalBatches = (int) Math.ceil((double) chunks.size() / EMBEDDING_BATCH_SIZE);
-        int failedChunks = 0;
-
         for (int i = 0; i < chunks.size(); i += EMBEDDING_BATCH_SIZE) {
             int end = Math.min(i + EMBEDDING_BATCH_SIZE, chunks.size());
             List<Document> batch = chunks.subList(i, end);
@@ -190,13 +188,12 @@ public class DocumentETLPipeline {
                 }
             }
             if (!success) {
-                failedChunks += batch.size();
                 log.error("[ETL] Embedding batch {}/{} permanently failed after {} retries, skipping {} chunks",
                         batchIndex, totalBatches, EMBEDDING_RETRY_COUNT, batch.size());
+                throw new IllegalStateException(String.format(
+                        "Embedding batch %s/%s failed after %s retries",
+                        batchIndex, totalBatches, EMBEDDING_RETRY_COUNT));
             }
-        }
-        if (failedChunks > 0) {
-            log.warn("[ETL] Embedding completed with {} failed chunks out of {}", failedChunks, chunks.size());
         }
     }
 

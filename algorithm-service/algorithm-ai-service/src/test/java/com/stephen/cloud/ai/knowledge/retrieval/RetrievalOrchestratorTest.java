@@ -62,6 +62,9 @@ class RetrievalOrchestratorTest {
         lenient().when(ragRetrievalProperties.getVectorWeight()).thenReturn(0.7);
         lenient().when(ragRetrievalProperties.getKeywordWeight()).thenReturn(0.3);
         lenient().when(ragRetrievalProperties.getRetrievalTimeoutSeconds()).thenReturn(3);
+        lenient().when(ragRetrievalProperties.isRewriteEnabled()).thenReturn(true);
+        lenient().when(ragRetrievalProperties.isRerankEnabled()).thenReturn(true);
+        lenient().when(ragRetrievalProperties.getRerankTopN()).thenReturn(5);
 
         // 模拟异步执行器（直接运行，简化测试）
         lenient().doAnswer(invocation -> {
@@ -92,7 +95,7 @@ class RetrievalOrchestratorTest {
                 .thenReturn(List.of(doc1, doc2));
 
         // 4. 模拟 Rerank 重排
-        when(rerankService.rerank(anyList(), anyString(), anyList(), anyMap(), anyInt()))
+        when(rerankService.rerank(anyList(), anyString(), nullable(List.class), nullable(Map.class), anyInt()))
                 .thenReturn(List.of(doc1));
 
         // 执行核心逻辑
@@ -108,6 +111,6 @@ class RetrievalOrchestratorTest {
         verify(vectorStoreService).similaritySearch(eq("冒泡排序 时间复杂度"), any(), anyInt(), any());
         verify(keywordSearchService).bm25Search(eq("冒泡排序 时间复杂度"), anyInt(), any());
         verify(rrfFusionService).fuse(anyList(), anyList(), anyInt(), anyInt(), anyDouble(), anyDouble());
-        verify(rerankService).rerank(anyList(), eq(question), anyList(), anyMap(), anyInt());
+        verify(rerankService).rerank(anyList(), eq(question), nullable(List.class), nullable(Map.class), anyInt());
     }
 }
