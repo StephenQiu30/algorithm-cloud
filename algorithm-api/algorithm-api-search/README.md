@@ -1,23 +1,35 @@
-# algorithm-api-search - 搜索服务 API 交互层
+# algorithm-api-search | 搜索服务 API 契约
 
-本模块提供了搜索服务的标准 RPC 协议，支撑微服务生态下的跨源垂直检索与聚合搜索功能。
+`algorithm-api-search` 是 `algorithm-cloud` 的搜索服务接口模块，使用 Feign 和统一请求模型提供帖子、用户和聚合搜索的跨服务调用能力。
 
-## 🌟 核心功能
+## 提供能力
 
-- **SearchFeignClient**:
-    - 提供高吞吐的搜索请求接口。
-    - 支持 `SearchRequest` 统一封装，实现对帖子、用户等多维度的弹性检索。
+- `SearchFeignClient`：调用全文检索和聚合搜索接口。
+- `SearchRequest`：统一封装关键词、搜索类型、分页和过滤条件。
+- 支持帖子、用户等多数据源检索结果的服务间复用。
 
-## 🛠️ 接入示例
+## Maven 接入
+
+```xml
+<dependency>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-api-search</artifactId>
+</dependency>
+```
+
+## 使用示例
 
 ```java
-@Resource
-private SearchFeignClient searchFeignClient;
+SearchRequest request = new SearchRequest();
+request.setSearchText("快速排序");
+request.setType(SearchTypeEnum.POST.getValue());
 
-public Page<PostVO> searchFromEs(String keyword) {
-    SearchRequest req = new SearchRequest();
-    req.setSearchText(keyword);
-    req.setType(SearchTypeEnum.POST.getValue());
-    return searchFeignClient.searchPostVo(req).getData();
-}
+Page<PostVO> page = searchFeignClient.searchPostVo(request).getData();
 ```
+
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [搜索服务](../../algorithm-service/algorithm-search-service/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

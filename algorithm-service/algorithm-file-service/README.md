@@ -1,37 +1,40 @@
-# algorithm-file-service - 文件服务
+# algorithm-file-service | COS 与 MinIO 文件服务
 
-文件服务作为系统的一站式对象存储入口，高度集成了主流云端与私有化存储方案，提供安全、高效的文件上传、校验及分发能力。
+`algorithm-file-service` 是 `algorithm-cloud` 的统一对象存储入口，为头像、帖子图片、教学文档等业务提供文件上传、格式校验、大小校验和存储地址返回。
 
-## 🌟 核心功能
+## 核心能力
 
-- **多模式驱动存储**：
-    - 深度集成 **腾讯云 COS** (云端) 与 **MinIO** (私有化/开发环境)。
-    - 支持通过 Nacos 配置在秒级切换不同的存储服务提供商。
-- **严苛的准入校验**：
-    - 基于业务类型执行严格的文件格式、魔数 (Magic Number) 及文件大小校验。
-- **规范化存储路径**：
-    - 自动生成的存储结构：`/{service}/{biz}/{userId}/{uuid}_{filename}`。
-- **弹性扩展**：
-    - 提供标准的 Feign 接口与直传接口，适配多样化的业务场景。
+- **多存储适配**：支持腾讯云 COS 和开发环境中的 MinIO。
+- **文件准入校验**：按业务类型检查文件扩展名、魔数和大小。
+- **统一存储路径**：按服务、业务类型、用户和 UUID 组织对象路径。
+- **服务间接入**：提供 Feign API 和 HTTP Multipart 上传接口。
+- **记录与审计**：与日志服务协同记录文件上传业务信息。
 
-## 🛠️ 技术选型
+## 主要 API
 
-- **SDK**: 腾讯云 COS SDK, MinIO Java SDK 8.6.0
-- **校验工具**: Hutool-File, Apache Commons FileUpload
-- **动态控制**: Nacos (感知配置热更新)
+以下为服务内部路径；通过网关访问时通常增加 `/api` 前缀。
 
-## 📡 核心 API 概览
+| 能力 | 方法 | 路径 |
+| --- | --- | --- |
+| 文件上传 | POST | `/file/upload` |
 
-| 模块     | 路径                 | 方法   | 描述                |
-|:-------|:-------------------|:-----|:------------------|
-| **上传** | `/api/file/upload` | POST | 核心文件上传 (支持各种业务类型) |
+## 技术栈
 
-## 🚀 启动与运行
+- Java 21、Spring Boot、Spring Cloud Alibaba、Nacos
+- 腾讯云 COS SDK、MinIO Java SDK
+- Hutool、Apache Commons FileUpload
+- MySQL、Redis（按配置启用）
 
-- **服务端口**: `8085`
-- **依赖服务**: Nacos, 以及已开通的存储桶 (COS 或本地运行的 MinIO)
+## 运行
 
----
+- 默认服务端口：`8085`
+- 必需配置：Nacos 和 COS 或 MinIO 存储桶
+- 敏感配置：在 `nacos-config/common-secret.properties` 中设置存储凭证
 
-**维护者**: StephenQiu30  
-**版本**: 1.0.0
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [文件 API 契约](../../algorithm-api/algorithm-api-file/README.md)
+- [Nacos 配置说明](../../nacos-config/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

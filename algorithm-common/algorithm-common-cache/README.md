@@ -1,19 +1,34 @@
-# algorithm-common-cache - 分布式缓存与并发基石
+# algorithm-common-cache | Redis、Redisson 与本地缓存组件
 
-集成高性能本地缓存与分布式缓存，为微服务提供多级缓存优化、高可靠分布式锁及流量治理能力。
+`algorithm-common-cache` 为 `algorithm-cloud` 微服务提供统一的缓存、分布式锁和限流能力，组合 Redis/Redisson 与 Caffeine，减少业务模块重复配置。
 
-## 🌟 核心功能
+## 核心能力
 
-- **Redisson 分布式增强**:
-    - 封装 `CacheUtils`，支持对象、集合等复杂类型的序列化存储。
-    - 集成 **Redisson 生产级分布式锁**，支持看门狗自续期、公平锁及读写锁。
-- **Caffeine 本地多级缓存**:
-    - 提供 `LocalCacheUtils`，实现 JVM 进程内毫秒级高速缓存，有效防止缓存击穿与雪崩。
-- **令牌桶分布式限流**:
-    - 封装 `RateLimitUtils`，支持基于 IP、用户、接口的多维度流量管控。
+- `CacheUtils`：统一处理对象、集合等缓存数据的序列化和读写。
+- `LocalCacheUtils`：提供 JVM 进程内的 Caffeine 本地缓存。
+- Redisson 分布式锁：支持看门狗续期、公平锁和读写锁等场景。
+- `RateLimitUtils`：按 IP、用户或接口维度执行令牌桶限流。
 
-## 🛠️ 使用场景
+## Maven 接入
 
-- **性能优化**: 高频访问数据的多级缓存加速。
-- **并发控制**: 关键业务（如发帖、注册）的幂等性与分布式一致性保证。
-- **安全防护**: 核心接口的防刷与过载保护。
+```xml
+<dependency>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-common-cache</artifactId>
+</dependency>
+```
+
+## 适用场景
+
+- 缓存热点用户、帖子和配置数据。
+- 保护注册、发帖等关键业务的并发一致性。
+- 对登录、搜索和 AI 接口进行访问频率控制。
+
+接入前请在 Nacos 中配置 Redis/Redisson 连接信息，并根据业务选择本地缓存或分布式缓存。
+
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [RabbitMQ 公共组件](../algorithm-common-rabbitmq/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

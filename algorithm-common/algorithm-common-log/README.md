@@ -1,19 +1,16 @@
-# algorithm-common-log - 分布式日志采集组件
+# algorithm-common-log | AOP 操作日志与审计组件
 
-基于 AOP 的无侵入式操作日志记录模块，助力微服务生态实现全链路审计与业务行为追踪。
+`algorithm-common-log` 是 `algorithm-cloud` 的分布式操作日志组件，基于 Spring AOP 和 `@OperationLog` 注解自动采集请求路径、参数、执行时间、用户和异常信息，并上报到日志服务。
 
-## 🌟 核心特性
+## 核心能力
 
-- **🚀 零侵入记录**: 仅需一个 `@OperationLog` 注解即可自动采集请求路径、参数、执行时间及异常堆栈。
-- **🧩 统一上报**: 默认由 `OperationLogRecorderImpl` 将 `OperationLogContext` 映射为 `OperationLogAddRequest`，并通过
-  `LogFeignClient` 上报到 `algorithm-log-service`（`POST /api/log/operation/add`）。如需特殊落放逻辑，可在微服务内实现
-  `OperationLogRecorder` 覆盖默认实现。
-- **📊 维度丰富**: 自动采集当前登录用户（`userId/userName`）、客户端 IP 及归属地 `location`，并携带模块名称及操作动作。
-- **🛡️ 生产级可靠**: 基于 `@Async` 异步处理，上报异常会被捕获，避免影响核心业务吞吐。
+- **注解式记录**：在 Controller 方法上添加一个 `@OperationLog` 即可接入。
+- **统一上报**：通过 `OperationLogRecorder` 和 `LogFeignClient` 发送到 `algorithm-log-service`。
+- **审计字段完整**：支持用户 ID、用户名、客户端 IP、归属地、模块和操作动作。
+- **异步容错**：默认异步上报并捕获异常，降低日志链路对主业务的影响。
+- **可扩展落库**：实现 `OperationLogRecorder` 可覆盖默认上报逻辑。
 
-## 🏗️ 快速开始
-
-### 1. 引入依赖
+## Maven 接入
 
 ```xml
 <dependency>
@@ -22,27 +19,31 @@
 </dependency>
 ```
 
-### 2. 使用方法
-
-在 Controller 方法上标注：
+## 使用示例
 
 ```java
-@PostMapping("/update")
-@OperationLog(module = "订单中心", action = "更新订单状态")
-public BaseResponse<Boolean> updateOrder(...) {
+@PostMapping("/review")
+@OperationLog(module = "内容管理", action = "审核帖子")
+public BaseResponse<Boolean> review(...) {
     // 业务逻辑
 }
 ```
 
-## 🛠️ 内部机制
+## 工作流程
 
-- **切面拦截**: `OperationLogAspect` 统一拦截标注了注解的方法，并构建 `OperationLogContext`。
-- **上下文感知**: 从请求头读取 `userId/userName`，计算 `clientIp/location`，并将上下文透传给
-  `OperationLogRecorder#recordOperationLogAsync`。
-- **默认落库上报**: `OperationLogRecorderImpl` 调用 `LogFeignClient#addOperationLog`，由 `algorithm-log-service`
-  对应控制器接收并落库。
+```text
+@OperationLog
+  → OperationLogAspect
+  → OperationLogContext
+  → OperationLogRecorder
+  → LogFeignClient
+  → algorithm-log-service
+```
 
----
+## 相关文档
 
-**维护者**: StephenQiu30  
-**版本**: 1.0.0
+- [algorithm-cloud 后端总览](../../README.md)
+- [日志 API 契约](../../algorithm-api/algorithm-api-log/README.md)
+- [日志服务](../../algorithm-service/algorithm-log-service/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

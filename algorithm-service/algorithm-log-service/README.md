@@ -1,54 +1,39 @@
-# algorithm-log-service - 日志服务
+# algorithm-log-service | MySQL 业务审计日志服务
 
-负责**业务审计类日志**的采集与存储（操作日志、登录日志、API 访问日志、邮件/文件记录），落库 MySQL，供管理端分页查询。
-与 **ELK**（logback → Logstash → ES，运行时技术日志）互补：本服务不依赖 ES，多环境下均可运行；ELK 仅在
-`spring.profiles.active=prod` 且部署 Logstash 时由 logback 输出。
+`algorithm-log-service` 负责 `algorithm-cloud` 的业务审计日志采集与存储，包括操作日志、登录日志、API 访问日志、邮件记录和文件上传记录。它使用 MySQL 保存结构化业务记录，与可选的 Logstash/Elasticsearch 运行时技术日志链路相互补充。
 
-## 🌟 核心功能
+## 核心能力
 
-- **分布式日志采集**：
-    - 各微服务/网关通过 Feign 或 WebFlux 上报日志到本服务。
-    - 本服务通过 Controller 接收请求，并由对应 Service 完成落库/更新。
-- **多维检索支持**：
-    - 提供分页查询接口（MyBatis-Plus：`page + LambdaQueryWrapper`）。
-- **审计与追踪**：
-    - 提供删除接口（管理员权限）与定时清理（根据 `log.cleanup.*` 配置）。
+- 接收网关和各微服务通过 Feign 或 WebFlux 上报的审计事件。
+- 使用 MyBatis-Plus 将日志写入 MySQL 并提供分页查询。
+- 支持管理员删除和按保留天数定时清理历史日志。
+- 记录操作、登录、API 访问、邮件和文件上传等业务事实。
 
-## 🛠️ 技术栈
+## 主要 API
 
-- **核心框架**: Spring Boot 3.5.9, MyBatis-Plus
-- **数据库**: MySQL
+以下为服务内部路径；通过网关访问时通常增加 `/api` 前缀。
 
-## 📡 核心 API 概览
+| 类型 | 上报 | 分页查询 |
+| --- | --- | --- |
+| 操作日志 | `POST /log/operation/add` | `POST /log/operation/list/page` |
+| 登录日志 | `POST /log/login/add` | `POST /log/login/list/page` |
+| API 访问 | `POST /log/access/add` | `POST /log/access/list/page` |
+| 邮件记录 | `POST /log/email/add` | `POST /log/email/list/page` |
+| 文件上传 | `POST /log/file/upload/add` | `POST /log/file/upload/list/page` |
 
-| 模块            | 路径                               | 方法   | 描述                           |
-|:--------------|:---------------------------------|:-----|:-----------------------------|
-| 上报-操作日志       | `/api/log/operation/add`         | POST | 内部调用：写入 `operation_log`      |
-| 上报-登录日志       | `/api/log/login/add`             | POST | 内部调用：写入 `user_login_log`     |
-| 上报-访问日志       | `/api/log/access/add`            | POST | 内部调用：写入 `api_access_log`     |
-| 上报-邮件记录       | `/api/log/email/add`             | POST | 内部调用：写入/更新 `email_record`    |
-| 上报-邮件记录(返回ID) | `/api/log/email/add/id`          | POST | 内部调用：创建邮件记录并返回记录 ID          |
-| 更新-邮件状态       | `/api/log/email/update/status`   | POST | 内部调用：更新邮件记录状态                |
-| 上报-文件上传       | `/api/log/file/upload/add`       | POST | 内部调用：写入 `file_upload_record` |
-| 查询-操作日志       | `/api/log/operation/list/page`   | POST | 管理员：分页查询                     |
-| 查询-访问日志       | `/api/log/access/list/page`      | POST | 管理员：分页查询                     |
-| 查询-登录日志       | `/api/log/login/list/page`       | POST | 管理员：分页查询                     |
-| 查询-邮件记录       | `/api/log/email/list/page`       | POST | 管理员：分页查询                     |
-| 查询-文件上传       | `/api/log/file/upload/list/page` | POST | 管理员：分页查询                     |
+## 数据清理
 
-## 🚀 启动与运行
+`LogCleanupJob` 按配置的 Cron 和 retention days 清理过期记录；生产环境启用前请先确认保留期限、备份策略和管理员权限。
 
-- **服务端口**: `8086`
-- **依赖服务**: Nacos, MySQL
+## 运行
 
-## 落库与清理实现
+- 默认服务端口：`8086`
+- 依赖：Nacos、MySQL；使用运行时日志汇聚时还需要 Logstash 和 Elasticsearch
 
-- 落库：各 Controller 分别接收 `POST /log/*/add`（以及邮件状态/返回 ID）请求，并由对应 `*LogService` 使用 MyBatis-Plus 完成
-  `save / updateById`。
-- 清理：`LogCleanupJob` 在 `cron = "0 0 3 * * ?"` 触发；当 `log.cleanup.enabled=true` 时，按各表 retentionDays 计算阈值并批量删除（以
-  `createTime` 小于阈值为准）。
+## 相关文档
 
----
+- [algorithm-cloud 后端总览](../../README.md)
+- [日志 API 契约](../../algorithm-api/algorithm-api-log/README.md)
+- [AOP 日志组件](../../algorithm-common/algorithm-common-log/README.md)
 
-**维护者**: StephenQiu30  
-**版本**: 1.0.0
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

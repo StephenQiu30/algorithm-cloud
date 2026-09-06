@@ -1,40 +1,37 @@
-# algorithm-notification-service - 通知服务
+# algorithm-notification-service | 站内通知与实时消息服务
 
-通知服务提供全方位的消息触达能力，确保系统通知与用户互动能够实时、准确地传递给目标用户。
+`algorithm-notification-service` 负责 `algorithm-cloud` 的站内通知、互动提醒、未读计数和消息状态管理，并可通过 RabbitMQ 消费业务事件、通过 WebSocket 向前端推送实时消息。
 
-## 🌟 核心功能
+## 核心能力
 
-- **统一消息管理**：
-    - 处理系统公告、业务通知及互动提醒（点赞、评论通知）。
-    - 支持标记已读、一键全读及未读数实时统计。
-- **智能化分发**：
-    - 集成 RabbitMQ 消费来自其他服务的交互事件。
-    - 支持按需生成私信消息或全员广播。
-- **实时性保障**：
-    - 与 `algorithm-websocket-service` 协同，实现 Web 端的毫秒级消息推送。
+- 系统公告、点赞、评论和业务提醒。
+- 通知创建、分页查询、已读/全读和批量操作。
+- RabbitMQ 事件消费与通知分发。
+- 与 WebSocket 公共组件协同，实现实时触达。
+- MySQL 持久化通知及用户阅读状态。
 
-## 🛠️ 技术栈
+## 主要 API
 
-- **核心框架**: Spring Boot 3.5.9, MyBatis-Plus
-- **消息总线**: RabbitMQ (事件驱动)
-- **数据存储**: MySQL 8.4
-- **实时推送**: Netty (协作模块)
+以下为服务内部路径；通过网关访问时通常增加 `/api` 前缀。
 
-## 📡 核心 API 概览
+| 能力 | 方法 | 路径 |
+| --- | --- | --- |
+| 创建通知 | POST | `/notification/add` |
+| 我的通知 | POST | `/notification/my/list/page/vo` |
+| 标记已读 | POST | `/notification/read` |
+| 全部已读 | POST | `/notification/read/all` |
+| 未读数量 | GET | `/notification/unread/count` |
+| 批量处理 | POST | `/notification/batch/read`、`/notification/batch/delete` |
 
-| 模块     | 路径                               | 方法   | 描述         |
-|:-------|:---------------------------------|:-----|:-----------|
-| **基础** | `/api/notification/add`          | POST | 创建通知 (管理员) |
-| **交互** | `/api/notification/read`         | POST | 标记通知已读     |
-| **统计** | `/api/notification/unread/count` | GET  | 获取未读消息总数   |
-| **列表** | `/api/notification/list/page`    | POST | 分页查询我的通知   |
+## 运行
 
-## 🚀 启动与运行
+- 默认服务端口：`8083`
+- 依赖：Nacos、MySQL、RabbitMQ、Redis，以及实时推送所需的 WebSocket 配置
 
-- **服务端口**: `8083`
-- **依赖服务**: Nacos, MySQL, RabbitMQ
+## 相关文档
 
----
+- [algorithm-cloud 后端总览](../../README.md)
+- [通知 API 契约](../../algorithm-api/algorithm-api-notification/README.md)
+- [WebSocket 公共组件](../../algorithm-common/algorithm-common-websocket/README.md)
 
-**维护者**: StephenQiu30  
-**版本**: 1.0.0
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

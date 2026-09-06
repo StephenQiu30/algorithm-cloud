@@ -1,38 +1,42 @@
-# algorithm-mail-service - 邮件服务
+# algorithm-mail-service | 验证码与异步邮件服务
 
-邮件服务为全系统提供稳定、高效的电子信息交互能力，主要应用于账户安全、系统告警及业务通知等关键流程。
+`algorithm-mail-service` 为 `algorithm-cloud` 提供验证码、账号安全、系统告警和业务通知邮件能力，支持同步发送、RabbitMQ 异步投递和模板渲染。
 
-## 🌟 核心功能
+## 核心能力
 
-- **多维发送模式**：
-    - **同步发送**：关键业务阻塞等待结果反馈。
-    - **异步发送 (推荐)**：基于 RabbitMQ 驱动，高吞吐处理大规模任务投递。
-- **业务场景覆盖**：
-    - 内置账号注册、登录验证码模板。
-    - 支持 HTML 模板动态渲染。
-- **高可用机制**：
-    - 集成消息幂等性校验与死信队列 (DLX) 处理。
-    - 支持多级重试策略，确保邮件最终送达。
+- 同步邮件发送，适合需要即时反馈的业务。
+- RabbitMQ 异步邮件发送，适合批量或非阻塞通知。
+- 注册、登录等验证码模板。
+- Thymeleaf HTML 模板渲染。
+- 重试、幂等和死信队列配置，提升投递链路可恢复性。
 
-## 🛠️ 技术选型
+## 主要 API
 
-- **底层库**: Spring Boot Starter Mail (JavaMailSender)
-- **消息驱动**: RabbitMQ
-- **稳定性**: Spring Retry / DLX 机制
+以下为服务内部路径；通过网关访问时通常增加 `/api` 前缀。
 
-## 📡 核心 API 概览
+| 能力 | 方法 | 路径 |
+| --- | --- | --- |
+| 同步发送 | POST | `/mail/send/sync` |
+| 异步发送 | POST | `/mail/send/async` |
+| 发送验证码 | POST | `/mail/send/verification-code` |
 
-| 模块     | 路径                                 | 方法   | 描述        |
-|:-------|:-----------------------------------|:-----|:----------|
-| **模板** | `/api/mail/send/verification-code` | POST | 发送验证码模板邮件 |
-| **基础** | `/api/mail/send/sync`              | POST | 实时同步发送    |
+## 技术栈与配置
 
-## 🚀 启动与运行
+- Spring Boot Mail（`JavaMailSender`）
+- RabbitMQ、Spring Retry、死信队列
+- Thymeleaf 邮件模板
+- SMTP 服务：QQ 邮箱、Gmail 或其他兼容服务
 
-- **服务端口**: `8087`
-- **依赖服务**: Nacos, RabbitMQ, SMTP 服务器 (如 QQ 邮箱, Gmail, 或阿里云邮件推送)
+## 运行
 
----
+- 默认服务端口：`8087`
+- 依赖：Nacos、RabbitMQ 和可用的 SMTP 服务器
+- 邮箱账号、密码和 SMTP 地址请放入 Nacos 敏感配置，不要提交到 Git
 
-**维护者**: StephenQiu30  
-**版本**: 1.0.0
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [邮件 API 契约](../../algorithm-api/algorithm-api-mail/README.md)
+- [Nacos 配置说明](../../nacos-config/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

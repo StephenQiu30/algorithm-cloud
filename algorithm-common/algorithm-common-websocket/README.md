@@ -1,27 +1,34 @@
-# algorithm-common-websocket - 实时通信基础设施
+# algorithm-common-websocket | Netty WebSocket 实时通信组件
 
-基于 **Netty** 构建的高性能 WebSocket 协议栈，为全系统提供实时双向通信、设备在线感知及多终端消息推送能力。
+`algorithm-common-websocket` 基于 Netty 为 `algorithm-cloud` 提供 WebSocket 长连接、用户会话管理、心跳检测和多端消息推送能力。
 
-## 🌟 核心功能
+## 核心能力
 
-- **Netty 高性能驱动**:
-    - 异步非阻塞 IO 框架，支持单机万级以上的长连接并发。
-    - 内置 WebSocket 握手协议处理器与心跳检测 (IdleStateHandler)。
-- **精细化会话管理**:
-    - 提供 `WebSocketSessionManager`，支持基于用户 ID 的连接绑定。
-    - 支持多终端登录下的连接路由与消息广播。
-- **设备鉴权集成**:
-    - 深度结合 **Sa-Token** 系统，在握手阶段实现严格的 Token 准入校验。
-- **消息可靠性**:
-    - 结构化 JSON 消息交互协议，支持 ACK 确认机制建议（可选）。
+- 异步非阻塞 WebSocket 握手、读写和心跳处理。
+- `WebSocketSessionManager`：按用户 ID 管理连接和消息路由。
+- 支持多端登录下的连接绑定和消息广播。
+- 在握手阶段结合 Sa-Token 执行 Token 鉴权。
+- 使用结构化 JSON 消息承载实时通知和互动事件。
 
-## 🛠️ 使用场景
+## Maven 接入
 
-- **实时提醒**: 配合通知服务实现消息的毫秒级端侧触达。
-- **在线状态**: 实时追踪全站用户的在线/下线状态。
-- **互动弹幕/聊天**: 为社交模块提供低延迟的实时消息分发。
+```xml
+<dependency>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-common-websocket</artifactId>
+</dependency>
+```
 
----
+## 适用场景
 
-**维护者**: StephenQiu30  
-**版本**: 1.0.0
+- 通知服务向 Web 端推送未读消息和系统提醒。
+- 维护用户在线/离线状态。
+- 为评论互动、聊天和实时课堂功能提供低延迟通道。
+
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [通知 API 契约](../../algorithm-api/algorithm-api-notification/README.md)
+- [通知服务](../../algorithm-service/algorithm-notification-service/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

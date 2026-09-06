@@ -1,15 +1,27 @@
-# algorithm-api-notification - 通知服务 API 交互层
+# algorithm-api-notification | 通知服务 API 契约
 
-本模块统一定义了通知系统的 RPC 接口与领域模型，支持各微服务模块高效、异步地触发系统级通知或业务提醒。
+`algorithm-api-notification` 是 `algorithm-cloud` 的通知服务接口模块，定义系统公告、互动提醒、未读计数和消息状态管理的跨服务 RPC 协议。
 
-## 🌟 核心组件
+## 提供能力
 
-- **NotificationFeignClient**:
-    - 对外暴露通知的创建、查询及未读计数获取等 RPC 入口。
-- **NotificationDTO**:
-    - 核心传输对象，包含通知内容、来源服务及目标用户标识。
+- `NotificationFeignClient`：创建、查询和更新通知。
+- 通知 DTO/VO：统一表达通知内容、来源服务、目标用户和关联业务。
+- 支持点赞、评论、系统公告和其他业务事件触发的通知。
+- 可与 RabbitMQ、WebSocket 通知链路组合使用。
 
-## 🛠️ 使用场景
+## Maven 接入
 
-- **互动提醒**: 帖子服务在收到评论时，调用本模块 RPC 向作者发送即时提醒。
-- **系统通知**: 后台管理系统发布全员公告时，调用相关接口进行大规模分发。
+```xml
+<dependency>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-api-notification</artifactId>
+</dependency>
+```
+
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [通知服务](../../algorithm-service/algorithm-notification-service/README.md)
+- [WebSocket 公共组件](../../algorithm-common/algorithm-common-websocket/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

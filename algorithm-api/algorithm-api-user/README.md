@@ -1,19 +1,34 @@
-# algorithm-api-user - 用户服务 API 交互层
+# algorithm-api-user | 用户与认证 API 契约
 
-本模块定义了用户服务对外提供的 Feign 客户端及其关联的传输对象 (DTO) 与视图对象 (VO)，是微服务间通信的标准协议层。
+`algorithm-api-user` 是 `algorithm-cloud` 的用户服务接口模块，定义用户资料、登录态、角色权限和服务间用户信息查询的 Feign 客户端与 DTO/VO。
 
-## 🌟 核心组件
+## 提供能力
 
-- **UserFeignClient**:
-    - 提供跨服务获取用户信息、权限状态及当前登录态的 RPC 接口。
-- **Shared Models**:
-    - `UserVO`: 经过数据脱敏的用户视图。
-    - `LoginUserVO`: 包含 Token 的会话状态模型。
-- **Fallback**:
-    - 内置 `UserFeignClientFallback`，处理服务熔断与异常降级，保障调用稳定性。
+- `UserFeignClient`：获取用户信息、权限状态和当前登录态。
+- `UserVO`：脱敏后的用户视图对象。
+- `LoginUserVO`：登录会话和 Token 相关模型。
+- `UserFeignClientFallback`：远程调用失败时的降级处理。
 
-## 🚀 接入说明
+## Maven 接入
 
-1. **引入依赖**: 在消费方 pom.xml 中引用本模块。
-2. **开启扫描**: 启动类添加 `@EnableFeignClients(basePackages = "com.algorithm.cloud.api.user.client")`。
-3. **注入使用**: 通过 `@Resource` 注入 `UserFeignClient` 即可进行同步/异步调用。
+```xml
+<dependency>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-api-user</artifactId>
+</dependency>
+```
+
+## 启用 Feign 客户端
+
+```java
+@EnableFeignClients(basePackages = "com.algorithm.cloud.api.user.client")
+```
+
+随后即可通过依赖注入使用 `UserFeignClient`。服务名、认证和 Nacos 配置请参考后端总览及用户服务文档。
+
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [用户服务](../../algorithm-service/algorithm-user-service/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

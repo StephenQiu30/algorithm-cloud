@@ -1,16 +1,15 @@
-# algorithm-api-file - 文件服务 API 交互层
+# algorithm-api-file | 文件服务 API 契约
 
-本模块为微服务系统提供了标准化的远程文件操作入口，支持跨服务的文件上传、校验及存储反馈。
+`algorithm-api-file` 是 `algorithm-cloud` 的文件服务 API 模块，使用 Spring Cloud OpenFeign 定义跨服务文件上传、业务类型校验和存储结果返回协议。
 
-## 🌟 核心组件
+## 提供能力
 
-- **FileFeignClient**:
-    - 提供 `uploadFile` RPC 接口，支持 Multipart 格式。
-    - 兼容多种业务逻辑标识 (`biz`)，自动下发校验规则。
+- `FileFeignClient`：调用文件服务的标准 Feign 客户端。
+- Multipart 文件上传和业务标识 `biz` 传递。
+- 统一的文件 URL/存储结果响应模型。
+- 为用户头像、帖子图片和教学文档等场景提供跨服务接入入口。
 
-## 🛠️ 接入示例
-
-### 1. 声明依赖
+## Maven 接入
 
 ```xml
 <dependency>
@@ -19,15 +18,24 @@
 </dependency>
 ```
 
-### 2. 多步上传调用
+## 使用示例
 
 ```java
 @Resource
 private FileFeignClient fileFeignClient;
 
-public String processAvatar(MultipartFile file) {
-    // 调用远程文件服务进行异步存储
-    BaseResponse<String> res = fileFeignClient.uploadFile(file, FileBizEnum.USER_AVATAR.getValue());
-    return res.getData(); 
+public String uploadAvatar(MultipartFile file) {
+    BaseResponse<String> response = fileFeignClient.uploadFile(
+        file,
+        FileBizEnum.USER_AVATAR.getValue()
+    );
+    return response.getData();
 }
 ```
+
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [文件服务](../../algorithm-service/algorithm-file-service/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

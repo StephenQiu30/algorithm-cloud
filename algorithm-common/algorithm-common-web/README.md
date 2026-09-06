@@ -1,17 +1,31 @@
-# algorithm-common-web - Web 开发增强规范
+# algorithm-common-web | Spring Boot Web 与 OpenAPI 公共组件
 
-本模块统一定义了微服务 Web 层的配置标准、数据序列化定制及 OpenAPI 交互文档体系。
+`algorithm-common-web` 统一 `algorithm-cloud` 各微服务的 Web 层行为，提供 Jackson 序列化、日期格式、CORS 和 Knife4j/OpenAPI 文档配置。
 
-## 🌟 核心功能
+## 核心能力
 
-- **Jackson 精度定制**:
-    - 自动将 Long 类型序列化为 String，完美解决前端 JavaScript 数值精度溢出问题。
-    - 统一日期格式化风格 (`yyyy-MM-dd HH:mm:ss`)。
-- **OpenAPI 交互文档**:
-    - 深度集成 **Knife4j**，为每个微服务自动生成美观、可交互的 API 调试文档。
-- **全局跨域治理**:
-    - 预设生产级 CORS 配置，支持多源跨域与凭证透传。
+- Long 类型序列化为 String，避免前端 JavaScript 整数精度问题。
+- 统一日期时间格式 `yyyy-MM-dd HH:mm:ss`。
+- 集成 Knife4j，生成可交互的 OpenAPI 调试文档。
+- 提供跨服务一致的 CORS 配置和凭证透传策略。
 
-## 🛠️ 使用场景
+## Maven 接入
 
-- 统一前端交互协议规格、提升联调效率、确保展示层数据展示的准确性。
+```xml
+<dependency>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-common-web</artifactId>
+</dependency>
+```
+
+## 适用场景
+
+所有对外提供 HTTP API 的 Spring Boot 服务都可以复用该模块，以保持响应序列化、跨域和 API 文档体验一致。
+
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [核心公共组件](../algorithm-common-core/README.md)
+- [API 网关](../../algorithm-gateway/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

@@ -1,17 +1,30 @@
-# algorithm-api-post - 帖子服务 API 交互层
+# algorithm-api-post | 帖子与评论 API 契约
 
-本模块集中管理帖子与评论服务的 Feign 客户端及其核心数据模型，为跨服务的内容引用提供了类型安全的 RPC 支撑。
+`algorithm-api-post` 是 `algorithm-cloud` 的内容服务接口模块，定义帖子、评论、互动数据和内容元信息的跨服务访问协议。
 
-## 🌟 核心组件
+## 提供能力
 
-- **PostFeignClient**:
-    - 支持根据 ID 批量获取帖子 VO 详情及基本状态校验。
-- **PostCommentFeignClient**:
-    - 提供对评论树数据的跨服务访问。
-- **Shared Models**:
-    - 核心包含 `PostVO`, `PostCommentVO` 等，确保服务间数据交换格式的一致性。
+- `PostFeignClient`：按 ID 获取帖子详情和状态。
+- `PostCommentFeignClient`：访问评论树和评论视图对象。
+- `PostVO`、`PostCommentVO` 等共享 DTO/VO。
+- 支持搜索索引、通知、AI 摘要等服务复用内容数据。
 
-## 🛠️ 使用场景
+## Maven 接入
 
-- **搜索服务**: 在构建搜索索引时，通过 Feign 请求最新的帖子元数据。
-- **通知服务**: 当产生互动（如点赞）时，通过 RPC 校验帖子是否存在并获取作者信息。
+```xml
+<dependency>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-api-post</artifactId>
+</dependency>
+```
+
+## 适用场景
+
+搜索服务构建索引、通知服务处理互动事件、AI 服务生成帖子摘要时，应使用本模块保持服务间数据结构一致。
+
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [帖子服务](../../algorithm-service/algorithm-post-service/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

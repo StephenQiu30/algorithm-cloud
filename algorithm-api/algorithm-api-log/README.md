@@ -1,14 +1,31 @@
-# algorithm-api-log - 日志服务 API 交互层
+# algorithm-api-log | 日志与审计 API 契约
 
-本模块定义了分布式环境下的统一审计与日志上报协议，支持全服务链路的透明化记录。
+`algorithm-api-log` 是 `algorithm-cloud` 的统一日志 API 模块，为用户服务、网关和其他微服务提供业务审计、登录日志、访问日志、邮件记录和文件记录的跨服务上报契约。
 
-## 🌟 核心功能
+## 提供能力
 
-- **LogFeignClient**:
-    - 标准化 RPC 接口，用于微服务上报访问日志、操作审计及异常堆栈采集。
-    - 支持 `BaseLogDTO` 系列模型，确保日志格式在全系统内严格一致。
+- `LogFeignClient`：统一日志上报入口。
+- `BaseLogDTO` 及操作、登录、访问、邮件、文件记录模型。
+- 跨服务一致的日志字段和请求结构。
+- 适合与 `algorithm-common-log` 的 AOP 组件组合使用。
 
-## 🛠️ 接入说明
+## Maven 接入
 
-1. **切面集成**: 各微服结合 `algorithm-common-log` 模块，在切面层自动注入 `LogFeignClient` 完成日志采集。
-2. **异步触发**: 本模块接口默认推荐结合 Feign 异步调用，最小化对业务吞吐的影响。
+```xml
+<dependency>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-api-log</artifactId>
+</dependency>
+```
+
+## 接入建议
+
+业务服务通过 Feign 上报日志，日志服务负责落库和查询。日志上报应保持异步或非阻塞，避免审计链路影响核心业务请求。
+
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [公共日志组件](../../algorithm-common/algorithm-common-log/README.md)
+- [日志服务](../../algorithm-service/algorithm-log-service/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

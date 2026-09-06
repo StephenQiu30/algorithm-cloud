@@ -1,46 +1,43 @@
-# algorithm-user-service - 用户服务
+# algorithm-user-service | 用户认证与 RBAC 权限服务
 
-用户服务是 `algorithm-cloud` 的基石，负责全系统的账号体系、多维身份认证、精细化权限控制及第三方登录集成。
+`algorithm-user-service` 负责 `algorithm-cloud` 的用户账号、邮箱/GitHub 登录、Token 会话、多端登录控制和 RBAC 权限校验。
 
-## 🌟 核心功能
+## 核心能力
 
-- **全方位身份认证**：
-    - 支持传统的邮箱/验证码登录。
-    - 集成 GitHub、微信 (扫码) 等多种社交账号登录方案。
-- **智能化会话管理**：
-    - 基于 **Sa-Token** 实现高性能的 Token 分发与管理。
-    - 支持多端在线控制、强制下线及并发登录限制。
-- **RBAC 权限体系**：
-    - 提供细粒度的角色、权限校验。
-    - 集成 `@AuthCheck` 注解，实现声明式权限管控。
-- **安全保障**：
-    - 分布式频率限制 (Rate Limiter)。
-    - 完善的脱敏逻辑，确保用户信息安全。
+- 邮箱验证码登录和 GitHub OAuth 登录。
+- 基于 Sa-Token 的 Token 会话、强制下线和登录限制。
+- 角色、权限和 `@AuthCheck` 声明式鉴权。
+- 邮箱验证码、Redis Session 和登录频率限制。
+- 用户信息脱敏，以及管理员用户分页管理。
 
-## 🛠️ 技术栈
+## 主要 API
 
-- **框架**: Spring Boot 3.5.9, MyBatis-Plus 3.5.12
-- **认证**: Sa-Token 1.44.0
-- **数据库**: MySQL 8.4
-- **缓存**: Redis (用于验证码存储与分布式 Session)
-- **消息**: RabbitMQ (处理异步数据统计或通知)
+以下为服务内部路径；通过网关访问时通常增加 `/api` 前缀。
 
-## 📡 核心 API 概览
+| 能力 | 方法 | 路径 |
+| --- | --- | --- |
+| 邮箱登录 | POST | `/user/login/email` |
+| GitHub 登录 | POST/GET | `/user/login/github` |
+| 当前用户 | GET | `/user/get/login` |
+| 退出登录 | POST | `/user/logout` |
+| 用户分页 | POST | `/user/list/page/vo` |
 
-| 模块      | 路径                       | 方法   | 描述           |
-|:--------|:-------------------------|:-----|:-------------|
-| **认证**  | `/api/user/login/email`  | POST | 邮箱验证码登录      |
-| **第三方** | `/api/user/login/github` | GET  | GitHub 授权跳转  |
-| **用户**  | `/api/user/get/login`    | GET  | 获取当前登录信息     |
-| **管理**  | `/api/user/list/page/vo` | POST | 分页获取用户 (管理员) |
+## 技术栈
 
-## 🚀 启动与运行
+- Spring Boot、MyBatis-Plus、MySQL
+- Sa-Token、Redis、Redisson
+- RabbitMQ、Nacos、OpenFeign
 
-- **服务端口**: `8081`
-- **默认命名空间**: `algorithm-cloud`
-- **依赖服务**: Nacos, MySQL, Redis, RabbitMQ
+## 运行
 
----
+- 默认服务端口：`8081`
+- 默认命名空间：`algorithm-cloud`
+- 依赖：Nacos、MySQL、Redis、RabbitMQ，以及邮件/GitHub OAuth 配置（按登录方式启用）
 
-**维护者**: StephenQiu30  
-**版本**: 1.0.0
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [用户 API 契约](../../algorithm-api/algorithm-api-user/README.md)
+- [Nacos 配置说明](../../nacos-config/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

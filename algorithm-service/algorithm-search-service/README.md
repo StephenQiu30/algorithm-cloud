@@ -1,39 +1,42 @@
-# algorithm-search-service - 搜索服务
+# algorithm-search-service | Elasticsearch 全文与聚合搜索服务
 
-搜索服务基于 **Elasticsearch 8.19.10** 构建，为整个微服务生态提供统一、高性能的全文检索、聚合搜索及智能推荐基础。
+`algorithm-search-service` 基于 Elasticsearch 为 `algorithm-cloud` 提供帖子、用户和多数据源聚合搜索，并负责搜索索引的初始化与增量同步。
 
-## 🌟 核心功能
+## 核心能力
 
-- **分布式全文检索**：
-    - 支持对帖子标题、内容、标签及用户基础信息的毫秒级全文匹配。
-    - 默认集成 **IK 分词器**，提供更加精准的中文检索性能。
-- **深度高亮渲染**：
-    - 自动提取搜索关键词并在结果中进行动态高亮标注。
-- **聚合检索 (Search All)**：
-    - **核心特性**：单次接口调用即可同步获取多个数据源（帖子、用户等）的检索结果，极大优化了前端展示逻辑。
-- **自动化同步**：
-    - 支持全量索引初始化及基于 MQ/Feign 的增量实时同步。
+- 帖子标题、正文、标签和用户信息的全文检索。
+- 搜索结果关键词高亮。
+- 一次请求聚合帖子、用户等多个数据源。
+- 通过 RabbitMQ/Feign 接收内容变更并更新索引。
+- 可与 AI 服务的向量检索能力组合，构建混合搜索体验。
 
-## 🛠️ 技术架构
+## 主要 API
 
-- **搜索引擎**: Elasticsearch 8.19.10
-- **客户端**: Elasticsearch Java Client (新版)
-- **高级分词**: IK Analysis (ik_max_word / ik_smart)
+以下为服务内部路径；通过网关访问时通常增加 `/api` 前缀。
 
-## 📡 核心 API 概览
+| 能力 | 方法 | 路径 |
+| --- | --- | --- |
+| 聚合搜索 | POST | `/search/all` |
+| 帖子搜索 | POST | `/search/post/page` |
+| 用户搜索 | POST | `/search/user/page` |
 
-| 模块     | 路径                      | 方法   | 描述           |
-|:-------|:------------------------|:-----|:-------------|
-| **聚合** | `/api/search/all`       | POST | 聚合检索 (多模型联合) |
-| **帖子** | `/api/search/post/page` | POST | 帖子维度全文检索     |
-| **用户** | `/api/search/user/page` | POST | 用户维度全文检索     |
+## 技术栈
 
-## 🚀 启动与运行
+- Elasticsearch Java Client
+- Elasticsearch 8.x 本地开发环境
+- Spring Boot、RabbitMQ、Nacos、Redis
+- 中文全文检索和高亮配置按部署环境启用
 
-- **服务端口**: `8084`
-- **依赖服务**: Nacos, Elasticsearch, RabbitMQ (用于同步消息)
+## 运行
 
----
+- 默认服务端口：`8084`
+- 依赖：Nacos、Elasticsearch、RabbitMQ（索引同步）
+- 索引配置和连接信息见 `nacos-config/`。
 
-**维护者**: StephenQiu30  
-**版本**: 1.0.0
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [搜索 API 契约](../../algorithm-api/algorithm-api-search/README.md)
+- [AI RAG 服务](../algorithm-ai-service/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

@@ -1,14 +1,30 @@
-# algorithm-api-ai - 智能化服务 API 交互层
+# algorithm-api-ai | RAG 与 AI 服务 API 契约
 
-本模块是 `algorithm-cloud` 智能化能力的契约层，定义了各微服务调用 AI 模型能力的 Feign 接口与数据标准。
+`algorithm-api-ai` 是 `algorithm-cloud` 的 AI 微服务接口模块，使用 Spring Cloud OpenFeign、DTO 和 VO 定义知识库、文档处理、RAG 流式问答与召回分析所需的跨服务通信契约。
 
-## 🌟 核心组件
+## 提供能力
 
-- **AiFeignClient**:
-    - 提供远程 AI 会话触发接口，支持同步与内联流式响应模拟。
-    - 核心 DTO 包含 `AiChatRequest`, `AiChatResponse` 等。
+- AI 服务 Feign 客户端和统一响应模型。
+- RAG 问答请求、历史记录和 SSE 流式事件模型。
+- 知识库、文档、文本分片和召回分析 DTO/VO。
+- 为帖子摘要、内容审核和其他服务调用 AI 能力提供类型安全的边界。
 
-## 🛠️ 典型应用
+## Maven 接入
 
-- **内容摘要**: 帖子服务在保存长文时，通过 RPC 调用 AI 进行内容自动提炼。
-- **智能纠错**: 在用户提交评论前，通过 AI 接口进行敏感词识别与语义审核。
+```xml
+<dependency>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-api-ai</artifactId>
+</dependency>
+```
+
+## 适用场景
+
+当业务服务需要调用 `algorithm-ai-service`，或前后端需要共享 RAG 数据结构时，应优先复用本模块的客户端和模型，避免重复定义接口对象。
+
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [AI 服务](../../algorithm-service/algorithm-ai-service/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

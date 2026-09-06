@@ -1,20 +1,30 @@
-# algorithm-common-core - 核心公共基础设施
+# algorithm-common-core | Java 微服务核心公共组件
 
-本模块是 `algorithm-cloud` 的技术基础，提供了全系统统一的基类、核心工具、通用枚举及全局异常处理规范。
+`algorithm-common-core` 是 `algorithm-cloud` 的基础公共模块，提供统一响应、异常处理、分页模型、公共枚举和通用工具，帮助各 Spring Boot 微服务保持一致的 API 行为。
 
-## 🌟 核心功能
+## 核心能力
 
-- **统一响应体系**:
-    - 提供 `BaseResponse` 封装。
-    - 集成 `ResultUtils` 实现标准化的 API 响应输出。
-- **全局异常管控**:
-    - 定义 `BusinessException` 业务异常。
-    - 提供 `ThrowUtils` 防御式编程工具，简化参数校验与流程阻断。
-- **基础通用类**:
-    - 包含分页请求基类 (`PageRequest`)、排序请求处理及 Spring 上下文持有者。
-- **全域元数据管理**:
-    - 统一管理用户角色、文件业务类型、系统错误码 (`ErrorCode`) 等静态常量。
+- `BaseResponse` 与 `ResultUtils`：统一封装成功和失败响应。
+- `BusinessException` 与 `ThrowUtils`：统一业务异常和参数校验。
+- `PageRequest`：分页、排序和查询请求的基础模型。
+- Spring 上下文持有、错误码、用户角色和文件业务类型等公共元数据。
 
-## 🛠️ 使用场景
+## Maven 接入
 
-- 作为全系统所有模块的**强制依赖**，用于维持代码健壮性、响应一致性及业务规范性。
+```xml
+<dependency>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-common-core</artifactId>
+</dependency>
+```
+
+## 适用场景
+
+所有业务服务都可以依赖该模块，以复用基础响应协议和异常规范，避免跨服务返回结构不一致。
+
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [Web 公共组件](../algorithm-common-web/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

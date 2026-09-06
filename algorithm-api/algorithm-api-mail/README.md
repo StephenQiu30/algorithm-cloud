@@ -1,28 +1,35 @@
-# algorithm-api-mail - 邮件服务 API 交互层
+# algorithm-api-mail | 邮件服务 API 契约
 
-本模块封装了邮件服务的远程调用协议，为全系统提供了统一、安全的邮件下发与验证码管理 RPC 能力。
+`algorithm-api-mail` 是 `algorithm-cloud` 的邮件微服务接口模块，统一封装验证码邮件、同步邮件和跨服务安全校验所需的 Feign 客户端与请求模型。
 
-## 🌟 核心组件
+## 提供能力
 
-- **MailFeignClient**:
-    - 提供 `sendEmailCode` 同步发送验证码接口。
-    - 提供 `verifyEmailCode` 跨服务安全校验入口。
+- `MailFeignClient`：发送邮件和校验验证码。
+- `EmailCodeRequest` 等邮件请求 DTO。
+- 为注册、登录、账号安全和系统通知提供统一 RPC 协议。
 
-## 🛠️ 接入流程
+## Maven 接入
 
-### 1. 发送逻辑
-
-```java
-EmailCodeRequest req = new EmailCodeRequest();
-req.setEmail("target@example.com");
-mailFeignClient.sendEmailCode(req);
+```xml
+<dependency>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-api-mail</artifactId>
+</dependency>
 ```
 
-### 2. 校验逻辑 (业务层使用)
+## 使用示例
 
 ```java
-EmailCodeRequest verifyReq = new EmailCodeRequest();
-verifyReq.setEmail(email);
-verifyReq.setCode(authCode);
-boolean isValid = mailFeignClient.verifyEmailCode(verifyReq).getData();
+EmailCodeRequest request = new EmailCodeRequest();
+request.setEmail("target@example.com");
+mailFeignClient.sendEmailCode(request);
+
+boolean valid = mailFeignClient.verifyEmailCode(request).getData();
 ```
+
+## 相关文档
+
+- [algorithm-cloud 后端总览](../../README.md)
+- [邮件服务](../../algorithm-service/algorithm-mail-service/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。

@@ -1,73 +1,54 @@
-# algorithm-common-rabbitmq - 消息队列基础设施
+# algorithm-common-rabbitmq | RabbitMQ 消息与可靠投递组件
 
-封装 RabbitMQ 核心操作，提供基于 **策略模式** 的标准化分发、**声明式幂等** 与 **事务一致性** 投递方案。
+`algorithm-common-rabbitmq` 封装 RabbitMQ 的消息发送、业务分发、幂等去重、重试和死信队列能力，为 `algorithm-cloud` 的异步任务提供统一基础设施。
 
-## 🌟 核心功能
+## 核心能力
 
-- **统一投递门面 (`RabbitMqSender`)**:
-    - 支持普通发送与 **事务发送**（与 Spring @Transactional 联动）。
-    - 自动封装 `RabbitMessage` 元数据。
-- **标准化分发器 (`MqConsumerDispatcher`)**:
-    - 基于业务类型 (`BizType`) 自动路由到对应处理器。
-- **声明式去重锁 (`@RabbitMqDedupeLock`)**:
-    - 仅需在处理器上添加注解，即可实现自动去重。
-- **高可靠性保障**:
-    - 集成退避重试 (Exponential Backoff) 与死信队列 (DLX)。
-    - Jackson2Json 反序列化，确保类型安全。
+- `RabbitMqSender`：普通发送和与事务联动的消息投递。
+- `MqConsumerDispatcher`：根据业务类型将消息分发给对应处理器。
+- `@RabbitMqDedupeLock`：为消费者提供声明式去重锁。
+- 退避重试、死信队列（DLX）和 Jackson JSON 类型反序列化。
 
-## 🛠️ 注册与使用指南
+## Maven 接入
 
-### 1. 发送消息 (Producer)
+```xml
+<dependency>
+    <groupId>com.algorithm.cloud</groupId>
+    <artifactId>algorithm-common-rabbitmq</artifactId>
+</dependency>
+```
 
-注入 `RabbitMqSender` 并指定业务类型：
+## 发送消息
 
 ```java
 @Resource
 private RabbitMqSender mqSender;
 
-public void doTask() {
-    // 1. 普通发送
-    mqSender.send(MqBizTypeEnum.USER_REGISTER, userData);
-
-    // 2. 事务投递（确保事务提交后才发送）
-    mqSender.sendTransactional(MqBizTypeEnum.POST_REVIEW, postData);
+public void publish(Object data) {
+    mqSender.send(MqBizTypeEnum.USER_REGISTER, data);
+    mqSender.sendTransactional(MqBizTypeEnum.POST_REVIEW, data);
 }
 ```
 
-### 2. 定义处理逻辑 (Handler)
+## 消费消息
 
-实现 `RabbitMqHandler<T>` 接口并注册为 Spring Bean：
+实现 `RabbitMqHandler<T>` 并注册为 Spring Bean，再由 `MqConsumerDispatcher` 统一分发：
 
 ```java
 @Component
 @RabbitMqDedupeLock(prefix = "mq:user:register")
 public class UserRegisterHandler implements RabbitMqHandler<UserDTO> {
-
-    @Override
-    public String getBizType() {
-        return MqBizTypeEnum.USER_REGISTER.getValue();
-    }
-
-    @Override
-    public void onMessage(UserDTO data, RabbitMessage rabbitMessage) {
-        // 执行业务逻辑
-    }
-
-    @Override
-    public Class<UserDTO> getDataType() {
-        return UserDTO.class;
-    }
+    // 实现 getBizType、onMessage 和 getDataType
 }
 ```
 
-### 3. 配置监听器 (Consumer)
+## 适用场景
 
-在消费者服务中调用 `MqConsumerDispatcher` 进行统一分发：
+适合文档入库、AI 摘要、Elasticsearch 索引同步、通知和邮件等不应阻塞 HTTP 请求的异步流程。
 
-```java
-@RabbitListener(queues = RabbitMqConstant.CORE_QUEUE)
-public void onMessage(RabbitMessage rabbitMessage, Channel channel, Message msg) {
-    mqConsumerDispatcher.dispatch(rabbitMessage, channel, msg);
-}
-```
+## 相关文档
 
+- [algorithm-cloud 后端总览](../../README.md)
+- [Nacos 配置](../../nacos-config/README.md)
+
+本模块基于 [Apache License 2.0](../../LICENSE) 开源。
