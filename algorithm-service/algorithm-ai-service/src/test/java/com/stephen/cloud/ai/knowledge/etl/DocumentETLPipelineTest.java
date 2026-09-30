@@ -52,6 +52,9 @@ class DocumentETLPipelineTest {
     @Mock
     private RabbitMqSender mqSender;
 
+    @Mock private KeywordIndexPublisher keywordIndexPublisher;
+    @Mock private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+
     @Mock
     private Resource resource;
 
@@ -80,10 +83,68 @@ class DocumentETLPipelineTest {
                 "md",
                 Map.of("documentId", 1001L, "knowledgeBaseId", 2002L, "documentName", "test.md")));
 
-        verify(vectorStoreService).deleteByDocumentId(1001L);
+        verify(vectorStoreService, never()).deleteByDocumentId(1001L);
+        verify(documentChunkMapper, never()).delete(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
         verify(documentChunkMapper, never()).batchInsert(anyList());
         verify(mqSender, never()).send(any(com.stephen.cloud.common.rabbitmq.enums.MqBizTypeEnum.class), any());
         verify(vectorStore).delete(anyList());
+    }
+
+    @Test
+    void shouldPreserveOldBuildWhenReadFails() {
+        when(resourceLoader.getResource(anyString())).thenReturn(resource);
+        when(documentReaderFactory.getReader(anyString(), eq(resource))).thenReturn(documentReader);
+        when(documentReader.get()).thenThrow(new IllegalStateException("read failed"));
+        assertThrows(IllegalStateException.class, () -> documentETLPipeline.process("/tmp/test.md", "md", Map.of("documentId", 1001L, "knowledgeBaseId", 2002L)));
+        verifyNoInteractions(vectorStore, keywordIndexPublisher, documentChunkMapper, transactionTemplate);
+    }
+
+    @Test
+    void keywordFailureMustNotPublishOrDeleteOldChunks() {
+        when(resourceLoader.getResource(anyString())).thenReturn(resource);
+        when(documentReaderFactory.getReader(anyString(), eq(resource))).thenReturn(documentReader);
+        when(documentReader.get()).thenReturn(List.of(new Document("有效课程文档".repeat(30))));
+        doThrow(new IllegalStateException("keyword unavailable")).when(keywordIndexPublisher).publish(anyList());
+        assertThrows(IllegalStateException.class, () -> documentETLPipeline.process("/tmp/test.md", "md", Map.of("documentId", 1001L, "knowledgeBaseId", 2002L)));
+        verifyNoInteractions(transactionTemplate);
+        verify(documentChunkMapper, never()).delete(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+        verify(documentChunkMapper, never()).batchInsert(anyList());
+        verify(vectorStore).delete(argThat((List<String> ids) -> ids.stream().allMatch(id -> id.startsWith("1001_") && !id.equals("1001_0"))));
+    }
+
+    @Test
+    void databaseFailureRollsBackOnlyIsolatedNewBuild() {
+        when(resourceLoader.getResource(anyString())).thenReturn(resource);
+        when(documentReaderFactory.getReader(anyString(), eq(resource))).thenReturn(documentReader);
+        when(documentReader.get()).thenReturn(List.of(new Document("有效课程文档".repeat(30))));
+        when(transactionTemplate.execute(any())).thenThrow(new IllegalStateException("db transaction failed"));
+        assertThrows(IllegalStateException.class, () -> documentETLPipeline.process("/tmp/test.md", "md", Map.of("documentId", 1001L, "knowledgeBaseId", 2002L)));
+        verify(keywordIndexPublisher).publish(anyList());
+        verify(keywordIndexPublisher).delete(anyList());
+        verify(vectorStore).delete(argThat((List<String> ids) -> ids.stream().noneMatch("1001_0"::equals)));
+    }
+
+    @Test
+    void shouldPublishOnlyAfterBothIndexesAreReadyAndThenRetireOldBuild() {
+        when(resourceLoader.getResource(anyString())).thenReturn(resource);
+        when(documentReaderFactory.getReader(anyString(), eq(resource))).thenReturn(documentReader);
+        when(documentReader.get()).thenReturn(List.of(new Document("有效课程文档".repeat(30))));
+        var old = new com.stephen.cloud.ai.model.entity.DocumentChunk();old.setId(99L);old.setVectorId("1001_0");
+        when(documentChunkMapper.lockDocument(1001L, 2002L, "course-v2", "/tmp/test.md")).thenReturn(1001L);
+        when(documentChunkMapper.selectList(any())).thenReturn(List.of(old));
+        when(documentChunkMapper.markDocumentPublished(eq(1001L), anyInt())).thenReturn(1);
+        when(documentChunkMapper.batchInsert(anyList())).thenAnswer(i -> ((List<?>) i.getArgument(0)).size());
+        when(transactionTemplate.execute(any())).thenAnswer(i -> {
+            org.springframework.transaction.support.TransactionCallback<?> callback = i.getArgument(0);
+            return callback.doInTransaction(mock(org.springframework.transaction.TransactionStatus.class));
+        });
+        org.junit.jupiter.api.Assertions.assertTrue(documentETLPipeline.process("/tmp/test.md", "md", Map.of("documentId",1001L,"knowledgeBaseId",2002L,"version","course-v2")) > 0);
+        var order=inOrder(vectorStore,keywordIndexPublisher,documentChunkMapper);
+        order.verify(vectorStore).add(anyList());order.verify(keywordIndexPublisher).publish(anyList());
+        order.verify(documentChunkMapper).lockDocument(1001L, 2002L, "course-v2", "/tmp/test.md");order.verify(documentChunkMapper).selectList(any());
+        order.verify(documentChunkMapper).delete(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));order.verify(documentChunkMapper).batchInsert(anyList());
+        order.verify(documentChunkMapper).markDocumentPublished(eq(1001L), anyInt());
+        order.verify(vectorStore).delete(List.of("1001_0"));order.verify(keywordIndexPublisher).delete(List.of(old));
     }
 
     private void setField(Object target, String fieldName, Object value) throws Exception {

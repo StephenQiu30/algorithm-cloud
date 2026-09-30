@@ -85,4 +85,7 @@ public class ChunkEsDTO extends BaseEsDTO {
      */
     @Field(type = FieldType.Keyword)
     private String vectorId;
+
+    @Field(type = FieldType.Object)
+    private java.util.Map<String, Object> metadata;
 }

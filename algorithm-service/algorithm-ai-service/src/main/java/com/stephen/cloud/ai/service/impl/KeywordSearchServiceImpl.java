@@ -106,6 +106,8 @@ public class KeywordSearchServiceImpl implements KeywordSearchService {
                     addMetadataIfPresent(source, metadata, DOCUMENT_ID);
                     addMetadataIfPresent(source, metadata, DOCUMENT_NAME);
                     addMetadataIfPresent(source, metadata, CHUNK_INDEX);
+                    addMetadataIfPresent(source, metadata, CHUNK_ID);
+                    addMetadataIfPresent(source, metadata, VECTOR_ID);
                     addMetadataIfPresent(source, metadata, KNOWLEDGE_BASE_ID);
                     addMetadataIfPresent(source, metadata, SECTION_TITLE);
                     addMetadataIfPresent(source, metadata, SECTION_PATH);

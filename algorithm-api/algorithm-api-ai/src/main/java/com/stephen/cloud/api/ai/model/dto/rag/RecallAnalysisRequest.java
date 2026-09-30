@@ -33,4 +33,6 @@ public class RecallAnalysisRequest implements Serializable {
 
     @Schema(description = "是否启用重排")
     private Boolean enableRerank = true;
+    @Schema(description = "精确课程过滤（version、bizTag）")
+    private java.util.Map<String, String> metadataFilters;
 }

@@ -86,6 +86,9 @@ public class DocumentChunk implements Serializable {
     @Schema(description = "向量存储ID")
     private String vectorId;
 
+    @Schema(description = "已发布分片的完整课程及构建元数据")
+    private String metadataJson;
+
     /**
      * 创建时间
      */

@@ -1,0 +1,13 @@
+name: AI teaching contract checks
+on: [push, pull_request]
+jobs:
+  controlled-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - run: mvn -B -pl algorithm-service/algorithm-ai-service -am -Dtest=RAGServiceImplTest,RetrievalOrchestratorTest,RagWebSearchFallbackDeciderTest,DocumentETLPipelineTest,SmartTextSplitterTest,RagConversationScopeTest,PublishedChunkFilterTest,ElasticsearchFilterExpressionConverterTest,RetiredChunkCleanupJobTest -Dsurefire.failIfNoSpecifiedTests=false test

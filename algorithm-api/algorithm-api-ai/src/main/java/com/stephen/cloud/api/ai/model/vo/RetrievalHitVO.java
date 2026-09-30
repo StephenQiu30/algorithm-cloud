@@ -63,4 +63,6 @@ public class RetrievalHitVO implements Serializable {
 
     @Schema(description = "命中原因")
     private String matchReason;
+    @Schema(description = "课程版本")
+    private String version;
 }

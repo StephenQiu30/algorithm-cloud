@@ -18,6 +18,8 @@ import com.stephen.cloud.ai.knowledge.retrieval.model.WebSearchFallbackDecision;
 import com.stephen.cloud.ai.mapper.RAGHistoryMapper;
 import com.stephen.cloud.ai.model.entity.RAGHistory;
 import com.stephen.cloud.ai.service.RAGService;
+import com.stephen.cloud.ai.knowledge.retrieval.RagConversationScope;
+import com.stephen.cloud.ai.knowledge.retrieval.TeachingContextFormatter;
 import com.stephen.cloud.api.ai.model.enums.RetrievalStrategyEnum;
 import com.stephen.cloud.api.ai.model.dto.rag.BatchRecallRequest;
 import com.stephen.cloud.api.ai.model.dto.rag.RAGHistoryQueryRequest;
@@ -57,6 +59,7 @@ import static com.stephen.cloud.ai.knowledge.retrieval.RagMetadataKeys.*;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -150,12 +153,20 @@ public class RAGServiceImpl implements RAGService {
     @Override
     public Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK,
             String conversationId, Boolean enableWebSearchFallback) {
+        return askStream(question, knowledgeBaseId, userId, topK, conversationId, enableWebSearchFallback, null);
+    }
+
+    @Override
+    public Flux<String> askStream(String question, Long knowledgeBaseId, Long userId, Integer topK,
+            String conversationId, Boolean enableWebSearchFallback, Map<String, Object> teachingContext) {
+        TeachingContextFormatter.validateRequest(question, knowledgeBaseId, topK);
+        String pageContext = TeachingContextFormatter.format(teachingContext);
         return Flux.defer(() -> {
             long start = System.currentTimeMillis();
             boolean requestAllowsWebSearchFallback = !Boolean.FALSE.equals(enableWebSearchFallback);
             String resolvedConversationId = resolveConversationId(conversationId, knowledgeBaseId, userId);
             PreparedAnswerContext context = prepareAnswerContext(question, knowledgeBaseId, userId, topK,
-                    resolvedConversationId, requestAllowsWebSearchFallback, start);
+                    resolvedConversationId, requestAllowsWebSearchFallback, start, pageContext);
             return buildTextAnswerStream(context);
         });
     }
@@ -163,6 +174,14 @@ public class RAGServiceImpl implements RAGService {
     @Override
     public Flux<ServerSentEvent<RAGStreamEventVO>> askEventStream(String question, Long knowledgeBaseId, Long userId,
             Integer topK, String conversationId, Boolean enableWebSearchFallback) {
+        return askEventStream(question, knowledgeBaseId, userId, topK, conversationId, enableWebSearchFallback, null);
+    }
+
+    @Override
+    public Flux<ServerSentEvent<RAGStreamEventVO>> askEventStream(String question, Long knowledgeBaseId, Long userId,
+            Integer topK, String conversationId, Boolean enableWebSearchFallback, Map<String, Object> teachingContext) {
+        TeachingContextFormatter.validateRequest(question, knowledgeBaseId, topK);
+        String pageContext = TeachingContextFormatter.format(teachingContext);
         long start = System.currentTimeMillis();
         boolean requestAllowsWebSearchFallback = !Boolean.FALSE.equals(enableWebSearchFallback);
         String resolvedConversationId = resolveConversationId(conversationId, knowledgeBaseId, userId);
@@ -175,7 +194,7 @@ public class RAGServiceImpl implements RAGService {
                 })),
                 Flux.defer(() -> {
                     PreparedAnswerContext context = prepareAnswerContext(question, knowledgeBaseId, userId, topK,
-                            resolvedConversationId, requestAllowsWebSearchFallback, start);
+                            resolvedConversationId, requestAllowsWebSearchFallback, start, pageContext);
                     Flux<ServerSentEvent<RAGStreamEventVO>> prelude = Flux.just(buildRetrievalEvent(context));
                     if (context.fallbackDecision().shouldFallback()) {
                         prelude = Flux.concat(prelude,
@@ -195,9 +214,11 @@ public class RAGServiceImpl implements RAGService {
     }
 
     private PreparedAnswerContext prepareAnswerContext(String question, Long knowledgeBaseId, Long userId, Integer topK,
-            String resolvedConversationId, boolean requestAllowsWebSearchFallback, long startTime) {
+            String resolvedConversationId, boolean requestAllowsWebSearchFallback, long startTime, String pageContext) {
         List<Message> history = loadConversationHistory(resolvedConversationId);
-        RetrievalResult result = retrievalOrchestrator.retrieve(question, knowledgeBaseId, topK, history);
+        RetrievalResult result = pageContext.isEmpty()
+                ? retrievalOrchestrator.retrieve(question, knowledgeBaseId, topK, history)
+                : retrievalOrchestrator.retrieve(TeachingContextFormatter.retrievalQuestion(question, pageContext), knowledgeBaseId, topK, null, null, history, TeachingContextFormatter.requiredFilters(pageContext));
         WebSearchFallbackDecision fallbackDecision = ragWebSearchFallbackDecider
                 .decide(result, requestAllowsWebSearchFallback);
         List<Document> docs = result.getDocs() == null ? List.of() : result.getDocs();
@@ -209,7 +230,7 @@ public class RAGServiceImpl implements RAGService {
                 ? buildHistoryRetrievalMeta(result, fallbackDecision, true, requestAllowsWebSearchFallback)
                 : retrievalMeta;
         return new PreparedAnswerContext(startTime, question, knowledgeBaseId, userId, resolvedConversationId,
-                result, fallbackDecision, retrievalMeta, webSearchRetrievalMeta, docs, sources, webSearchSources);
+                result, fallbackDecision, retrievalMeta, webSearchRetrievalMeta, docs, sources, webSearchSources, pageContext);
     }
 
     private Flux<String> buildTextAnswerStream(PreparedAnswerContext context) {
@@ -327,9 +348,9 @@ public class RAGServiceImpl implements RAGService {
 
     private ChatClient.ChatClientRequestSpec buildGenerationRequest(PreparedAnswerContext context, boolean webSearchMode) {
         if (webSearchMode) {
-            return buildWebSearchRequest(context.question(), context.resolvedConversationId());
+            return buildWebSearchRequest(context.question() + context.pageContext(), context.resolvedConversationId());
         }
-        return buildRagRequest(context.question(), context.resolvedConversationId(), context.docs());
+        return buildRagRequest(context.question() + context.pageContext(), context.resolvedConversationId(), context.docs());
     }
 
     private List<SourceVO> resolveResponseSources(PreparedAnswerContext context, boolean webSearchMode) {
@@ -348,9 +369,11 @@ public class RAGServiceImpl implements RAGService {
     @Override
     public RecallAnalysisVO analyzeRecall(RecallAnalysisRequest request) {
         long start = System.currentTimeMillis();
+        Map<String, String> requiredFilters = request.getMetadataFilters() == null ? Map.of() : request.getMetadataFilters();
+        if (!java.util.Set.of("version", "bizTag").containsAll(requiredFilters.keySet()) || requiredFilters.values().stream().anyMatch(v -> v == null || v.length() > 128)) throw new IllegalArgumentException("召回过滤无效");
         RetrievalResult result = retrievalOrchestrator.retrieve(
                 request.getQuestion(), request.getKnowledgeBaseId(), request.getTopK(),
-                request.getSimilarityThreshold(), request.getEnableRerank());
+                request.getSimilarityThreshold(), request.getEnableRerank(), List.of(), requiredFilters);
 
         // 构造 VO（利用 RetrievalResult 中的各阶段数据）
         List<RetrievalHitVO> finalHitVOs = convertToHitVOs(result.getDocs());
@@ -691,12 +714,7 @@ public class RAGServiceImpl implements RAGService {
     }
 
     private String resolveConversationId(String conversationId, Long knowledgeBaseId, Long userId) {
-        if (StringUtils.isNotBlank(conversationId)) {
-            return conversationId.trim();
-        }
-        String userPart = userId == null ? "anonymous" : String.valueOf(userId);
-        String kbPart = knowledgeBaseId == null ? "0" : String.valueOf(knowledgeBaseId);
-        return "rag:" + userPart + ":" + kbPart;
+        return RagConversationScope.resolve(conversationId, knowledgeBaseId, userId);
     }
 
     private String buildHistoryRetrievalMeta(RetrievalResult result, WebSearchFallbackDecision fallbackDecision,
@@ -720,15 +738,9 @@ public class RAGServiceImpl implements RAGService {
     }
 
     private List<SourceVO> buildWebSearchSources(WebSearchFallbackDecision fallbackDecision) {
-        SourceVO source = new SourceVO();
-        source.setDocumentName(WEB_SEARCH_SOURCE_NAME);
-        source.setSourceType(WEB_SEARCH_SOURCE_TYPE);
-        source.setSectionTitle("联网搜索兜底");
-        source.setBizTag("web-search-fallback");
-        source.setMatchReason(fallbackDecision.reason());
-        source.setContent("知识库召回不足，本次回答已切换为 DashScope 联网搜索。");
-        source.setVectorSimilarity(fallbackDecision.topVectorSimilarity());
-        return List.of(source);
+        // The content-only provider stream supplies no verifiable URLs. A fallback reason
+        // belongs in retrievalMeta, not in a fabricated document citation.
+        return List.of();
     }
 
     private ServerSentEvent<RAGStreamEventVO> buildRetrievalEvent(PreparedAnswerContext context) {
@@ -840,7 +852,8 @@ public class RAGServiceImpl implements RAGService {
             String webSearchRetrievalMeta,
             List<Document> docs,
             List<SourceVO> sources,
-            List<SourceVO> webSearchSources
+            List<SourceVO> webSearchSources,
+            String pageContext
     ) {
     }
 

@@ -4,6 +4,8 @@ import com.stephen.cloud.ai.model.entity.DocumentChunk;
 import com.stephen.cloud.api.ai.model.vo.ChunkVO;
 import com.stephen.cloud.api.search.model.entity.ChunkEsDTO;
 import org.springframework.beans.BeanUtils;
+import cn.hutool.json.JSONUtil;
+import java.util.LinkedHashMap;
 
 /**
  * 文档分片转换器
@@ -41,6 +43,7 @@ public class DocumentChunkConvert {
         ChunkEsDTO chunkEsDTO = new ChunkEsDTO();
         BeanUtils.copyProperties(chunk, chunkEsDTO);
         chunkEsDTO.setChunkId(chunk.getVectorId());
+        if (chunk.getMetadataJson() != null && JSONUtil.isTypeJSONObject(chunk.getMetadataJson())) chunkEsDTO.setMetadata(new LinkedHashMap<>(JSONUtil.parseObj(chunk.getMetadataJson())));
         return chunkEsDTO;
     }
 

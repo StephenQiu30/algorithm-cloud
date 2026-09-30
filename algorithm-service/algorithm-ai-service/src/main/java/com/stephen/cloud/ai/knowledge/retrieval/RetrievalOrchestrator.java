@@ -68,6 +68,9 @@ public class RetrievalOrchestrator {
     private RagDocumentHelper ragDocumentHelper;
 
     @Resource
+    private PublishedChunkFilter publishedChunkFilter;
+
+    @Resource
     @Qualifier("aiAsyncExecutor")
     private Executor aiAsyncExecutor;
 
@@ -89,6 +92,11 @@ public class RetrievalOrchestrator {
      */
     public RetrievalResult retrieve(String question, Long knowledgeBaseId, Integer topK,
                                      Double similarityThreshold, Boolean enableRerank, List<Message> history) {
+        return retrieve(question, knowledgeBaseId, topK, similarityThreshold, enableRerank, history, Map.of());
+    }
+
+    public RetrievalResult retrieve(String question, Long knowledgeBaseId, Integer topK,
+                                     Double similarityThreshold, Boolean enableRerank, List<Message> history, Map<String, String> requiredFilters) {
         boolean complexQuery = isComplexQuery(question);
         int finalTopK = resolveTopK(topK, complexQuery);
         int vectorTopK = Math.max(ragRetrievalProperties.getVectorTopK() <= 0 ? finalTopK
@@ -101,7 +109,10 @@ public class RetrievalOrchestrator {
         // 1. Query 改写
         long rewriteStart = System.currentTimeMillis();
         RewriteResult rewriteResult = buildRewriteResult(question, history);
-        Filter.Expression filter = buildFilterExpression(knowledgeBaseId, rewriteResult.getMetadataFilters());
+        Map<String, String> filters = new HashMap<>();
+        if (rewriteResult.getMetadataFilters() != null) filters.putAll(rewriteResult.getMetadataFilters());
+        filters.putAll(requiredFilters); // A query rewrite cannot override the course release boundary.
+        Filter.Expression filter = buildFilterExpression(knowledgeBaseId, filters);
         long rewriteCostMs = System.currentTimeMillis() - rewriteStart;
 
         // 2. 向量检索 + 关键词 BM25 检索（并行执行 + 超时保护）
@@ -140,6 +151,9 @@ public class RetrievalOrchestrator {
             log.info("[Retrieval] 触发补召回, originalHits={}, supplementHits={}, mergedHits={}",
                     originalVectorHits, supplementDocs.size(), vectorDocs.size());
         }
+
+        vectorDocs = publishedChunkFilter.filter(vectorDocs);
+        keywordDocs = publishedChunkFilter.filter(keywordDocs);
 
         // 4. 加权 RRF 融合
         long fusionStart = System.currentTimeMillis();

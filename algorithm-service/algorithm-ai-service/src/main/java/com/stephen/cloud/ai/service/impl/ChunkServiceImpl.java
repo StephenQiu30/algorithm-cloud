@@ -70,6 +70,9 @@ public class ChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, DocumentC
     @Resource
     private RagDocumentHelper ragDocumentHelper;
 
+    @Resource
+    private com.stephen.cloud.ai.knowledge.retrieval.PublishedChunkFilter publishedChunkFilter;
+
     @Override
     public LambdaQueryWrapper<DocumentChunk> getQueryWrapper(ChunkQueryRequest queryRequest) {
         LambdaQueryWrapper<DocumentChunk> queryWrapper = new LambdaQueryWrapper<>();
@@ -136,6 +139,9 @@ public class ChunkServiceImpl extends ServiceImpl<DocumentChunkMapper, DocumentC
 
         // 关键词检索
         List<Document> keywordDocs = keywordSearchService.bm25Search(query, keywordTopK, filterExpression);
+
+        vectorDocs = publishedChunkFilter.filter(vectorDocs);
+        keywordDocs = publishedChunkFilter.filter(keywordDocs);
 
         // 加权 RRF 融合
         List<Document> fusedDocs = rrfFusionService.fuse(vectorDocs, keywordDocs, finalTopK, rrfK,

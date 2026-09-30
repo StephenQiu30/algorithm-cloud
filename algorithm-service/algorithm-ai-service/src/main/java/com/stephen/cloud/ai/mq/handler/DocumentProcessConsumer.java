@@ -65,7 +65,7 @@ public class DocumentProcessConsumer implements RabbitMqHandler<DocumentProcessM
             document.setChunkCount(chunkCount);
             document.setErrorMessage(null);
             document.setProcessEndTime(new Date());
-            documentService.updateById(document);
+            // ETL commits readiness status and the active chunk inventory in one DB transaction.
             log.info("[DocumentProcessConsumer] 文档处理成功, msgId={}, documentId={}, cost={}ms",
                     msgId, documentId, System.currentTimeMillis() - start);
         } catch (Exception e) {

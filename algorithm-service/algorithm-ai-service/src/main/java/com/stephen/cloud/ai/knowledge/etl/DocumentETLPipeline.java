@@ -1,6 +1,9 @@
 package com.stephen.cloud.ai.knowledge.etl;
 
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import org.springframework.transaction.support.TransactionTemplate;
+import java.util.UUID;
 import com.stephen.cloud.ai.convert.DocumentChunkConvert;
 import com.stephen.cloud.ai.knowledge.retrieval.RagDocumentHelper;
 import com.stephen.cloud.ai.knowledge.reader.DocumentReaderFactory;
@@ -66,7 +69,10 @@ public class DocumentETLPipeline {
     private DocumentChunkMapper documentChunkMapper;
 
     @Resource
-    private VectorStoreService vectorStoreService;
+    private KeywordIndexPublisher keywordIndexPublisher;
+
+    @Resource
+    private TransactionTemplate transactionTemplate;
 
     @Resource
     private RabbitMqSender mqSender;
@@ -81,7 +87,7 @@ public class DocumentETLPipeline {
      * <p>
      * 阶段 1: 读取文档 → 阶段 2: 分片 → 阶段 3: Embedding 向量化（分批 + 重试） →
      * 阶段 4: DB 持久化 → 阶段 5: ES 关键词索引同步。
-     * 处理前会清理该文档的旧数据，保证重复调用的幂等性。
+     * 新版本先构建向量及可检索的关键词索引，再以 DB 事务切换已发布分片；构建失败保留旧版本。
      * </p>
      *
      * @param filePath      文件路径（支持 http/https/file/classpath 协议）
@@ -95,8 +101,9 @@ public class DocumentETLPipeline {
         Long documentId = parseLong(baseMetadata.get(DOCUMENT_ID));
         Long knowledgeBaseId = parseLong(baseMetadata.get(KNOWLEDGE_BASE_ID));
 
-        // 幂等性保证：清理旧的向量 + DB chunk 数据，防止分片 ID 碰撞
-        cleanupExistingChunks(documentId);
+        if (documentId == null || documentId <= 0 || knowledgeBaseId == null || knowledgeBaseId <= 0) throw new IllegalArgumentException("文档和知识库 ID 必须有效");
+        // Each build gets isolated IDs: rollback can never delete the active build's vectors.
+        baseMetadata.put("buildId", UUID.randomUUID().toString());
 
         // ---- 阶段 1: 文档读取 ----
         long readStart = System.currentTimeMillis();
@@ -119,6 +126,9 @@ public class DocumentETLPipeline {
         log.info("[ETL] 分片完成, strategy={}, chunkCount={}, fileExtension={}",
                 strategy, chunks.size(), fileExtension);
 
+        if (chunks.isEmpty()) throw new IllegalStateException("解析未产生有效分片，旧版本仍保留");
+        List<DocumentChunk> entities = buildChunkEntities(chunks, documentId, knowledgeBaseId);
+        boolean published = false;
         try {
             // ---- 阶段 3: Embedding + 向量存储 ----
             long embeddingStart = System.currentTimeMillis();
@@ -127,22 +137,34 @@ public class DocumentETLPipeline {
             }
             long embeddingCostMs = System.currentTimeMillis() - embeddingStart;
 
-            // ---- 阶段 4: DB 持久化 ----
-            long dbStart = System.currentTimeMillis();
-            batchSaveChunks(chunks, documentId, knowledgeBaseId);
-            long dbCostMs = System.currentTimeMillis() - dbStart;
-
-            // ---- 阶段 5: ES 关键词索引同步 ----
+            // ---- 阶段 4: synchronous keyword readiness (refresh=wait_for) ----
             long esStart = System.currentTimeMillis();
-            batchSyncChunksToKeywordIndex(documentId, knowledgeBaseId);
+            keywordIndexPublisher.publish(entities);
             long esCostMs = System.currentTimeMillis() - esStart;
+
+            // ---- 阶段 5: atomic active-build switch. Retrieval checks this DB inventory. ----
+            long dbStart = System.currentTimeMillis();
+            List<DocumentChunk> old = transactionTemplate.execute(status -> {
+                if (documentChunkMapper.lockDocument(documentId, knowledgeBaseId, toStr(baseMetadata.get(VERSION)), filePath) == null) throw new IllegalStateException("文档已删除或源版本已变化，取消旧构建发布");
+                List<DocumentChunk> previous = documentChunkMapper.selectList(new LambdaQueryWrapper<DocumentChunk>().eq(DocumentChunk::getDocumentId, documentId));
+                documentChunkMapper.delete(new LambdaQueryWrapper<DocumentChunk>().eq(DocumentChunk::getDocumentId, documentId));
+                batchSaveChunks(entities);
+                if (documentChunkMapper.markDocumentPublished(documentId, chunks.size()) != 1) throw new IllegalStateException("文档发布状态更新失败");
+                return previous == null ? List.<DocumentChunk>of() : previous;
+            });
+            published = true;
+            long dbCostMs = System.currentTimeMillis() - dbStart;
+            cleanupRetiredChunks(old);
 
             long totalCostMs = System.currentTimeMillis() - pipelineStart;
             log.info("[ETL] 管道完成, documentId={}, chunks={}, totalCost={}ms | read={}ms, split={}ms, embedding={}ms, db={}ms, es={}ms",
                     documentId, chunks.size(), totalCostMs,
                     readCostMs, splitCostMs, embeddingCostMs, dbCostMs, esCostMs);
         } catch (Exception e) {
-            rollbackVectorStore(chunks, documentId, e);
+            if (!published) {
+                rollbackVectorStore(chunks, documentId, e);
+                try {keywordIndexPublisher.delete(entities);} catch (Exception cleanupError) {log.warn("未发布关键词残留会由已发布分片过滤隔离", cleanupError);}
+            }
             throw e;
         }
 
@@ -153,7 +175,7 @@ public class DocumentETLPipeline {
      * 分批写入向量存储，避免大文档一次性 Embedding 超时或触发 Token 限制。
      * <p>
      * 每批 {@code EMBEDDING_BATCH_SIZE} 个 chunks，失败则重试一次；
-     * 单批持续失败仅记录错误，不中断已成功的批次。
+     * 单批持续失败中止构建并回滚本次构建，旧版本保留。
      * </p>
      */
     private static final int EMBEDDING_BATCH_SIZE = 20;
@@ -197,25 +219,13 @@ public class DocumentETLPipeline {
         }
     }
 
-    /**
-     * 幂等性清理：删除文档关联的旧向量数据和 DB chunk 记录
-     */
-    private void cleanupExistingChunks(Long documentId) {
-        if (documentId == null || documentId <= 0) {
-            return;
-        }
+    private void cleanupRetiredChunks(List<DocumentChunk> retired) {
+        if (retired == null || retired.isEmpty()) return;
         try {
-            // 清理向量存储中的旧数据
-            vectorStoreService.deleteByDocumentId(documentId);
-            // 清理 DB 中的旧 chunk 记录
-            int deleted = documentChunkMapper.delete(
-                    new LambdaQueryWrapper<DocumentChunk>().eq(DocumentChunk::getDocumentId, documentId));
-            if (deleted > 0) {
-                log.info("[ETL] 清理旧分片数据, documentId={}, deletedCount={}", documentId, deleted);
-            }
-        } catch (Exception e) {
-            log.warn("[ETL] 清理旧分片数据失败, documentId={}, error={}", documentId, e.getMessage());
-        }
+            List<String> ids = retired.stream().map(DocumentChunk::getVectorId).filter(StringUtils::isNotBlank).toList();
+            if (!ids.isEmpty()) vectorStore.delete(ids);
+            keywordIndexPublisher.delete(retired);
+        } catch (Exception e) {log.warn("旧索引清理失败；检索按 DB 已发布分片过滤，不会使用旧版本", e);}
     }
 
     private List<Document> assignStableChunkIds(List<Document> chunks, Map<String, Object> baseMetadata) {
@@ -226,7 +236,7 @@ public class DocumentETLPipeline {
             Map<String, Object> chunkMetadata = new LinkedHashMap<>(baseMetadata);
             chunkMetadata.putAll(chunk.getMetadata());
             chunkMetadata.put(CHUNK_INDEX, i);
-            String chunkId = buildChunkId(documentId, i);
+            String chunkId = buildChunkId(documentId, i) + "_" + baseMetadata.get("buildId");
             chunkMetadata.put(CHUNK_ID, chunkId);
             chunkMetadata.put(VECTOR_ID, chunkId);
             normalizedChunks.add(new Document(chunkId, chunk.getText(), chunkMetadata));
@@ -256,12 +266,15 @@ public class DocumentETLPipeline {
     /**
      * 批量持久化分片
      */
-    private void batchSaveChunks(List<Document> chunks, Long documentId, Long knowledgeBaseId) {
+    private List<DocumentChunk> buildChunkEntities(List<Document> chunks, Long documentId, Long knowledgeBaseId) {
         List<DocumentChunk> chunkEntities = new ArrayList<>(chunks.size());
         for (int i = 0; i < chunks.size(); i++) {
             Document chunk = chunks.get(i);
             Map<String, Object> meta = chunk.getMetadata();
             DocumentChunk entity = new DocumentChunk();
+            entity.setId(IdWorker.getId());
+            entity.setIsDelete(0);
+            entity.setMetadataJson(JSONUtil.toJsonStr(meta));
             entity.setDocumentId(documentId);
             entity.setKnowledgeBaseId(knowledgeBaseId);
             entity.setChunkIndex(i);
@@ -276,57 +289,20 @@ public class DocumentETLPipeline {
             entity.setSectionPath(toStr(meta.get(SECTION_PATH)));
             chunkEntities.add(entity);
         }
-        // 批量插入（MyBatis-Plus 的 insert 逐条，这里分批次减少事务压力）
+        return chunkEntities;
+    }
+
+    private void batchSaveChunks(List<DocumentChunk> chunkEntities) {
         int batchSize = 100;
         for (int i = 0; i < chunkEntities.size(); i += batchSize) {
             int end = Math.min(i + batchSize, chunkEntities.size());
             List<DocumentChunk> batch = chunkEntities.subList(i, end);
-            documentChunkMapper.batchInsert(batch);
+            if (documentChunkMapper.batchInsert(batch) != batch.size()) throw new IllegalStateException("分片持久化数量不匹配");
         }
     }
 
     private String toStr(Object value) {
         return value == null ? null : String.valueOf(value);
-    }
-
-    /**
-     * 批量同步 chunk 到 ES 关键词索引（替代逐条 MQ 发送）
-     */
-    private void batchSyncChunksToKeywordIndex(Long documentId, Long knowledgeBaseId) {
-        if (documentId == null || documentId <= 0) {
-            return;
-        }
-        try {
-            LambdaQueryWrapper<DocumentChunk> qw = new LambdaQueryWrapper<>();
-            qw.eq(DocumentChunk::getDocumentId, documentId)
-                    .eq(knowledgeBaseId != null && knowledgeBaseId > 0, DocumentChunk::getKnowledgeBaseId, knowledgeBaseId)
-                    .eq(DocumentChunk::getIsDelete, 0)
-                    .orderByAsc(DocumentChunk::getChunkIndex);
-            List<DocumentChunk> chunks = documentChunkMapper.selectList(qw);
-            if (chunks == null || chunks.isEmpty()) {
-                return;
-            }
-
-            // 批量构建 ES DTO 并一次性发送
-            List<ChunkEsDTO> esDTOList = chunks.stream()
-                    .map(DocumentChunkConvert::objToEsDTO)
-                    .collect(Collectors.toList());
-
-            EsSyncBatchMessage batchMessage = new EsSyncBatchMessage();
-            batchMessage.setDataType(EsSyncDataTypeEnum.CHUNK.getValue());
-            batchMessage.setOperation("upsert");
-            batchMessage.setDataContentList(esDTOList.stream()
-                    .map(JSONUtil::toJsonStr)
-                    .collect(Collectors.toList()));
-            batchMessage.setTimestamp(System.currentTimeMillis());
-
-            mqSender.send(MqBizTypeEnum.ES_SYNC_BATCH, batchMessage);
-            log.info("[ETL] 批量 ES 同步消息已发送, documentId={}, chunkCount={}", documentId, chunks.size());
-        } catch (Exception e) {
-            // ES 同步失败不影响主流程，但必须记录错误以便后续对账
-            log.error("[ETL] chunk 关键词索引批量同步失败, documentId={}, 需要人工对账, error={}",
-                    documentId, e.getMessage(), e);
-        }
     }
 
     private void rollbackVectorStore(List<Document> chunks, Long documentId, Exception cause) {

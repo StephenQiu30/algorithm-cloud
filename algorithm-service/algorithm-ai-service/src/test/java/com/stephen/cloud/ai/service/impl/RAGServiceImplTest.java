@@ -111,6 +111,8 @@ class RAGServiceImplTest {
                 .map(RAGStreamEventVO::getFallbackReason))
                 .contains(WebSearchFallbackDecision.EMPTY_RECALL);
 
+        assertThat(events.stream().map(ServerSentEvent::data).filter(data -> data != null && "done".equals(data.getType())).allMatch(data -> data.getSources() == null || data.getSources().isEmpty())).isTrue();
+
         ArgumentCaptor<RAGHistory> historyCaptor = ArgumentCaptor.forClass(RAGHistory.class);
         verify(ragHistoryMapper).insert(historyCaptor.capture());
         assertThat(historyCaptor.getValue().getRetrievalStrategy())
@@ -191,6 +193,17 @@ class RAGServiceImplTest {
 
     private RagWebSearchFallbackDecider getDeciderMock() throws Exception {
         return (RagWebSearchFallbackDecider) getField("ragWebSearchFallbackDecider");
+    }
+
+    @Test
+    void pageContextMustConstrainRetrievalAndNamespaceActualMemory() throws Exception {
+        RetrievalResult result = new RetrievalResult();result.setDocs(List.of());result.setRetrievalMeta("{}");
+        when(retrievalOrchestrator.retrieve(anyString(), eq(2002L), eq(5), isNull(), isNull(), anyList(), anyMap())).thenReturn(result);
+        when(getDeciderMock().decide(eq(result), eq(false))).thenReturn(new WebSearchFallbackDecision(false, WebSearchFallbackDecision.EMPTY_RECALL, 0, null, null));
+        ragService.askEventStream("为什么？", 2002L, 1001L, 5, "chosen-client-id", false,
+                Map.of("algorithmId", "merge", "courseVersion", "sorting-123456abcdef", "originalArray", List.of(3,1,2), "currentArray", List.of(1,3,2))).collectList().block();
+        verify(retrievalOrchestrator).retrieve(eq("merge sorting 排序算法：为什么？"), eq(2002L), eq(5), isNull(), isNull(), anyList(), eq(Map.of("version", "sorting-123456abcdef", "bizTag", "sorting:merge")));
+        verify(chatMemory).get(eq(com.stephen.cloud.ai.knowledge.retrieval.RagConversationScope.resolve("chosen-client-id",2002L,1001L)));
     }
 
     private void setField(String fieldName, Object value) throws Exception {

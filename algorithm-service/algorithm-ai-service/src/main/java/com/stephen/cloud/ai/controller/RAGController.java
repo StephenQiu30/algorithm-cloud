@@ -17,6 +17,7 @@ import com.stephen.cloud.common.log.annotation.OperationLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -52,10 +53,10 @@ public class RAGController {
     @PostMapping(value = "/ask/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "RAG流式问答", description = "基于知识库进行问答，支持流式输出答案")
     @OperationLog(module = "RAG问答", action = "RAG流式问答")
-    public Flux<String> askStream(@RequestBody RAGAskRequest askRequest) {
+    public Flux<String> askStream(@Valid @RequestBody RAGAskRequest askRequest) {
         Long userId = SecurityUtils.getLoginUserId();
         return ragService.askStream(askRequest.getQuestion(), askRequest.getKnowledgeBaseId(), userId,
-                askRequest.getTopK(), askRequest.getConversationId(), askRequest.getEnableWebSearchFallback());
+                askRequest.getTopK(), askRequest.getConversationId(), askRequest.getEnableWebSearchFallback(), askRequest.getTeachingContext());
     }
 
     /**
@@ -70,10 +71,10 @@ public class RAGController {
     @PostMapping(value = "/ask/stream/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "RAG结构化流式问答", description = "基于知识库进行问答，返回带阶段信息的 SSE 事件流")
     @OperationLog(module = "RAG问答", action = "RAG结构化流式问答")
-    public Flux<ServerSentEvent<RAGStreamEventVO>> askEventStream(@RequestBody RAGAskRequest askRequest) {
+    public Flux<ServerSentEvent<RAGStreamEventVO>> askEventStream(@Valid @RequestBody RAGAskRequest askRequest) {
         Long userId = SecurityUtils.getLoginUserId();
         return ragService.askEventStream(askRequest.getQuestion(), askRequest.getKnowledgeBaseId(), userId,
-                askRequest.getTopK(), askRequest.getConversationId(), askRequest.getEnableWebSearchFallback());
+                askRequest.getTopK(), askRequest.getConversationId(), askRequest.getEnableWebSearchFallback(), askRequest.getTeachingContext());
     }
 
     /**

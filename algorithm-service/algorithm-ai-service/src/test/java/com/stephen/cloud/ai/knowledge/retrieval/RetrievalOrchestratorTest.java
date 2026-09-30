@@ -25,7 +25,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("RAG 检索编排器集成测试")
+@DisplayName("RAG 检索编排器受控单元测试")
 class RetrievalOrchestratorTest {
 
     @Mock
@@ -52,11 +52,14 @@ class RetrievalOrchestratorTest {
     @Mock
     private Executor aiAsyncExecutor;
 
+    @Mock private PublishedChunkFilter publishedChunkFilter;
+
     @InjectMocks
     private RetrievalOrchestrator orchestrator;
 
     @BeforeEach
     void setUp() {
+        lenient().when(publishedChunkFilter.filter(anyList())).thenAnswer(i -> i.getArgument(0));
         // 模拟默认配置
         lenient().when(ragRetrievalProperties.getTopK()).thenReturn(5);
         lenient().when(ragRetrievalProperties.getVectorWeight()).thenReturn(0.7);

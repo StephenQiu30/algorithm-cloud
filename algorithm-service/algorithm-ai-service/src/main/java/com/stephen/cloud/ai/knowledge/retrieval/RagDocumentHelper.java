@@ -144,6 +144,7 @@ public class RagDocumentHelper {
         hit.setChunkIndex(toInteger(meta.get(CHUNK_INDEX)));
         hit.setSectionTitle(toStr(meta.get(SECTION_TITLE)));
         hit.setSectionPath(toStr(meta.get(SECTION_PATH)));
+        hit.setVersion(toStr(meta.get(VERSION)));
         hit.setContent(doc.getText());
         hit.setVectorScore(resolveVectorScore(doc));
         hit.setKeywordScore(resolveKeywordScore(doc));
